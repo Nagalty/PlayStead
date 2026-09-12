@@ -1,0 +1,12 @@
+namespace PlayStead.Core.Library;
+
+public sealed record GameInstallation(
+    InstallationId Id,
+    GameId GameId,
+    ProviderKind Provider,
+    string ExternalId,
+    string InstallPath,
+    long? InstalledSizeBytes,
+    bool IsPreferred,
+    bool IsPresent,
+    DateTimeOffset LastSeenUtc);

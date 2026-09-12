@@ -1,0 +1,72 @@
+<Window x:Class="PlayStead.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:library="clr-namespace:PlayStead.UI.Library"
+        Title="PlayStead"
+        Width="1280"
+        Height="800"
+        MinWidth="960"
+        MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="#111316"
+        Foreground="#F3F3F3">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="72" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="#171A1F"
+                BorderBrush="#2A2E34"
+                BorderThickness="0,0,0,1">
+            <Grid Margin="28,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="48" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="32" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="PlaySteadWordmark"
+                           Grid.Column="0"
+                           Text="PlayStead"
+                           VerticalAlignment="Center"
+                           FontSize="24"
+                           FontWeight="SemiBold"
+                           Foreground="#F5F5F5" />
+
+                <TextBlock x:Name="HomeNavText"
+                           Grid.Column="2"
+                           Text="Accueil"
+                           VerticalAlignment="Center"
+                           FontSize="15"
+                           Foreground="#A8ADB5" />
+
+                <Grid Grid.Column="4"
+                      VerticalAlignment="Stretch">
+                    <TextBlock x:Name="LibraryNavText"
+                               Text="Bibliothèque"
+                               VerticalAlignment="Center"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="#C9824B" />
+
+                    <Border Height="2"
+                            VerticalAlignment="Bottom"
+                            Background="#C9824B"
+                            CornerRadius="1" />
+                </Grid>
+            </Grid>
+        </Border>
+
+        <ContentControl x:Name="MainContent"
+                        Grid.Row="1">
+            <library:LibraryView
+                RescanRequested="LibraryView_OnRescanRequested" />
+        </ContentControl>
+    </Grid>
+</Window>

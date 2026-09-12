@@ -1,0 +1,88 @@
+using PlayStead.Core.Library;
+using PlayStead.Core.Persistence;
+using PlayStead.Core.Scanning;
+using PlayStead.Data.Database;
+using PlayStead.Data.Library;
+using PlayStead.UI.Bootstrap;
+
+namespace PlayStead.UI.Tests.Bootstrap;
+
+public sealed class LocalStartupPipelineTests : IDisposable
+{
+    private readonly string _root = Path.Combine(
+        Path.GetTempPath(),
+        "PlayStead.Tests",
+        Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public async Task Initialize_then_refresh_exposes_cached_snapshot_before_applying_local_scan()
+    {
+        Directory.CreateDirectory(_root);
+
+        var options = new DatabaseOptions(
+            Path.Combine(_root, "playstead.db"),
+            Path.Combine(_root, "Backups"));
+
+        ILibraryStore store = new SqliteLibraryStore(options);
+
+        var observed = new DateTimeOffset(
+            2026, 9, 12, 9, 0, 0, TimeSpan.Zero);
+
+        var source = new StubSource(
+            SourceScanResult.Success(
+                ProviderKind.Steam,
+                observed,
+                [
+                    DiscoveredInstallation.Create(
+                        ProviderKind.Steam,
+                        "730",
+                        "Counter-Strike 2",
+                        @"G:\SteamLibrary\steamapps\common\Counter-Strike Global Offensive",
+                        42_000_000_000,
+                        observed)
+                ]));
+
+        var sut = new LocalStartupPipeline(
+            new DatabaseInitializer(options),
+            new DatabaseHealthChecker(options),
+            store,
+            new LocalScanCoordinator([source]));
+
+        var initial = await sut.InitializeAsync(
+            CancellationToken.None);
+
+        Assert.True(initial.Health.IsHealthy);
+        Assert.Empty(initial.Snapshot.Games);
+        Assert.Empty(initial.Snapshot.Installations);
+
+        var refreshed = await sut.RefreshAsync(
+            CancellationToken.None);
+
+        var game = Assert.Single(refreshed.Games);
+        var installation = Assert.Single(refreshed.Installations);
+
+        Assert.Equal("Counter-Strike 2", game.Title);
+        Assert.Equal(game.Id, installation.GameId);
+        Assert.True(installation.IsPresent);
+    }
+
+    private sealed class StubSource(
+        SourceScanResult result) : ILocalLibrarySource
+    {
+        public ProviderKind Provider => result.Provider;
+
+        public Task<SourceScanResult> ScanAsync(
+            CancellationToken cancellationToken) =>
+            Task.FromResult(result);
+    }
+
+    public void Dispose()
+    {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+        if (Directory.Exists(_root))
+        {
+            Directory.Delete(_root, recursive: true);
+        }
+    }
+}
