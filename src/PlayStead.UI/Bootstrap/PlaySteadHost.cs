@@ -1,15 +1,20 @@
-﻿using System.IO;
+using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
+using PlayStead.Core.Steam;
 using PlayStead.Data.Database;
 using PlayStead.Data.Library;
+using PlayStead.Data.Steam;
 using PlayStead.Platform.Paths;
 using PlayStead.Providers.Steam;
+using PlayStead.Providers.Steam.Evidence;
+using PlayStead.Providers.Steam.Remote;
 using PlayStead.UI.Library;
 using PlayStead.UI.SingleInstance;
 using PlayStead.UI.State;
+using PlayStead.UI.Steam;
 
 namespace PlayStead.UI.Bootstrap;
 
@@ -19,7 +24,8 @@ public static class PlaySteadHost
     {
         ArgumentNullException.ThrowIfNull(layout);
 
-        var builder = Host.CreateApplicationBuilder();
+        var builder =
+            Host.CreateApplicationBuilder();
 
         builder.Services.AddSingleton(
             new DatabaseOptions(
@@ -29,29 +35,101 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<DatabaseInitializer>();
         builder.Services.AddSingleton<DatabaseHealthChecker>();
 
-        builder.Services.AddSingleton<ILibraryStore, SqliteLibraryStore>();
+        builder.Services.AddSingleton<
+            ILibraryStore,
+            SqliteLibraryStore>();
+
+        builder.Services.AddSingleton<
+            ISteamEvidenceStore,
+            SqliteSteamEvidenceStore>();
 
         builder.Services.AddSingleton<WindowsSteamRootLocator>(
             _ => new WindowsSteamRootLocator());
-        builder.Services.AddSingleton<SteamLibraryFoldersReader>();
-        builder.Services.AddSingleton<SteamAppManifestReader>();
-        builder.Services.AddSingleton<ILocalLibrarySource, SteamLocalLibrarySource>();
 
-        builder.Services.AddSingleton<LocalScanCoordinator>();
-        builder.Services.AddSingleton<LocalStartupPipeline>();
-        builder.Services.AddSingleton<ApplicationRuntime>();
+        builder.Services.AddSingleton<
+            SteamLibraryFoldersReader>();
+
+        builder.Services.AddSingleton<
+            SteamAppManifestReader>();
+
+        builder.Services.AddSingleton<
+            ILocalLibrarySource,
+            SteamLocalLibrarySource>();
+
+        builder.Services.AddSingleton<
+            SteamLocalEvidenceReader>();
+
+        builder.Services.AddSingleton<
+            ISteamLocalEvidenceSource,
+            SteamLocalEvidenceSource>();
+
+        builder.Services.AddSingleton<
+            SteamUpdateStateEvaluator>();
+
+        builder.Services.AddSingleton<TimeProvider>(
+            TimeProvider.System);
+
+        builder.Services.AddSingleton(
+            SteamCmdOptions.Default);
+
+        builder.Services.AddSingleton<
+            SteamCmdPathResolver>();
+
+        builder.Services.AddSingleton<
+            ISteamCmdProcessInvoker,
+            SystemSteamCmdProcessInvoker>();
+
+        builder.Services.AddSingleton<
+            ISteamCmdRunner,
+            SteamCmdRunner>();
+
+        builder.Services.AddSingleton<
+            ISteamCmdAppInfoParser,
+            SteamCmdAppInfoParser>();
+
+        builder.Services.AddSingleton<
+            ISteamRemoteEvidenceProvider,
+            SteamRemoteEvidenceProvider>();
+
+        builder.Services.AddSingleton<
+            SteamRemoteEvidenceFreshnessPolicy>();
+
+        builder.Services.AddSingleton<
+            SteamRemoteRefreshCoordinator>();
+
+        builder.Services.AddSingleton<
+            ISteamReferenceRuntime,
+            SteamReferenceRuntime>();
+
+        builder.Services.AddSingleton<
+            LocalScanCoordinator>();
+
+        builder.Services.AddSingleton<
+            LocalStartupPipeline>();
+
+        builder.Services.AddSingleton<
+            ApplicationRuntime>();
 
         builder.Services.AddSingleton(
             new WindowPlacementService(
                 Path.Combine(
-                    Path.GetDirectoryName(layout.DatabasePath)!,
+                    Path.GetDirectoryName(
+                        layout.DatabasePath)!,
                     "window-placement.json")));
 
-        builder.Services.AddSingleton<LibraryViewModel>();
-        builder.Services.AddSingleton<MainWindow>();
+        builder.Services.AddSingleton<
+            LibraryViewModel>();
 
-        builder.Services.AddSingleton<IWindowActivator, MainWindowActivator>();
-        builder.Services.AddSingleton<IAppInvocationHandler, AppInvocationHandler>();
+        builder.Services.AddSingleton<
+            MainWindow>();
+
+        builder.Services.AddSingleton<
+            IWindowActivator,
+            MainWindowActivator>();
+
+        builder.Services.AddSingleton<
+            IAppInvocationHandler,
+            AppInvocationHandler>();
 
         return builder.Build();
     }
