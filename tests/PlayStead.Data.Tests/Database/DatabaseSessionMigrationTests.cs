@@ -3,7 +3,7 @@ using PlayStead.Data.Database;
 
 namespace PlayStead.Data.Tests.Database;
 
-public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
+public sealed class DatabaseSessionMigrationTests : IDisposable
 {
     private readonly string _root = Path.Combine(
         Path.GetTempPath(),
@@ -11,7 +11,7 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task Initialize_fresh_database_keeps_Steam_evidence_tables_in_current_schema()
+    public async Task Initialize_fresh_database_creates_schema_v3_with_session_and_signature_tables()
     {
         Directory.CreateDirectory(_root);
 
@@ -34,10 +34,10 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
         versionCommand.CommandText =
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
-        var version = Convert.ToInt32(
-            await versionCommand.ExecuteScalarAsync());
-
-        Assert.Equal(3, version);
+        Assert.Equal(
+            3,
+            Convert.ToInt32(
+                await versionCommand.ExecuteScalarAsync()));
 
         var tablesCommand = connection.CreateCommand();
         tablesCommand.CommandText = """
@@ -45,26 +45,32 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
             FROM sqlite_master
             WHERE type = 'table'
               AND name IN (
-                  'steam_local_evidence',
-                  'steam_remote_evidence'
+                  'game_sessions',
+                  'process_signatures',
+                  'process_signature_entries'
               );
             """;
 
-        var tableCount = Convert.ToInt32(
-            await tablesCommand.ExecuteScalarAsync());
-
-        Assert.Equal(2, tableCount);
+        Assert.Equal(
+            3,
+            Convert.ToInt32(
+                await tablesCommand.ExecuteScalarAsync()));
     }
 
     [Fact]
-    public async Task Initialize_upgrades_existing_v1_database_to_current_schema_without_losing_existing_data()
+    public async Task Initialize_upgrades_existing_v2_database_to_v3_without_losing_games()
     {
         Directory.CreateDirectory(_root);
 
         var databasePath = Path.Combine(_root, "playstead.db");
         var backupsDirectory = Path.Combine(_root, "Backups");
 
-        await CreateV1DatabaseAsync(databasePath);
+        var gameId = Guid.Parse(
+            "55555555-5555-5555-5555-555555555555");
+
+        await CreateV2DatabaseAsync(
+            databasePath,
+            gameId);
 
         var sut = new DatabaseInitializer(
             new DatabaseOptions(
@@ -82,19 +88,22 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
         versionCommand.CommandText =
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
-        var version = Convert.ToInt32(
-            await versionCommand.ExecuteScalarAsync());
-
-        Assert.Equal(3, version);
+        Assert.Equal(
+            3,
+            Convert.ToInt32(
+                await versionCommand.ExecuteScalarAsync()));
 
         var titleCommand = connection.CreateCommand();
         titleCommand.CommandText =
-            "SELECT title FROM games WHERE game_id = 'game-1';";
+            "SELECT title FROM games WHERE game_id = $gameId;";
+        titleCommand.Parameters.AddWithValue(
+            "$gameId",
+            gameId.ToString());
 
-        var title = Convert.ToString(
-            await titleCommand.ExecuteScalarAsync());
-
-        Assert.Equal("Existing Game", title);
+        Assert.Equal(
+            "Preserved Game",
+            Convert.ToString(
+                await titleCommand.ExecuteScalarAsync()));
 
         var tablesCommand = connection.CreateCommand();
         tablesCommand.CommandText = """
@@ -102,19 +111,21 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
             FROM sqlite_master
             WHERE type = 'table'
               AND name IN (
-                  'steam_local_evidence',
-                  'steam_remote_evidence'
+                  'game_sessions',
+                  'process_signatures',
+                  'process_signature_entries'
               );
             """;
 
-        var tableCount = Convert.ToInt32(
-            await tablesCommand.ExecuteScalarAsync());
-
-        Assert.Equal(2, tableCount);
+        Assert.Equal(
+            3,
+            Convert.ToInt32(
+                await tablesCommand.ExecuteScalarAsync()));
     }
 
-    private static async Task CreateV1DatabaseAsync(
-        string databasePath)
+    private static async Task CreateV2DatabaseAsync(
+        string databasePath,
+        Guid gameId)
     {
         await using var connection = new SqliteConnection(
             $"Data Source={databasePath};Pooling=False");
@@ -129,7 +140,9 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
             );
 
             INSERT INTO schema_migrations(version, applied_utc)
-            VALUES (1, '2026-09-12T00:00:00.0000000+00:00');
+            VALUES
+                (1, '2026-09-12T00:00:00.0000000+00:00'),
+                (2, '2026-09-12T01:00:00.0000000+00:00');
 
             CREATE TABLE games (
                 game_id TEXT PRIMARY KEY,
@@ -146,13 +159,17 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
                 created_utc,
                 updated_utc)
             VALUES (
-                'game-1',
-                'Existing Game',
+                $gameId,
+                'Preserved Game',
                 0,
                 '2026-09-12T00:00:00.0000000+00:00',
                 '2026-09-12T00:00:00.0000000+00:00'
             );
             """;
+
+        command.Parameters.AddWithValue(
+            "$gameId",
+            gameId.ToString());
 
         await command.ExecuteNonQueryAsync();
     }
