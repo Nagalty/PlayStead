@@ -1,0 +1,16 @@
+"AppState"
+{
+    "appid" "730"
+    "buildid" "100"
+    "InstalledDepots"
+    {
+        "731"
+        {
+            "manifest" "111"
+        }
+        "732"
+        {
+            "manifest" "222"
+        }
+    }
+}

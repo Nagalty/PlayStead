@@ -1,0 +1,16 @@
+"AppState"
+{
+    "appid" "550"
+    "buildid" "250"
+    "UserConfig"
+    {
+        "BetaKey" ""
+    }
+    "InstalledDepots"
+    {
+        "551"
+        {
+            "manifest" "444"
+        }
+    }
+}
