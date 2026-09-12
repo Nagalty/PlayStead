@@ -1,0 +1,123 @@
+name: Windows CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  release-gate:
+    name: Release Gate
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore PlayStead.sln
+
+      - name: Build Release
+        shell: pwsh
+        run: dotnet build PlayStead.sln --configuration Release --no-restore /warnaserror
+
+      - name: Test Release
+        shell: pwsh
+        run: dotnet test PlayStead.sln --configuration Release --no-build --logger "trx" --results-directory "TestResults"
+
+      - name: Verify test baseline
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          $MinimumExpectedTests = 89
+
+          $trxFiles = @(
+              Get-ChildItem -LiteralPath "TestResults" -Recurse -Filter *.trx -File |
+                  Sort-Object FullName
+          )
+
+          if ($trxFiles.Count -eq 0) {
+              throw "No TRX files were produced."
+          }
+
+          $totalCount = 0
+          $passedCount = 0
+          $failedCount = 0
+          $notExecutedCount = 0
+          $errorCount = 0
+          $timeoutCount = 0
+          $abortedCount = 0
+          $inconclusiveCount = 0
+          $notRunnableCount = 0
+
+          foreach ($trx in $trxFiles) {
+              [xml]$xml = Get-Content -LiteralPath $trx.FullName -Raw
+              $counters = $xml.TestRun.ResultSummary.Counters
+
+              if ($null -eq $counters) {
+                  throw "TRX counters missing: $($trx.FullName)"
+              }
+
+              $totalCount += [int]$counters.total
+              $passedCount += [int]$counters.passed
+              $failedCount += [int]$counters.failed
+              $notExecutedCount += [int]$counters.notExecuted
+              $errorCount += [int]$counters.error
+              $timeoutCount += [int]$counters.timeout
+              $abortedCount += [int]$counters.aborted
+              $inconclusiveCount += [int]$counters.inconclusive
+              $notRunnableCount += [int]$counters.notRunnable
+          }
+
+          Write-Host "TRX files: $($trxFiles.Count)"
+          Write-Host "Total: $totalCount"
+          Write-Host "Passed: $passedCount"
+          Write-Host "Failed: $failedCount"
+          Write-Host "Not executed: $notExecutedCount"
+
+          if ($totalCount -lt $MinimumExpectedTests) {
+              throw "Test baseline regression: $totalCount < $MinimumExpectedTests"
+          }
+
+          if ($failedCount -ne 0) {
+              throw "Failed tests: $failedCount"
+          }
+
+          if ($notExecutedCount -ne 0) {
+              throw "Skipped/not-executed tests: $notExecutedCount"
+          }
+
+          if (
+              $errorCount -ne 0 -or
+              $timeoutCount -ne 0 -or
+              $abortedCount -ne 0 -or
+              $inconclusiveCount -ne 0 -or
+              $notRunnableCount -ne 0
+          ) {
+              throw "TRX contains non-clean result counters."
+          }
+
+          if ($passedCount -ne $totalCount) {
+              throw "TRX mismatch: passed=$passedCount total=$totalCount"
+          }
+
+          Write-Host "PlayStead CI test gate PASS: $passedCount/$totalCount"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playstead-test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
+          retention-days: 14
