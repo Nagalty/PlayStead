@@ -39,7 +39,7 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = "Stop"
-          $MinimumExpectedTests = 89
+          $MinimumExpectedTests = 186
 
           $trxFiles = @(
               Get-ChildItem -LiteralPath "TestResults" -Recurse -Filter *.trx -File |
