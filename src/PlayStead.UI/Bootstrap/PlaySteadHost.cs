@@ -3,15 +3,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
+using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
 using PlayStead.Data.Database;
 using PlayStead.Data.Library;
+using PlayStead.Data.Sessions;
 using PlayStead.Data.Steam;
 using PlayStead.Platform.Paths;
+using PlayStead.Platform.Processes;
 using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Evidence;
 using PlayStead.Providers.Steam.Remote;
 using PlayStead.UI.Library;
+using PlayStead.UI.Sessions;
 using PlayStead.UI.SingleInstance;
 using PlayStead.UI.State;
 using PlayStead.UI.Steam;
@@ -42,6 +46,39 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             ISteamEvidenceStore,
             SqliteSteamEvidenceStore>();
+
+        builder.Services.AddSingleton<
+            IProcessSignatureStore,
+            SqliteProcessSignatureStore>();
+
+        builder.Services.AddSingleton<
+            ISessionStore,
+            SqliteSessionStore>();
+
+        builder.Services.AddSingleton<
+            IProcessSnapshotSource,
+            WindowsProcessSnapshotSource>();
+
+        builder.Services.AddSingleton<
+            ProcessSignatureMatcher>();
+
+        builder.Services.AddSingleton<
+            SessionTransitionPolicy>();
+
+        builder.Services.AddSingleton<
+            ISessionRuntime,
+            SessionRuntime>();
+
+        builder.Services.AddSingleton(
+            SessionMonitorOptions.Default);
+
+        builder.Services.AddSingleton<
+            SessionMonitor>();
+
+        builder.Services.AddSingleton<IHostedService>(
+            services =>
+                services.GetRequiredService<
+                    SessionMonitor>());
 
         builder.Services.AddSingleton<WindowsSteamRootLocator>(
             _ => new WindowsSteamRootLocator());
