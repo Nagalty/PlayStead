@@ -11,7 +11,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task Initialize_fresh_database_creates_schema_v3_with_session_and_signature_tables()
+    public async Task Initialize_fresh_database_keeps_session_and_signature_tables_in_current_schema()
     {
         Directory.CreateDirectory(_root);
 
@@ -35,7 +35,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            3,
+            4,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
@@ -58,7 +58,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
     }
 
     [Fact]
-    public async Task Initialize_upgrades_existing_v2_database_to_v3_without_losing_games()
+    public async Task Initialize_upgrades_existing_v2_database_to_current_schema_without_losing_games()
     {
         Directory.CreateDirectory(_root);
 
@@ -89,7 +89,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            3,
+            4,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 

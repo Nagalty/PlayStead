@@ -4,14 +4,15 @@ namespace PlayStead.Data.Database;
 
 public sealed class DatabaseInitializer
 {
-    private const int TargetVersion = 3;
+    private const int TargetVersion = 4;
 
     private static readonly IReadOnlyDictionary<int, string> MigrationFiles =
         new Dictionary<int, string>
         {
             [1] = "001_initial.sql",
             [2] = "002_steam_evidence.sql",
-            [3] = "003_sessions.sql"
+            [3] = "003_sessions.sql",
+            [4] = "004_session_corrections.sql"
         };
 
     private readonly DatabaseOptions _options;
