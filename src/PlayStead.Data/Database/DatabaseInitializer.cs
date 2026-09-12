@@ -4,7 +4,15 @@ namespace PlayStead.Data.Database;
 
 public sealed class DatabaseInitializer
 {
-    private const int TargetVersion = 1;
+    private const int TargetVersion = 2;
+
+    private static readonly IReadOnlyDictionary<int, string> MigrationFiles =
+        new Dictionary<int, string>
+        {
+            [1] = "001_initial.sql",
+            [2] = "002_steam_evidence.sql"
+        };
+
     private readonly DatabaseOptions _options;
 
     public DatabaseInitializer(DatabaseOptions options)
@@ -15,7 +23,8 @@ public sealed class DatabaseInitializer
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         var databaseDirectory = Path.GetDirectoryName(_options.DatabasePath)
-            ?? throw new InvalidOperationException("Database path has no parent directory.");
+            ?? throw new InvalidOperationException(
+                "Database path has no parent directory.");
 
         Directory.CreateDirectory(databaseDirectory);
         Directory.CreateDirectory(_options.BackupsDirectory);
@@ -33,16 +42,39 @@ public sealed class DatabaseInitializer
             return;
         }
 
+        string? backupPath = null;
+
         if (databaseExists)
         {
-            var backupPath = Path.Combine(
+            backupPath = Path.Combine(
                 _options.BackupsDirectory,
                 $"playstead.db.pre-migration-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmssfff}.bak");
 
-            File.Copy(_options.DatabasePath, backupPath, overwrite: false);
+            File.Copy(
+                _options.DatabasePath,
+                backupPath,
+                overwrite: false);
         }
 
-        await ApplyMigrationAsync(cancellationToken);
+        try
+        {
+            await ApplyPendingMigrationsAsync(
+                currentVersion,
+                cancellationToken);
+        }
+        catch
+        {
+            if (backupPath is not null &&
+                File.Exists(backupPath))
+            {
+                File.Copy(
+                    backupPath,
+                    _options.DatabasePath,
+                    overwrite: true);
+            }
+
+            throw;
+        }
     }
 
     private async Task<int> ReadCurrentVersionAsync(
@@ -52,10 +84,14 @@ public sealed class DatabaseInitializer
             $"Data Source={_options.DatabasePath};Pooling=False");
 
         await connection.OpenAsync(cancellationToken);
-        return await GetCurrentVersionAsync(connection, cancellationToken);
+
+        return await GetCurrentVersionAsync(
+            connection,
+            cancellationToken);
     }
 
-    private async Task ApplyMigrationAsync(
+    private async Task ApplyPendingMigrationsAsync(
+        int currentVersion,
         CancellationToken cancellationToken)
     {
         await using var connection = new SqliteConnection(
@@ -63,24 +99,72 @@ public sealed class DatabaseInitializer
 
         await connection.OpenAsync(cancellationToken);
 
-        var currentVersion = await GetCurrentVersionAsync(connection, cancellationToken);
-        if (currentVersion >= TargetVersion)
+        var actualVersion = await GetCurrentVersionAsync(
+            connection,
+            cancellationToken);
+
+        if (actualVersion > currentVersion)
         {
-            return;
+            currentVersion = actualVersion;
         }
 
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        for (var version = currentVersion + 1;
+             version <= TargetVersion;
+             version++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!MigrationFiles.TryGetValue(
+                    version,
+                    out var migrationFile))
+            {
+                throw new InvalidOperationException(
+                    $"No migration file is registered for schema version {version}.");
+            }
+
+            await ApplyMigrationAsync(
+                connection,
+                version,
+                migrationFile,
+                cancellationToken);
+        }
+    }
+
+    private static async Task ApplyMigrationAsync(
+        SqliteConnection connection,
+        int version,
+        string migrationFile,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction =
+            await connection.BeginTransactionAsync(cancellationToken);
 
         var migration = connection.CreateCommand();
         migration.Transaction = (SqliteTransaction)transaction;
-        migration.CommandText = ReadEmbeddedMigration("001_initial.sql");
+        migration.CommandText =
+            ReadEmbeddedMigration(migrationFile);
+
         await migration.ExecuteNonQueryAsync(cancellationToken);
 
         var record = connection.CreateCommand();
         record.Transaction = (SqliteTransaction)transaction;
-        record.CommandText =
-            "INSERT OR IGNORE INTO schema_migrations(version, applied_utc) VALUES (1, $utc);";
-        record.Parameters.AddWithValue("$utc", DateTimeOffset.UtcNow.ToString("O"));
+        record.CommandText = """
+            INSERT INTO schema_migrations(
+                version,
+                applied_utc)
+            VALUES (
+                $version,
+                $utc);
+            """;
+
+        record.Parameters.AddWithValue(
+            "$version",
+            version);
+
+        record.Parameters.AddWithValue(
+            "$utc",
+            DateTimeOffset.UtcNow.ToString("O"));
+
         await record.ExecuteNonQueryAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
@@ -91,8 +175,12 @@ public sealed class DatabaseInitializer
         CancellationToken cancellationToken)
     {
         var exists = connection.CreateCommand();
-        exists.CommandText =
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='schema_migrations';";
+        exists.CommandText = """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name = 'schema_migrations';
+            """;
 
         var hasTable = Convert.ToInt32(
             await exists.ExecuteScalarAsync(cancellationToken)) == 1;
@@ -110,19 +198,25 @@ public sealed class DatabaseInitializer
             await command.ExecuteScalarAsync(cancellationToken));
     }
 
-    private static string ReadEmbeddedMigration(string fileName)
+    private static string ReadEmbeddedMigration(
+        string fileName)
     {
         var assembly = typeof(DatabaseInitializer).Assembly;
 
         var resourceName = assembly
             .GetManifestResourceNames()
-            .Single(name => name.EndsWith(fileName, StringComparison.Ordinal));
+            .Single(
+                name => name.EndsWith(
+                    fileName,
+                    StringComparison.Ordinal));
 
-        using var stream = assembly.GetManifestResourceStream(resourceName)
+        using var stream =
+            assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException(
                 $"Embedded migration resource '{resourceName}' was not found.");
 
         using var reader = new StreamReader(stream);
+
         return reader.ReadToEnd();
     }
 }

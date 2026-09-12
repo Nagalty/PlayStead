@@ -1,0 +1,171 @@
+using Microsoft.Data.Sqlite;
+using PlayStead.Data.Database;
+
+namespace PlayStead.Data.Tests.Database;
+
+public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
+{
+    private readonly string _root = Path.Combine(
+        Path.GetTempPath(),
+        "PlayStead.Tests",
+        Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public async Task Initialize_fresh_database_creates_schema_v2_with_Steam_evidence_tables()
+    {
+        Directory.CreateDirectory(_root);
+
+        var databasePath = Path.Combine(_root, "playstead.db");
+        var backupsDirectory = Path.Combine(_root, "Backups");
+
+        var sut = new DatabaseInitializer(
+            new DatabaseOptions(
+                databasePath,
+                backupsDirectory));
+
+        await sut.InitializeAsync(CancellationToken.None);
+
+        await using var connection = new SqliteConnection(
+            $"Data Source={databasePath};Pooling=False");
+
+        await connection.OpenAsync();
+
+        var versionCommand = connection.CreateCommand();
+        versionCommand.CommandText =
+            "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
+
+        var version = Convert.ToInt32(
+            await versionCommand.ExecuteScalarAsync());
+
+        Assert.Equal(2, version);
+
+        var tablesCommand = connection.CreateCommand();
+        tablesCommand.CommandText = """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name IN (
+                  'steam_local_evidence',
+                  'steam_remote_evidence'
+              );
+            """;
+
+        var tableCount = Convert.ToInt32(
+            await tablesCommand.ExecuteScalarAsync());
+
+        Assert.Equal(2, tableCount);
+    }
+
+    [Fact]
+    public async Task Initialize_upgrades_existing_v1_database_to_v2_without_losing_existing_data()
+    {
+        Directory.CreateDirectory(_root);
+
+        var databasePath = Path.Combine(_root, "playstead.db");
+        var backupsDirectory = Path.Combine(_root, "Backups");
+
+        await CreateV1DatabaseAsync(databasePath);
+
+        var sut = new DatabaseInitializer(
+            new DatabaseOptions(
+                databasePath,
+                backupsDirectory));
+
+        await sut.InitializeAsync(CancellationToken.None);
+
+        await using var connection = new SqliteConnection(
+            $"Data Source={databasePath};Pooling=False");
+
+        await connection.OpenAsync();
+
+        var versionCommand = connection.CreateCommand();
+        versionCommand.CommandText =
+            "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
+
+        var version = Convert.ToInt32(
+            await versionCommand.ExecuteScalarAsync());
+
+        Assert.Equal(2, version);
+
+        var titleCommand = connection.CreateCommand();
+        titleCommand.CommandText =
+            "SELECT title FROM games WHERE game_id = 'game-1';";
+
+        var title = Convert.ToString(
+            await titleCommand.ExecuteScalarAsync());
+
+        Assert.Equal("Existing Game", title);
+
+        var tablesCommand = connection.CreateCommand();
+        tablesCommand.CommandText = """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name IN (
+                  'steam_local_evidence',
+                  'steam_remote_evidence'
+              );
+            """;
+
+        var tableCount = Convert.ToInt32(
+            await tablesCommand.ExecuteScalarAsync());
+
+        Assert.Equal(2, tableCount);
+    }
+
+    private static async Task CreateV1DatabaseAsync(
+        string databasePath)
+    {
+        await using var connection = new SqliteConnection(
+            $"Data Source={databasePath};Pooling=False");
+
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_utc TEXT NOT NULL
+            );
+
+            INSERT INTO schema_migrations(version, applied_utc)
+            VALUES (1, '2026-09-12T00:00:00.0000000+00:00');
+
+            CREATE TABLE games (
+                game_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                is_hidden INTEGER NOT NULL DEFAULT 0,
+                created_utc TEXT NOT NULL,
+                updated_utc TEXT NOT NULL
+            );
+
+            INSERT INTO games(
+                game_id,
+                title,
+                is_hidden,
+                created_utc,
+                updated_utc)
+            VALUES (
+                'game-1',
+                'Existing Game',
+                0,
+                '2026-09-12T00:00:00.0000000+00:00',
+                '2026-09-12T00:00:00.0000000+00:00'
+            );
+            """;
+
+        await command.ExecuteNonQueryAsync();
+    }
+
+    public void Dispose()
+    {
+        SqliteConnection.ClearAllPools();
+
+        if (Directory.Exists(_root))
+        {
+            Directory.Delete(
+                _root,
+                recursive: true);
+        }
+    }
+}
