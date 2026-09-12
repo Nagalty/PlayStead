@@ -2,6 +2,9 @@ namespace PlayStead.Core.Sessions;
 
 public sealed class SessionRuntime : ISessionRuntime
 {
+    private static readonly TimeSpan HeartbeatPersistenceInterval =
+        TimeSpan.FromSeconds(5);
+
     private readonly IProcessSnapshotSource _processSource;
     private readonly IProcessSignatureStore _signatureStore;
     private readonly ISessionStore _sessionStore;
@@ -14,6 +17,11 @@ public sealed class SessionRuntime : ISessionRuntime
 
     private readonly Dictionary<Guid, GameSession>
         _active = [];
+
+    private readonly Dictionary<Guid, DateTimeOffset>
+        _lastPersistedAtUtc = [];
+
+    private bool _recoveryInitialized;
 
     public SessionRuntime(
         IProcessSnapshotSource processSource,
@@ -45,6 +53,10 @@ public sealed class SessionRuntime : ISessionRuntime
 
         var nowUtc =
             _timeProvider.GetUtcNow();
+
+        var recoveredThisRefresh =
+            await LoadPersistedActiveSessionsOnceAsync(
+                cancellationToken);
 
         var processes =
             await _processSource.CaptureAsync(
@@ -83,14 +95,30 @@ public sealed class SessionRuntime : ISessionRuntime
                         active,
                         nowUtc);
 
-                if (heartbeat.Session is not null)
-                {
-                    _active[signature.GameId] =
-                        heartbeat.Session;
-                }
+                var updatedActive =
+                    heartbeat.Session
+                    ?? active;
+
+                _active[signature.GameId] =
+                    updatedActive;
 
                 _pending.Remove(
                     signature.GameId);
+
+                if (heartbeat.Kind ==
+                        SessionTransitionKind.Heartbeat &&
+                    ShouldPersistHeartbeat(
+                        signature.GameId,
+                        updatedActive.LastSeenAtUtc))
+                {
+                    await _sessionStore.UpsertAsync(
+                        updatedActive,
+                        cancellationToken);
+
+                    _lastPersistedAtUtc[
+                        signature.GameId] =
+                        updatedActive.LastSeenAtUtc;
+                }
 
                 continue;
             }
@@ -144,6 +172,10 @@ public sealed class SessionRuntime : ISessionRuntime
             await _sessionStore.UpsertAsync(
                 current,
                 cancellationToken);
+
+            _lastPersistedAtUtc[
+                signature.GameId] =
+                current.LastSeenAtUtc;
         }
 
         var pendingToClear =
@@ -174,11 +206,16 @@ public sealed class SessionRuntime : ISessionRuntime
             var active =
                 _active[gameId];
 
+            var reason =
+                recoveredThisRefresh.Contains(gameId)
+                    ? SessionEndReason.RecoveredAfterUnexpectedShutdown
+                    : SessionEndReason.ProcessExited;
+
             var ended =
                 _transitions.End(
                     active,
                     active.LastSeenAtUtc,
-                    SessionEndReason.ProcessExited,
+                    reason,
                     nowUtc).Session
                 ?? throw new InvalidOperationException(
                     "Session end transition did not produce a session.");
@@ -188,6 +225,9 @@ public sealed class SessionRuntime : ISessionRuntime
                 cancellationToken);
 
             _active.Remove(
+                gameId);
+
+            _lastPersistedAtUtc.Remove(
                 gameId);
         }
 
@@ -201,6 +241,62 @@ public sealed class SessionRuntime : ISessionRuntime
                     session =>
                         session.SessionId)
                 .ToArray());
+    }
+
+    private async Task<HashSet<Guid>>
+        LoadPersistedActiveSessionsOnceAsync(
+            CancellationToken cancellationToken)
+    {
+        var recovered =
+            new HashSet<Guid>();
+
+        if (_recoveryInitialized)
+        {
+            return recovered;
+        }
+
+        var persisted =
+            await _sessionStore.GetActiveAsync(
+                cancellationToken);
+
+        foreach (var session in persisted)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (session.State != SessionState.Active)
+            {
+                continue;
+            }
+
+            _active[session.GameId] =
+                session;
+
+            _lastPersistedAtUtc[
+                session.GameId] =
+                session.LastSeenAtUtc;
+
+            recovered.Add(
+                session.GameId);
+        }
+
+        _recoveryInitialized = true;
+
+        return recovered;
+    }
+
+    private bool ShouldPersistHeartbeat(
+        Guid gameId,
+        DateTimeOffset lastSeenAtUtc)
+    {
+        if (!_lastPersistedAtUtc.TryGetValue(
+                gameId,
+                out var lastPersistedAtUtc))
+        {
+            return true;
+        }
+
+        return lastSeenAtUtc - lastPersistedAtUtc >=
+            HeartbeatPersistenceInterval;
     }
 
     private sealed record PendingObservation(
