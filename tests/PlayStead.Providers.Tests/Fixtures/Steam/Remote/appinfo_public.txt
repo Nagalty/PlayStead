@@ -1,0 +1,46 @@
+Redirecting stderr to 'C:\steamcmd\logs\stderr.txt'
+Logging directory: 'C:\steamcmd/logs'
+[  0%] Checking for available updates...
+Steam Console Client (c) Valve Corporation
+Loading Steam API...OK
+AppID : 730, change number : 123456
+"730"
+{
+    "common"
+    {
+        "name" "Example Public Game"
+    }
+    "depots"
+    {
+        "branches"
+        {
+            "public"
+            {
+                "buildid" "101"
+                "timeupdated" "1789236000"
+            }
+        }
+        "731"
+        {
+            "manifests"
+            {
+                "public"
+                {
+                    "gid" "111"
+                    "size" "1000"
+                }
+            }
+        }
+        "732"
+        {
+            "manifests"
+            {
+                "public"
+                {
+                    "gid" "222"
+                    "size" "2000"
+                }
+            }
+        }
+    }
+}

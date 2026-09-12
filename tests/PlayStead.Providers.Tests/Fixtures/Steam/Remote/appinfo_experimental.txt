@@ -1,0 +1,33 @@
+Steam Console Client (c) Valve Corporation
+Loading Steam API...OK
+"440"
+{
+    "depots"
+    {
+        "branches"
+        {
+            "public"
+            {
+                "buildid" "199"
+            }
+            "experimental"
+            {
+                "buildid" "201"
+            }
+        }
+        "441"
+        {
+            "manifests"
+            {
+                "public"
+                {
+                    "gid" "300"
+                }
+                "experimental"
+                {
+                    "gid" "333"
+                }
+            }
+        }
+    }
+}

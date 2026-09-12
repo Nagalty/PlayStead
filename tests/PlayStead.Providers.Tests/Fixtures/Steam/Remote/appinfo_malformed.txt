@@ -1,0 +1,10 @@
+Steam Console Client (c) Valve Corporation
+"730"
+{
+    "depots"
+    {
+        "branches"
+        {
+            "public"
+            {
+                "buildid" "101"

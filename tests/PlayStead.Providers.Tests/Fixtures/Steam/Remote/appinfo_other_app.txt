@@ -1,0 +1,24 @@
+Steam Console Client (c) Valve Corporation
+"999"
+{
+    "depots"
+    {
+        "branches"
+        {
+            "public"
+            {
+                "buildid" "500"
+            }
+        }
+        "1000"
+        {
+            "manifests"
+            {
+                "public"
+                {
+                    "gid" "900"
+                }
+            }
+        }
+    }
+}
