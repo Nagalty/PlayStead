@@ -54,6 +54,28 @@ Cette checklist documente les critères réellement validés pour la fondation l
 - [x] Les résultats de tests sont publiés comme artefact de CI.
 - [x] Aucun chemin Windows spécifique au poste de développement n'est codé dans le workflow.
 
-## Critère de sortie Task 13
+## Publish dev — Task 13E CLOSED
 
-Task 13 ne sera fermée qu'après validation supplémentaire du publish dev `0.1.0-dev`, de la baseline de performances et du gate final. Cette checklist documente l'état accepté avant ces dernières étapes.
+- [x] Publish dev **`0.1.0-dev`** généré en `win-x64`, framework-dependent.
+- [x] Publish : **46 fichiers**, **3 988 909 octets** (≈ **3,8 MiB**).
+- [x] `PlayStead.UI.exe`, `PlayStead.UI.runtimeconfig.json` et `PlayStead.UI.deps.json` présents.
+- [x] `runtimeconfig` validé pour .NET 10.
+- [x] Aucune donnée utilisateur embarquée dans le publish.
+- [x] Aucune fuite de sources/projets dans le publish.
+- [x] Smoke réel du binaire publié : fenêtre affichée, fermeture propre, `ExitCode=0`.
+
+## Baseline performances — Task 13F CLOSED
+
+Mesure réalisée sur le publish `0.1.0-dev-win-x64`. Le cache disque/page Windows n'a pas été forcé à froid : il s'agit d'une **baseline reproductible de développement**, pas d'un SLA.
+
+- [x] Premier lancement “cold-ish” jusqu'à fenêtre prête : **507 ms**.
+- [x] Lancements warm : **452 ms de moyenne**, **450 ms de médiane**, min **449 ms**, max **457 ms**.
+- [x] Working set cold-ish après stabilisation : **158,23 MiB**.
+- [x] Working set warm moyen : **152,94 MiB**.
+- [x] Mémoire privée cold-ish : **191,23 MiB**.
+- [x] Mémoire privée warm moyenne : **155,39 MiB**.
+- [x] Publish de référence : **46 fichiers / 3,8 MiB**.
+
+## Task 13G — Gate final
+
+Le gate final doit confirmer une dernière fois l'état Git, le build Release, les **89/89 tests**, la CI Windows, la documentation, le publish dev et la présence de la baseline de performances. Une fois ce gate PASS, la fondation PlayStead **0.1** peut être déclarée complète.
