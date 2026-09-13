@@ -61,6 +61,10 @@ public static class PlaySteadHost
             SqliteSessionStore>();
 
         builder.Services.AddSingleton<
+            ISessionCorrectionStore,
+            SqliteSessionCorrectionStore>();
+
+        builder.Services.AddSingleton<
             IProcessSnapshotSource,
             WindowsProcessSnapshotSource>();
 
@@ -69,6 +73,9 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<
             SessionTransitionPolicy>();
+
+        builder.Services.AddSingleton<
+            SessionCorrectionPolicy>();
 
         builder.Services.AddSingleton<
             ISessionRuntime,

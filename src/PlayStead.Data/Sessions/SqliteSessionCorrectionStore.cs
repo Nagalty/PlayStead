@@ -23,6 +23,13 @@ public sealed class SqliteSessionCorrectionStore :
     {
         ArgumentNullException.ThrowIfNull(correction);
 
+        if (correction.CorrectionId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "A correction identity is required.",
+                nameof(correction));
+        }
+
         if (correction.CorrectedStartedAtUtc is null &&
             correction.CorrectedEndedAtUtc is null)
         {
@@ -44,24 +51,36 @@ public sealed class SqliteSessionCorrectionStore :
 
         command.CommandText = """
             INSERT INTO session_corrections(
+                correction_id,
                 session_id,
                 corrected_started_at_utc,
                 corrected_ended_at_utc,
-                corrected_at_utc)
+                reason,
+                created_at_utc)
             VALUES(
+                $correctionId,
                 $sessionId,
                 $correctedStartedAtUtc,
                 $correctedEndedAtUtc,
-                $correctedAtUtc)
+                $reason,
+                $createdAtUtc)
             ON CONFLICT(session_id)
             DO UPDATE SET
+                correction_id =
+                    excluded.correction_id,
                 corrected_started_at_utc =
                     excluded.corrected_started_at_utc,
                 corrected_ended_at_utc =
                     excluded.corrected_ended_at_utc,
-                corrected_at_utc =
-                    excluded.corrected_at_utc;
+                reason =
+                    excluded.reason,
+                created_at_utc =
+                    excluded.created_at_utc;
             """;
+
+        command.Parameters.AddWithValue(
+            "$correctionId",
+            correction.CorrectionId.ToString());
 
         command.Parameters.AddWithValue(
             "$sessionId",
@@ -82,9 +101,15 @@ public sealed class SqliteSessionCorrectionStore :
                     correction.CorrectedEndedAtUtc.Value));
 
         command.Parameters.AddWithValue(
-            "$correctedAtUtc",
+            "$reason",
+            correction.Reason is null
+                ? DBNull.Value
+                : correction.Reason);
+
+        command.Parameters.AddWithValue(
+            "$createdAtUtc",
             FormatUtc(
-                correction.CorrectedAtUtc));
+                correction.CreatedAtUtc));
 
         await command.ExecuteNonQueryAsync(
             cancellationToken);
@@ -103,10 +128,12 @@ public sealed class SqliteSessionCorrectionStore :
 
         command.CommandText = """
             SELECT
+                correction_id,
                 session_id,
                 corrected_started_at_utc,
                 corrected_ended_at_utc,
-                corrected_at_utc
+                reason,
+                created_at_utc
             FROM session_corrections
             WHERE session_id = $sessionId
             LIMIT 1;
@@ -129,16 +156,21 @@ public sealed class SqliteSessionCorrectionStore :
         return new SessionCorrection(
             Guid.Parse(
                 reader.GetString(0)),
-            reader.IsDBNull(1)
-                ? null
-                : ParseUtc(
-                    reader.GetString(1)),
+            Guid.Parse(
+                reader.GetString(1)),
             reader.IsDBNull(2)
                 ? null
                 : ParseUtc(
                     reader.GetString(2)),
+            reader.IsDBNull(3)
+                ? null
+                : ParseUtc(
+                    reader.GetString(3)),
+            reader.IsDBNull(4)
+                ? null
+                : reader.GetString(4),
             ParseUtc(
-                reader.GetString(3)));
+                reader.GetString(5)));
     }
 
     private async Task<SqliteConnection>

@@ -36,6 +36,8 @@ public sealed class SessionRuntimeHeartbeatPersistenceTests
                 store,
                 new ProcessSignatureMatcher(),
                 new SessionTransitionPolicy(),
+                new FakeSessionCorrectionStore(),
+                new SessionCorrectionPolicy(),
                 time);
 
         await sut.RefreshAsync(
@@ -110,6 +112,8 @@ public sealed class SessionRuntimeHeartbeatPersistenceTests
                 firstStore,
                 new ProcessSignatureMatcher(),
                 new SessionTransitionPolicy(),
+                new FakeSessionCorrectionStore(),
+                new SessionCorrectionPolicy(),
                 time);
 
         await firstRuntime.RefreshAsync(
@@ -146,6 +150,8 @@ public sealed class SessionRuntimeHeartbeatPersistenceTests
                 restartStore,
                 new ProcessSignatureMatcher(),
                 new SessionTransitionPolicy(),
+                new FakeSessionCorrectionStore(),
+                new SessionCorrectionPolicy(),
                 new FixedTimeProvider(
                     T0.AddSeconds(30)));
 
@@ -308,6 +314,27 @@ public sealed class SessionRuntimeHeartbeatPersistenceTests
             CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<GameSession>>(
                 []);
+    }
+
+
+    private sealed class FakeSessionCorrectionStore :
+        ISessionCorrectionStore
+    {
+        public Task UpsertAsync(
+            SessionCorrection correction,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+
+        public Task<SessionCorrection?> GetAsync(
+            Guid sessionId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<SessionCorrection?>(null);
+        }
     }
 
     private sealed class MutableTimeProvider :

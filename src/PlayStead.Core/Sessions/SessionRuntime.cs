@@ -10,6 +10,8 @@ public sealed class SessionRuntime : ISessionRuntime
     private readonly ISessionStore _sessionStore;
     private readonly ProcessSignatureMatcher _matcher;
     private readonly SessionTransitionPolicy _transitions;
+    private readonly ISessionCorrectionStore _correctionStore;
+    private readonly SessionCorrectionPolicy _correctionPolicy;
     private readonly TimeProvider _timeProvider;
 
     private readonly Dictionary<Guid, PendingObservation>
@@ -29,6 +31,8 @@ public sealed class SessionRuntime : ISessionRuntime
         ISessionStore sessionStore,
         ProcessSignatureMatcher matcher,
         SessionTransitionPolicy transitions,
+        ISessionCorrectionStore correctionStore,
+        SessionCorrectionPolicy correctionPolicy,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(processSource);
@@ -36,6 +40,8 @@ public sealed class SessionRuntime : ISessionRuntime
         ArgumentNullException.ThrowIfNull(sessionStore);
         ArgumentNullException.ThrowIfNull(matcher);
         ArgumentNullException.ThrowIfNull(transitions);
+        ArgumentNullException.ThrowIfNull(correctionStore);
+        ArgumentNullException.ThrowIfNull(correctionPolicy);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         _processSource = processSource;
@@ -43,6 +49,8 @@ public sealed class SessionRuntime : ISessionRuntime
         _sessionStore = sessionStore;
         _matcher = matcher;
         _transitions = transitions;
+        _correctionStore = correctionStore;
+        _correctionPolicy = correctionPolicy;
         _timeProvider = timeProvider;
     }
 
@@ -241,6 +249,49 @@ public sealed class SessionRuntime : ISessionRuntime
                     session =>
                         session.SessionId)
                 .ToArray());
+    }
+
+    public async Task CorrectSessionAsync(
+        SessionCorrectionRequest correction,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(correction);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (correction.SessionId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "A session identity is required to persist a correction.",
+                nameof(correction));
+        }
+
+        var session =
+            await _sessionStore.GetAsync(
+                correction.SessionId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"Session '{correction.SessionId}' was not found.");
+
+        SessionCorrection persistedCorrection;
+
+        try
+        {
+            persistedCorrection =
+                _correctionPolicy.Create(
+                    session,
+                    correction,
+                    _timeProvider.GetUtcNow());
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            throw new InvalidOperationException(
+                "The requested correction would produce an invalid session interval.",
+                exception);
+        }
+
+        await _correctionStore.UpsertAsync(
+            persistedCorrection,
+            cancellationToken);
     }
 
     private async Task<HashSet<Guid>>

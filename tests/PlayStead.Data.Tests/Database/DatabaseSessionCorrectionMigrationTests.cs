@@ -11,7 +11,7 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task Initialize_fresh_database_creates_schema_v4_with_session_corrections()
+    public async Task Initialize_fresh_database_creates_schema_v5_with_traceable_session_corrections()
     {
         Directory.CreateDirectory(_root);
 
@@ -44,7 +44,7 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            4,
+            5,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
@@ -65,7 +65,7 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
     }
 
     [Fact]
-    public async Task Initialize_upgrades_v3_to_v4_without_mutating_observed_session_data()
+    public async Task Initialize_upgrades_v3_to_v5_without_mutating_observed_session_data()
     {
         Directory.CreateDirectory(_root);
 
@@ -111,7 +111,7 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            4,
+            5,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 

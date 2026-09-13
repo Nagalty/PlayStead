@@ -10,6 +10,14 @@ public sealed class SessionCorrectionPolicy
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(request);
 
+        if (request.SessionId != Guid.Empty &&
+            request.SessionId != session.SessionId)
+        {
+            throw new ArgumentException(
+                "Session correction request does not belong to the supplied session.",
+                nameof(request));
+        }
+
         if (session.State == SessionState.Active)
         {
             throw new InvalidOperationException(
@@ -46,9 +54,11 @@ public sealed class SessionCorrectionPolicy
         }
 
         return new SessionCorrection(
+            Guid.NewGuid(),
             session.SessionId,
             request.CorrectedStartedAtUtc,
             request.CorrectedEndedAtUtc,
+            request.Reason,
             correctedAtUtc);
     }
 

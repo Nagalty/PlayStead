@@ -75,6 +75,12 @@ public sealed class SessionMonitorTests
     {
         public int RefreshCount { get; private set; }
 
+
+        public Task CorrectSessionAsync(
+            SessionCorrectionRequest correction,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
         public Task<SessionRuntimeSnapshot> RefreshAsync(
             CancellationToken cancellationToken)
         {

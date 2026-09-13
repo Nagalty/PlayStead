@@ -82,6 +82,12 @@ public sealed class Task09SessionMonitorPublicationTests
             _snapshot = snapshot;
         }
 
+
+        public Task CorrectSessionAsync(
+            SessionCorrectionRequest correction,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
         public Task<SessionRuntimeSnapshot> RefreshAsync(
             CancellationToken cancellationToken)
         {

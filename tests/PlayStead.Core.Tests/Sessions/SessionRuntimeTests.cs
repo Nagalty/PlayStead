@@ -271,6 +271,8 @@ public sealed class SessionRuntimeTests
             sessions,
             new ProcessSignatureMatcher(),
             new SessionTransitionPolicy(),
+            new FakeSessionCorrectionStore(),
+            new SessionCorrectionPolicy(),
             timeProvider);
 
     private static ProcessSignature Signature(
@@ -385,6 +387,27 @@ public sealed class SessionRuntimeTests
             CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<GameSession>>(
                 []);
+    }
+
+
+    private sealed class FakeSessionCorrectionStore :
+        ISessionCorrectionStore
+    {
+        public Task UpsertAsync(
+            SessionCorrection correction,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+
+        public Task<SessionCorrection?> GetAsync(
+            Guid sessionId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<SessionCorrection?>(null);
+        }
     }
 
     private sealed class MutableTimeProvider :
