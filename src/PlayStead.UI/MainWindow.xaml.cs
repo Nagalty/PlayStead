@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Media;
 using PlayStead.UI.Library;
+using PlayStead.UI.Sessions;
 using PlayStead.UI.State;
 using PlayStead.UI.Tray;
 
@@ -8,12 +10,36 @@ namespace PlayStead.UI;
 
 public partial class MainWindow : Window
 {
+    private static readonly Brush ActiveNavBrush =
+        CreateFrozenBrush(
+            0xC9,
+            0x82,
+            0x4B);
+
+    private static readonly Brush InactiveNavBrush =
+        CreateFrozenBrush(
+            0xA8,
+            0xAD,
+            0xB5);
+
     private readonly WindowPlacementService? _windowPlacementService;
     private readonly WindowClosePolicy? _windowClosePolicy;
+    private readonly LibraryView _libraryView;
+
+    private SessionViewModel? _sessionViewModel;
+    private SessionsView? _sessionsView;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        _libraryView =
+            MainContent.Content as LibraryView
+            ?? throw new InvalidOperationException(
+                "The main window must start with LibraryView.");
+
+        UpdateNavigationState(
+            sessionsSelected: false);
     }
 
     public MainWindow(
@@ -48,6 +74,22 @@ public partial class MainWindow : Window
 
         _windowClosePolicy =
             windowClosePolicy;
+    }
+
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy,
+        SessionViewModel sessionViewModel)
+        : this(
+            viewModel,
+            windowPlacementService,
+            windowClosePolicy)
+    {
+        ArgumentNullException.ThrowIfNull(sessionViewModel);
+
+        _sessionViewModel =
+            sessionViewModel;
     }
 
     public event EventHandler? RescanRequested;
@@ -148,6 +190,75 @@ public partial class MainWindow : Window
             IsMaximized:
                 WindowState ==
                 WindowState.Maximized);
+    }
+
+    private void LibraryNavButton_OnClick(
+        object sender,
+        RoutedEventArgs e)
+    {
+        MainContent.Content =
+            _libraryView;
+
+        UpdateNavigationState(
+            sessionsSelected: false);
+    }
+
+    private void SessionsNavButton_OnClick(
+        object sender,
+        RoutedEventArgs e)
+    {
+        _sessionsView ??=
+            new SessionsView();
+
+        _sessionsView.DataContext =
+            _sessionViewModel;
+
+        MainContent.Content =
+            _sessionsView;
+
+        UpdateNavigationState(
+            sessionsSelected: true);
+    }
+
+    private void UpdateNavigationState(
+        bool sessionsSelected)
+    {
+        LibraryNavIndicator.Visibility =
+            sessionsSelected
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+        SessionsNavIndicator.Visibility =
+            sessionsSelected
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        LibraryNavText.Foreground =
+            sessionsSelected
+                ? InactiveNavBrush
+                : ActiveNavBrush;
+
+        SessionsNavText.Foreground =
+            sessionsSelected
+                ? ActiveNavBrush
+                : InactiveNavBrush;
+    }
+
+    private static Brush CreateFrozenBrush(
+        byte red,
+        byte green,
+        byte blue)
+    {
+        var brush =
+            new SolidColorBrush(
+                Color.FromRgb(
+                    red,
+                    green,
+                    blue));
+
+        brush.Freeze();
+
+        return brush;
     }
 
     private void LibraryView_OnRescanRequested(

@@ -1,0 +1,147 @@
+<UserControl x:Class="PlayStead.UI.Sessions.SessionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="24"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="12"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="28"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="12"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Name="SessionsHeading"
+                       Grid.Row="0"
+                       Text="Sessions"
+                       Foreground="#F2F4F7"
+                       FontSize="26"
+                       FontWeight="SemiBold"/>
+
+            <TextBlock x:Name="ActiveSessionsHeading"
+                       Grid.Row="2"
+                       Text="Sessions en cours"
+                       Foreground="#E5E7EB"
+                       FontSize="17"
+                       FontWeight="SemiBold"/>
+
+            <Grid Grid.Row="4">
+                <ItemsControl x:Name="ActiveSessionsList"
+                              ItemsSource="{Binding ActiveSessions}">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasActiveSessions}"
+                                             Value="True">
+                                    <Setter Property="Visibility"
+                                            Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,10"
+                                    Padding="16"
+                                    Background="#1D2024"
+                                    BorderBrush="#30343A"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding Title}"
+                                                   Foreground="#F2F4F7"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"/>
+
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Text="{Binding StartedAtLabel}"
+                                                   Foreground="#8F969F"
+                                                   FontSize="12"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1"
+                                                Margin="24,0,0,0"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Right">
+                                        <TextBlock Text="EN COURS"
+                                                   Foreground="#C9824B"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   HorizontalAlignment="Right"/>
+
+                                        <TextBlock Margin="0,5,0,0"
+                                                   Text="{Binding DurationLabel}"
+                                                   Foreground="#F2F4F7"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   HorizontalAlignment="Right"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Border x:Name="ActiveSessionsEmptyState"
+                        Padding="18"
+                        Background="#181B1F"
+                        BorderBrush="#2C3036"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility"
+                                    Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasActiveSessions}"
+                                             Value="True">
+                                    <Setter Property="Visibility"
+                                            Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+
+                    <TextBlock Text="Aucune session active."
+                               Foreground="#A9AFB7"
+                               FontSize="14"/>
+                </Border>
+            </Grid>
+
+            <TextBlock x:Name="RecentHistoryHeading"
+                       Grid.Row="6"
+                       Text="Historique récent"
+                       Foreground="#E5E7EB"
+                       FontSize="17"
+                       FontWeight="SemiBold"/>
+
+            <Border x:Name="RecentHistoryHost"
+                    Grid.Row="8"
+                    Padding="18"
+                    Background="#181B1F"
+                    BorderBrush="#2C3036"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <TextBlock Text="L’historique détaillé des sessions sera disponible dans l’étape suivante."
+                           Foreground="#8F969F"
+                           FontSize="13"
+                           TextWrapping="Wrap"/>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

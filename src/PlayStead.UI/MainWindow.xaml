@@ -26,7 +26,9 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="48" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="32" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="20" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
@@ -46,20 +48,54 @@
                            FontSize="15"
                            Foreground="#A8ADB5" />
 
-                <Grid Grid.Column="4"
-                      VerticalAlignment="Stretch">
-                    <TextBlock x:Name="LibraryNavText"
-                               Text="Bibliothèque"
-                               VerticalAlignment="Center"
-                               FontSize="15"
-                               FontWeight="SemiBold"
-                               Foreground="#C9824B" />
+                <Button x:Name="LibraryNavButton"
+                        Grid.Column="4"
+                        Click="LibraryNavButton_OnClick"
+                        VerticalAlignment="Stretch"
+                        Padding="0"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Cursor="Hand">
+                    <Grid VerticalAlignment="Stretch">
+                        <TextBlock x:Name="LibraryNavText"
+                                   Text="Bibliothèque"
+                                   VerticalAlignment="Center"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="#C9824B" />
 
-                    <Border Height="2"
-                            VerticalAlignment="Bottom"
-                            Background="#C9824B"
-                            CornerRadius="1" />
-                </Grid>
+                        <Border x:Name="LibraryNavIndicator"
+                                Height="2"
+                                VerticalAlignment="Bottom"
+                                Background="#C9824B"
+                                CornerRadius="1" />
+                    </Grid>
+                </Button>
+
+                <Button x:Name="SessionsNavButton"
+                        Grid.Column="6"
+                        Click="SessionsNavButton_OnClick"
+                        VerticalAlignment="Stretch"
+                        Padding="0"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Cursor="Hand">
+                    <Grid VerticalAlignment="Stretch">
+                        <TextBlock x:Name="SessionsNavText"
+                                   Text="Sessions"
+                                   VerticalAlignment="Center"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="#A8ADB5" />
+
+                        <Border x:Name="SessionsNavIndicator"
+                                Height="2"
+                                VerticalAlignment="Bottom"
+                                Background="#C9824B"
+                                CornerRadius="1"
+                                Visibility="Collapsed" />
+                    </Grid>
+                </Button>
             </Grid>
         </Border>
 

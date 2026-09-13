@@ -168,6 +168,9 @@ public static class PlaySteadHost
             LibraryViewModel>();
 
         builder.Services.AddSingleton<
+            SessionViewModel>();
+
+        builder.Services.AddSingleton<
             MainWindow>();
 
         builder.Services.AddSingleton<

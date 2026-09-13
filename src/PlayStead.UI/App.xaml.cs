@@ -4,6 +4,7 @@ using PlayStead.Platform.Paths;
 using PlayStead.Platform.SingleInstance;
 using PlayStead.UI.Bootstrap;
 using PlayStead.UI.Library;
+using PlayStead.UI.Sessions;
 using PlayStead.UI.Tray;
 using System.Windows;
 using System.Windows.Threading;
@@ -174,6 +175,10 @@ public partial class App : Application
                                 .RefreshAsync(
                                     cancellationToken);
 
+                            await GetRequiredService<SessionViewModel>()
+                                .RefreshAsync(
+                                    cancellationToken);
+
                             var window =
                                 GetRequiredService<MainWindow>();
 
@@ -221,10 +226,16 @@ public partial class App : Application
                     _ = snapshot;
 
                     await RunOnUiAsync(
-                        () =>
-                            GetRequiredService<LibraryViewModel>()
+                        async () =>
+                        {
+                            await GetRequiredService<LibraryViewModel>()
                                 .RefreshAsync(
-                                    cancellationToken),
+                                    cancellationToken);
+
+                            await GetRequiredService<SessionViewModel>()
+                                .RefreshAsync(
+                                    cancellationToken);
+                        },
                         cancellationToken);
                 },
             StopPipeAsync:
