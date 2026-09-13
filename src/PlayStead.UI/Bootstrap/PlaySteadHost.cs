@@ -19,12 +19,14 @@ using PlayStead.UI.Sessions;
 using PlayStead.UI.SingleInstance;
 using PlayStead.UI.State;
 using PlayStead.UI.Steam;
+using PlayStead.UI.Tray;
 
 namespace PlayStead.UI.Bootstrap;
 
 public static class PlaySteadHost
 {
-    public static IHost Build(UserDataLayout layout)
+    public static IHost Build(
+        UserDataLayout layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
 
@@ -36,8 +38,11 @@ public static class PlaySteadHost
                 layout.DatabasePath,
                 layout.BackupsDirectory));
 
-        builder.Services.AddSingleton<DatabaseInitializer>();
-        builder.Services.AddSingleton<DatabaseHealthChecker>();
+        builder.Services.AddSingleton<
+            DatabaseInitializer>();
+
+        builder.Services.AddSingleton<
+            DatabaseHealthChecker>();
 
         builder.Services.AddSingleton<
             ILibraryStore,
@@ -80,7 +85,8 @@ public static class PlaySteadHost
                 services.GetRequiredService<
                     SessionMonitor>());
 
-        builder.Services.AddSingleton<WindowsSteamRootLocator>(
+        builder.Services.AddSingleton<
+            WindowsSteamRootLocator>(
             _ => new WindowsSteamRootLocator());
 
         builder.Services.AddSingleton<
@@ -103,7 +109,8 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             SteamUpdateStateEvaluator>();
 
-        builder.Services.AddSingleton<TimeProvider>(
+        builder.Services.AddSingleton<
+            TimeProvider>(
             TimeProvider.System);
 
         builder.Services.AddSingleton(
@@ -155,6 +162,9 @@ public static class PlaySteadHost
                     "window-placement.json")));
 
         builder.Services.AddSingleton<
+            WindowClosePolicy>();
+
+        builder.Services.AddSingleton<
             LibraryViewModel>();
 
         builder.Services.AddSingleton<
@@ -167,6 +177,9 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             IAppInvocationHandler,
             AppInvocationHandler>();
+
+        builder.Services.AddSingleton<
+            TrayIconService>();
 
         return builder.Build();
     }

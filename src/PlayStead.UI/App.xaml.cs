@@ -1,9 +1,10 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PlayStead.Platform.Paths;
 using PlayStead.Platform.SingleInstance;
 using PlayStead.UI.Bootstrap;
 using PlayStead.UI.Library;
+using PlayStead.UI.Tray;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -23,7 +24,9 @@ public partial class App : Application
     private ApplicationStartupCoordinator? _startupCoordinator;
     private SingleInstanceGate? _singleInstanceGate;
     private NamedPipeInvocationServer? _invocationServer;
+    private TrayIconService? _trayIconService;
     private IHost? _host;
+    private bool _hostStarted;
 
     protected override async void OnStartup(
         StartupEventArgs e)
@@ -64,7 +67,10 @@ public partial class App : Application
                 ApplicationStartupCoordinator.StartResult.DatabaseUnhealthy)
             {
                 Shutdown(-1);
+                return;
             }
+
+            StartTray();
         }
         catch (OperationCanceledException)
             when (_lifetime.IsCancellationRequested)
@@ -88,6 +94,15 @@ public partial class App : Application
     {
         _lifetime.Cancel();
 
+        if (_trayIconService is not null)
+        {
+            _trayIconService.ExitRequested -=
+                TrayIconService_OnExitRequested;
+
+            _trayIconService.Dispose();
+            _trayIconService = null;
+        }
+
         try
         {
             var coordinator =
@@ -106,6 +121,7 @@ public partial class App : Application
         {
             _host?.Dispose();
             _host = null;
+            _hostStarted = false;
 
             _invocationServer = null;
 
@@ -122,7 +138,8 @@ public partial class App : Application
         CreateStartupOperations()
     {
         return new ApplicationStartupCoordinator.Operations(
-            ParseInvocation: ParseInvocation,
+            ParseInvocation:
+                ParseInvocation,
             AcquireSingleInstanceAsync:
                 (invocation, cancellationToken) =>
                     RequireSingleInstanceGate()
@@ -136,13 +153,15 @@ public partial class App : Application
             EnsureDirectoriesExist:
                 layout =>
                     layout.EnsureDirectoriesExist(),
-            StartHostAsync:
-                StartHostAsync,
+            BuildHostAsync:
+                BuildHostAsync,
             InitializeLocalStateAsync:
                 cancellationToken =>
                     GetRequiredService<LocalStartupPipeline>()
                         .InitializeAsync(
                             cancellationToken),
+            StartHostAsync:
+                StartHostAsync,
             ShowCachedSnapshotAsync:
                 async (snapshot, cancellationToken) =>
                 {
@@ -224,16 +243,70 @@ public partial class App : Application
                 });
     }
 
-    private async Task StartHostAsync(
+    private Task BuildHostAsync(
         UserDataLayout layout,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (_host is not null)
+        {
+            throw new InvalidOperationException(
+                "The PlayStead host has already been built.");
+        }
+
         _host =
             PlaySteadHost.Build(
                 layout);
 
-        await _host.StartAsync(
+        _hostStarted =
+            false;
+
+        return Task.CompletedTask;
+    }
+
+    private async Task StartHostAsync(
+        CancellationToken cancellationToken)
+    {
+        var host =
+            _host
+            ?? throw new InvalidOperationException(
+                "The PlayStead host has not been built.");
+
+        await host.StartAsync(
             cancellationToken);
+
+        _hostStarted =
+            true;
+    }
+
+    private void StartTray()
+    {
+        var tray =
+            GetRequiredService<TrayIconService>();
+
+        _trayIconService =
+            tray;
+
+        tray.ExitRequested +=
+            TrayIconService_OnExitRequested;
+
+        tray.Start();
+    }
+
+    private void TrayIconService_OnExitRequested(
+        object? sender,
+        EventArgs e)
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            Shutdown();
+            return;
+        }
+
+        _ = Dispatcher.BeginInvoke(
+            new Action(Shutdown),
+            DispatcherPriority.Normal);
     }
 
     private void BindInvocationReceived(
@@ -359,16 +432,29 @@ public partial class App : Application
     private async Task StopHostAsync(
         CancellationToken cancellationToken)
     {
-        if (_host is null)
+        var host =
+            _host;
+
+        if (host is null)
         {
             return;
         }
 
-        await _host.StopAsync(
-            cancellationToken);
+        try
+        {
+            if (_hostStarted)
+            {
+                await host.StopAsync(
+                    cancellationToken);
+            }
+        }
+        finally
+        {
+            host.Dispose();
 
-        _host.Dispose();
-        _host = null;
+            _host = null;
+            _hostStarted = false;
+        }
     }
 
     private async Task RunOnUiAsync(
@@ -401,7 +487,7 @@ public partial class App : Application
         var host =
             _host
             ?? throw new InvalidOperationException(
-                "The PlayStead host is not running.");
+                "The PlayStead host has not been built.");
 
         return host.Services
             .GetRequiredService<T>();

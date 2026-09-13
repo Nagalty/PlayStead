@@ -11,7 +11,7 @@ public sealed class ApplicationStartupCoordinator
 
     private int _stopStarted;
     private bool _primaryAcquired;
-    private bool _hostStarted;
+    private bool _hostBuilt;
 
     public ApplicationStartupCoordinator(
         Operations operations)
@@ -56,11 +56,11 @@ public sealed class ApplicationStartupCoordinator
         _operations.EnsureDirectoriesExist(
             layout);
 
-        await _operations.StartHostAsync(
+        await _operations.BuildHostAsync(
             layout,
             cancellationToken);
 
-        _hostStarted = true;
+        _hostBuilt = true;
 
         var localState =
             await _operations.InitializeLocalStateAsync(
@@ -74,6 +74,9 @@ public sealed class ApplicationStartupCoordinator
 
             return StartResult.DatabaseUnhealthy;
         }
+
+        await _operations.StartHostAsync(
+            cancellationToken);
 
         await _operations.ShowCachedSnapshotAsync(
             localState.Snapshot,
@@ -110,7 +113,7 @@ public sealed class ApplicationStartupCoordinator
         await _operations.StopPipeAsync(
             cancellationToken);
 
-        if (_hostStarted)
+        if (_hostBuilt)
         {
             await _operations.StopHostAsync(
                 cancellationToken);
@@ -159,11 +162,15 @@ public sealed class ApplicationStartupCoordinator
             UserDataLayout,
             CancellationToken,
             Task>
-            StartHostAsync,
+            BuildHostAsync,
         Func<
             CancellationToken,
             Task<LocalStartupState>>
             InitializeLocalStateAsync,
+        Func<
+            CancellationToken,
+            Task>
+            StartHostAsync,
         Func<
             LibrarySnapshot,
             CancellationToken,

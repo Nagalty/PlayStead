@@ -1,20 +1,23 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using PlayStead.UI.Library;
 using PlayStead.UI.State;
+using PlayStead.UI.Tray;
 
 namespace PlayStead.UI;
 
 public partial class MainWindow : Window
 {
     private readonly WindowPlacementService? _windowPlacementService;
+    private readonly WindowClosePolicy? _windowClosePolicy;
 
     public MainWindow()
     {
         InitializeComponent();
     }
 
-    public MainWindow(LibraryViewModel viewModel)
+    public MainWindow(
+        LibraryViewModel viewModel)
         : this()
     {
         ArgumentNullException.ThrowIfNull(viewModel);
@@ -33,14 +36,30 @@ public partial class MainWindow : Window
         RestoreWindowPlacement();
     }
 
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy)
+        : this(
+            viewModel,
+            windowPlacementService)
+    {
+        ArgumentNullException.ThrowIfNull(windowClosePolicy);
+
+        _windowClosePolicy =
+            windowClosePolicy;
+    }
+
     public event EventHandler? RescanRequested;
 
-    protected override void OnClosing(CancelEventArgs e)
+    protected override void OnClosing(
+        CancelEventArgs e)
     {
         if (!e.Cancel &&
             _windowPlacementService is not null)
         {
-            var state = CaptureWindowPlacement();
+            var state =
+                CaptureWindowPlacement();
 
             Task.Run(
                     () => _windowPlacementService.SaveAsync(
@@ -48,6 +67,14 @@ public partial class MainWindow : Window
                         CancellationToken.None))
                 .GetAwaiter()
                 .GetResult();
+        }
+
+        if (!e.Cancel &&
+            _windowClosePolicy is not null &&
+            !_windowClosePolicy.IsExitRequested)
+        {
+            e.Cancel = true;
+            Hide();
         }
 
         base.OnClosing(e);
@@ -60,7 +87,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var workArea = SystemParameters.WorkArea;
+        var workArea =
+            SystemParameters.WorkArea;
 
         var currentWorkAreas =
             new[]
@@ -73,46 +101,53 @@ public partial class MainWindow : Window
                     IsPrimary: true)
             };
 
-        var placement = Task.Run(
-                () => _windowPlacementService.LoadAsync(
-                    currentWorkAreas,
-                    CancellationToken.None))
-            .GetAwaiter()
-            .GetResult();
+        var placement =
+            Task.Run(
+                    () => _windowPlacementService.LoadAsync(
+                        currentWorkAreas,
+                        CancellationToken.None))
+                .GetAwaiter()
+                .GetResult();
 
         if (placement is null)
         {
             return;
         }
 
-        WindowStartupLocation = WindowStartupLocation.Manual;
+        WindowStartupLocation =
+            WindowStartupLocation.Manual;
 
         Left = placement.Left;
         Top = placement.Top;
         Width = placement.Width;
         Height = placement.Height;
 
-        WindowState = placement.IsMaximized
-            ? WindowState.Maximized
-            : WindowState.Normal;
+        WindowState =
+            placement.IsMaximized
+                ? WindowState.Maximized
+                : WindowState.Normal;
     }
 
-    private WindowPlacementState CaptureWindowPlacement()
+    private WindowPlacementState
+        CaptureWindowPlacement()
     {
-        var normalBounds = WindowState == WindowState.Normal
-            ? new Rect(
-                Left,
-                Top,
-                Width,
-                Height)
-            : RestoreBounds;
+        var normalBounds =
+            WindowState == WindowState.Normal
+                ? new Rect(
+                    Left,
+                    Top,
+                    Width,
+                    Height)
+                : RestoreBounds;
 
         return new WindowPlacementState(
             normalBounds.Left,
             normalBounds.Top,
             normalBounds.Width,
             normalBounds.Height,
-            IsMaximized: WindowState == WindowState.Maximized);
+            IsMaximized:
+                WindowState ==
+                WindowState.Maximized);
     }
 
     private void LibraryView_OnRescanRequested(

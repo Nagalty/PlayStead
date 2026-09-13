@@ -3,13 +3,21 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\PlayStead.Core\PlayStead.Core.csproj" />
     <ProjectReference Include="..\PlayStead.Data\PlayStead.Data.csproj" />
     <ProjectReference Include="..\PlayStead.Platform\PlayStead.Platform.csproj" />
     <ProjectReference Include="..\PlayStead.Providers\PlayStead.Providers.csproj" />
   </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />

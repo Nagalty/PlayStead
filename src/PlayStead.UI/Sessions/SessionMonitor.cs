@@ -50,13 +50,29 @@ public sealed class SessionMonitor : BackgroundService
         _delayAsync = delayAsync;
     }
 
+    public SessionRuntimeSnapshot? LatestSnapshot
+    {
+        get;
+        private set;
+    }
+
+    public event Action<SessionRuntimeSnapshot>?
+        SnapshotUpdated;
+
     public async Task RunAsync(
         CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            await _runtime.RefreshAsync(
-                cancellationToken);
+            var snapshot =
+                await _runtime.RefreshAsync(
+                    cancellationToken);
+
+            LatestSnapshot =
+                snapshot;
+
+            SnapshotUpdated?.Invoke(
+                snapshot);
 
             try
             {

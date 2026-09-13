@@ -34,6 +34,7 @@ public sealed class ApplicationStartupCoordinatorTests
         Assert.Null(sut.BackgroundRefreshTask);
         Assert.False(probe.LayoutCreated);
         Assert.False(probe.DirectoriesEnsured);
+        Assert.False(probe.HostBuilt);
         Assert.False(probe.HostStarted);
         Assert.False(probe.DatabaseInitialized);
         Assert.False(probe.MainWindowShown);
@@ -43,7 +44,7 @@ public sealed class ApplicationStartupCoordinatorTests
     }
 
     [Fact]
-    public async Task Primary_healthy_startup_shows_cache_before_non_blocking_refresh_and_applies_fresh_snapshot_on_UI()
+    public async Task Primary_healthy_startup_initializes_local_state_before_starting_hosted_services()
     {
         var refreshCompletion =
             new TaskCompletionSource<LibrarySnapshot>(
@@ -80,7 +81,11 @@ public sealed class ApplicationStartupCoordinatorTests
             ApplicationStartupCoordinator.StartResult.Started,
             result);
 
+        Assert.True(probe.HostBuilt);
+        Assert.True(probe.DatabaseInitialized);
+        Assert.True(probe.HostStarted);
         Assert.True(probe.MainWindowShown);
+
         Assert.Same(
             probe.CachedSnapshot,
             probe.ShownSnapshot);
@@ -89,7 +94,8 @@ public sealed class ApplicationStartupCoordinatorTests
             Assert.IsAssignableFrom<Task>(
                 sut.BackgroundRefreshTask);
 
-        Assert.False(backgroundRefresh.IsCompleted);
+        Assert.False(
+            backgroundRefresh.IsCompleted);
 
         AssertAppearsBefore(
             probe.LogSnapshot(),
@@ -97,8 +103,9 @@ public sealed class ApplicationStartupCoordinatorTests
             "gate",
             "layout",
             "dirs",
-            "host",
+            "build-host",
             "initialize",
+            "start-host",
             "show-cache",
             "scan");
 
@@ -122,7 +129,7 @@ public sealed class ApplicationStartupCoordinatorTests
     }
 
     [Fact]
-    public async Task Unhealthy_database_fails_closed_without_main_window_bindings_or_refresh_writes()
+    public async Task Unhealthy_database_does_not_start_hosted_services_or_show_main_window()
     {
         var probe = new StartupProbe
         {
@@ -149,13 +156,17 @@ public sealed class ApplicationStartupCoordinatorTests
                 "gate",
                 "layout",
                 "dirs",
-                "host",
+                "build-host",
                 "initialize",
                 "recovery"
             ],
             probe.LogSnapshot());
 
+        Assert.True(probe.HostBuilt);
+        Assert.True(probe.DatabaseInitialized);
+        Assert.False(probe.HostStarted);
         Assert.True(probe.RecoveryShown);
+
         Assert.Same(
             probe.Health,
             probe.RecoveryHealth);
@@ -238,6 +249,7 @@ public sealed class ApplicationStartupCoordinatorTests
             CancellationToken.None);
 
         Assert.True(probe.RefreshStarted);
+
         Assert.Same(
             probe.FreshSnapshot,
             probe.AppliedSnapshot);
@@ -284,6 +296,41 @@ public sealed class ApplicationStartupCoordinatorTests
     }
 
     [Fact]
+    public async Task StopAsync_disposes_built_host_when_database_is_unhealthy()
+    {
+        var probe = new StartupProbe
+        {
+            Health = new DatabaseHealthResult(
+                IsHealthy: false,
+                Detail: "bad")
+        };
+
+        var sut = new ApplicationStartupCoordinator(
+            probe.CreateOperations());
+
+        var result = await sut.StartAsync(
+            [],
+            CancellationToken.None);
+
+        Assert.Equal(
+            ApplicationStartupCoordinator.StartResult.DatabaseUnhealthy,
+            result);
+
+        probe.ClearLog();
+
+        await sut.StopAsync(
+            CancellationToken.None);
+
+        Assert.Equal(
+            [
+                "stop-pipe",
+                "stop-host",
+                "release-gate"
+            ],
+            probe.LogSnapshot());
+    }
+
+    [Fact]
     public void App_xaml_does_not_declare_StartupUri()
     {
         var appXaml = FindRepositoryFile(
@@ -311,12 +358,14 @@ public sealed class ApplicationStartupCoordinatorTests
         {
             var index = -1;
 
-            for (var i = previousIndex + 1; i < actual.Count; i++)
+            for (var i = previousIndex + 1;
+                 i < actual.Count;
+                 i++)
             {
                 if (string.Equals(
-                    actual[i],
-                    expected,
-                    StringComparison.Ordinal))
+                        actual[i],
+                        expected,
+                        StringComparison.Ordinal))
                 {
                     index = i;
                     break;
@@ -362,7 +411,8 @@ public sealed class ApplicationStartupCoordinatorTests
                     relativeParts.Length);
 
                 var candidate =
-                    Path.Combine(candidateParts);
+                    Path.Combine(
+                        candidateParts);
 
                 if (File.Exists(candidate))
                 {
@@ -379,55 +429,142 @@ public sealed class ApplicationStartupCoordinatorTests
 
     private sealed class StartupProbe
     {
-        private readonly object _logLock = new();
-        private readonly List<string> _log = [];
+        private readonly object _logLock =
+            new();
 
-        public SingleInstanceResult GateResult { get; init; } =
-            SingleInstanceResult.Primary;
+        private readonly List<string> _log =
+            [];
 
-        public DatabaseHealthResult Health { get; init; } =
-            new(
-                IsHealthy: true,
-                Detail: "ok");
+        public SingleInstanceResult GateResult
+        {
+            get;
+            init;
+        } = SingleInstanceResult.Primary;
 
-        public LibrarySnapshot CachedSnapshot { get; } =
-            CreateEmptySnapshot();
+        public DatabaseHealthResult Health
+        {
+            get;
+            init;
+        } = new(
+            IsHealthy: true,
+            Detail: "ok");
 
-        public LibrarySnapshot FreshSnapshot { get; } =
-            CreateEmptySnapshot();
+        public LibrarySnapshot CachedSnapshot
+        {
+            get;
+        } = CreateEmptySnapshot();
 
-        public Func<CancellationToken, Task<LibrarySnapshot>>? RefreshBehavior
+        public LibrarySnapshot FreshSnapshot
+        {
+            get;
+        } = CreateEmptySnapshot();
+
+        public Func<
+            CancellationToken,
+            Task<LibrarySnapshot>>?
+            RefreshBehavior
         {
             get;
             set;
         }
 
-        public bool LayoutCreated { get; private set; }
-        public bool DirectoriesEnsured { get; private set; }
-        public bool HostStarted { get; private set; }
-        public bool DatabaseInitialized { get; private set; }
-        public bool MainWindowShown { get; private set; }
-        public bool RecoveryShown { get; private set; }
-        public bool InvocationBindingInstalled { get; private set; }
-        public bool RescanBindingInstalled { get; private set; }
+        public bool LayoutCreated
+        {
+            get;
+            private set;
+        }
 
-        public bool RefreshStarted { get; set; }
+        public bool DirectoriesEnsured
+        {
+            get;
+            private set;
+        }
 
-        public LibrarySnapshot? ShownSnapshot { get; private set; }
-        public LibrarySnapshot? AppliedSnapshot { get; set; }
+        public bool HostBuilt
+        {
+            get;
+            private set;
+        }
 
-        public DatabaseHealthResult? RecoveryHealth { get; private set; }
+        public bool HostStarted
+        {
+            get;
+            private set;
+        }
 
-        public AppInvocation? LastHandledInvocation { get; private set; }
+        public bool DatabaseInitialized
+        {
+            get;
+            private set;
+        }
 
-        public Func<AppInvocation, CancellationToken, Task>?
+        public bool MainWindowShown
+        {
+            get;
+            private set;
+        }
+
+        public bool RecoveryShown
+        {
+            get;
+            private set;
+        }
+
+        public bool InvocationBindingInstalled
+        {
+            get;
+            private set;
+        }
+
+        public bool RescanBindingInstalled
+        {
+            get;
+            private set;
+        }
+
+        public bool RefreshStarted
+        {
+            get;
+            set;
+        }
+
+        public LibrarySnapshot? ShownSnapshot
+        {
+            get;
+            private set;
+        }
+
+        public LibrarySnapshot? AppliedSnapshot
+        {
+            get;
+            set;
+        }
+
+        public DatabaseHealthResult? RecoveryHealth
+        {
+            get;
+            private set;
+        }
+
+        public AppInvocation? LastHandledInvocation
+        {
+            get;
+            private set;
+        }
+
+        public Func<
+            AppInvocation,
+            CancellationToken,
+            Task>?
             InvocationReceivedHandler
         {
             get;
             private set;
         }
 
-        public Func<CancellationToken, Task>?
+        public Func<
+            CancellationToken,
+            Task>?
             RescanRequestedHandler
         {
             get;
@@ -438,14 +575,15 @@ public sealed class ApplicationStartupCoordinatorTests
             CreateOperations()
         {
             return new ApplicationStartupCoordinator.Operations(
-                ParseInvocation: args =>
-                {
-                    Mark("parse");
+                ParseInvocation:
+                    args =>
+                    {
+                        Mark("parse");
 
-                    Assert.NotNull(args);
+                        Assert.NotNull(args);
 
-                    return AppInvocation.Default;
-                },
+                        return AppInvocation.Default;
+                    },
                 AcquireSingleInstanceAsync:
                     (invocation, cancellationToken) =>
                     {
@@ -456,32 +594,35 @@ public sealed class ApplicationStartupCoordinatorTests
                         return Task.FromResult(
                             GateResult);
                     },
-                CreateUserDataLayout: () =>
-                {
-                    Mark("layout");
-                    LayoutCreated = true;
+                CreateUserDataLayout:
+                    () =>
+                    {
+                        Mark("layout");
+                        LayoutCreated = true;
 
-                    var root = Path.Combine(
-                        Path.GetTempPath(),
-                        "PlayStead.Tests",
-                        "StartupCoordinator",
-                        Guid.NewGuid().ToString("N"));
+                        var root =
+                            Path.Combine(
+                                Path.GetTempPath(),
+                                "PlayStead.Tests",
+                                "StartupCoordinator",
+                                Guid.NewGuid().ToString("N"));
 
-                    return UserDataLayout.FromRoot(
-                        root);
-                },
-                EnsureDirectoriesExist: layout =>
-                {
-                    Mark("dirs");
-                    DirectoriesEnsured = true;
+                        return UserDataLayout.FromRoot(
+                            root);
+                    },
+                EnsureDirectoriesExist:
+                    layout =>
+                    {
+                        Mark("dirs");
+                        DirectoriesEnsured = true;
 
-                    Assert.NotNull(layout);
-                },
-                StartHostAsync:
+                        Assert.NotNull(layout);
+                    },
+                BuildHostAsync:
                     (layout, cancellationToken) =>
                     {
-                        Mark("host");
-                        HostStarted = true;
+                        Mark("build-host");
+                        HostBuilt = true;
 
                         Assert.NotNull(layout);
 
@@ -497,6 +638,14 @@ public sealed class ApplicationStartupCoordinatorTests
                             new LocalStartupState(
                                 Health,
                                 CachedSnapshot));
+                    },
+                StartHostAsync:
+                    cancellationToken =>
+                    {
+                        Mark("start-host");
+                        HostStarted = true;
+
+                        return Task.CompletedTask;
                     },
                 ShowCachedSnapshotAsync:
                     (snapshot, cancellationToken) =>
@@ -516,18 +665,20 @@ public sealed class ApplicationStartupCoordinatorTests
 
                         return Task.CompletedTask;
                     },
-                BindInvocationReceived: handler =>
-                {
-                    Mark("bind-pipe");
-                    InvocationBindingInstalled = true;
-                    InvocationReceivedHandler = handler;
-                },
-                BindRescanRequested: handler =>
-                {
-                    Mark("bind-rescan");
-                    RescanBindingInstalled = true;
-                    RescanRequestedHandler = handler;
-                },
+                BindInvocationReceived:
+                    handler =>
+                    {
+                        Mark("bind-pipe");
+                        InvocationBindingInstalled = true;
+                        InvocationReceivedHandler = handler;
+                    },
+                BindRescanRequested:
+                    handler =>
+                    {
+                        Mark("bind-rescan");
+                        RescanBindingInstalled = true;
+                        RescanRequestedHandler = handler;
+                    },
                 HandleInvocationAsync:
                     (invocation, cancellationToken) =>
                     {
@@ -536,7 +687,8 @@ public sealed class ApplicationStartupCoordinatorTests
 
                         return Task.CompletedTask;
                     },
-                RefreshAsync: RefreshAsync,
+                RefreshAsync:
+                    RefreshAsync,
                 ApplySnapshotOnUiAsync:
                     (snapshot, cancellationToken) =>
                     {
@@ -573,7 +725,8 @@ public sealed class ApplicationStartupCoordinatorTests
         {
             lock (_logLock)
             {
-                _log.Add(step);
+                _log.Add(
+                    step);
             }
         }
 
@@ -609,7 +762,8 @@ public sealed class ApplicationStartupCoordinatorTests
                 FreshSnapshot);
         }
 
-        private static LibrarySnapshot CreateEmptySnapshot() =>
+        private static LibrarySnapshot
+            CreateEmptySnapshot() =>
             new(
                 Array.Empty<LogicalGame>(),
                 Array.Empty<GameInstallation>());
