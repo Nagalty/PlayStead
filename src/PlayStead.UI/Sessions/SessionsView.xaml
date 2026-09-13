@@ -1,6 +1,7 @@
 <UserControl x:Class="PlayStead.UI.Sessions.SessionsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:PlayStead.UI.Controls"
              xmlns:sessions="clr-namespace:PlayStead.UI.Sessions"
              Background="Transparent">
 
@@ -81,11 +82,8 @@
                                                 Margin="24,0,0,0"
                                                 VerticalAlignment="Center"
                                                 HorizontalAlignment="Right">
-                                        <TextBlock Text="EN COURS"
-                                                   Foreground="#C9824B"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"
-                                                   HorizontalAlignment="Right"/>
+                                        <controls:StatusBadge Text="EN COURS"
+                                                              HorizontalAlignment="Right"/>
 
                                         <TextBlock Margin="0,5,0,0"
                                                    Text="{Binding DurationLabel}"
@@ -100,12 +98,7 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <Border x:Name="ActiveSessionsEmptyState"
-                        Padding="18"
-                        Background="#181B1F"
-                        BorderBrush="#2C3036"
-                        BorderThickness="1"
-                        CornerRadius="8">
+                <Border x:Name="ActiveSessionsEmptyState">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility"
@@ -120,9 +113,7 @@
                         </Style>
                     </Border.Style>
 
-                    <TextBlock Text="Aucune session active."
-                               Foreground="#A9AFB7"
-                               FontSize="14"/>
+                    <controls:EmptyState Message="Aucune session active."/>
                 </Border>
             </Grid>
 

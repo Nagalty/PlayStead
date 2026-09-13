@@ -11,7 +11,8 @@ public sealed record LibraryItemViewModel(
     string ProviderLabel,
     string InstallPath,
     long? InstalledSizeBytes,
-    SteamUpdateState? SteamState = null)
+    SteamUpdateState? SteamState = null,
+    bool IsSessionActive = false)
 {
     private static readonly CultureInfo DisplayCulture =
         CultureInfo.GetCultureInfo("fr-FR");
@@ -47,4 +48,9 @@ public sealed record LibraryItemViewModel(
             _ =>
                 string.Empty
         };
+
+    public string? SessionStatusLabel =>
+        IsSessionActive
+            ? "En cours"
+            : null;
 }

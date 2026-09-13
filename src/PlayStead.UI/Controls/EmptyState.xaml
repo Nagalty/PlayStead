@@ -1,0 +1,15 @@
+<UserControl x:Class="PlayStead.UI.Controls.EmptyState"
+             x:Name="Root"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Padding="18"
+            Background="#181B1F"
+            BorderBrush="#2C3036"
+            BorderThickness="1"
+            CornerRadius="8">
+        <TextBlock Text="{Binding Message, ElementName=Root}"
+                   Foreground="#A9AFB7"
+                   FontSize="14"
+                   TextWrapping="Wrap"/>
+    </Border>
+</UserControl>

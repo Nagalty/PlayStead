@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
+using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
+using PlayStead.UI.Sessions;
 using PlayStead.UI.Steam;
 
 namespace PlayStead.UI.Library;
@@ -13,6 +15,8 @@ public sealed class LibraryViewModel :
     private readonly ILibraryStore _libraryStore;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly object _verifySteamGate = new();
+
+    private SessionMonitor? _sessionMonitor;
 
     private IReadOnlyList<LibraryItemViewModel> _items =
         Array.Empty<LibraryItemViewModel>();
@@ -38,6 +42,27 @@ public sealed class LibraryViewModel :
 
         _steamReferenceRuntime =
             steamReferenceRuntime;
+    }
+
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
+        SessionMonitor sessionMonitor)
+        : this(libraryStore)
+    {
+        AttachSessionMonitor(
+            sessionMonitor);
+    }
+
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        SessionMonitor sessionMonitor)
+        : this(
+            libraryStore,
+            steamReferenceRuntime)
+    {
+        AttachSessionMonitor(
+            sessionMonitor);
     }
 
     public event PropertyChangedEventHandler?
@@ -209,6 +234,10 @@ public sealed class LibraryViewModel :
                     group.First().Evaluation.State,
                 StringComparer.Ordinal);
 
+        var activeGameIds =
+            ActiveGameIds(
+                _sessionMonitor?.LatestSnapshot);
+
         return snapshot.Games
             .Where(
                 game =>
@@ -254,7 +283,9 @@ public sealed class LibraryViewModel :
                             installation.Provider),
                         installation.InstallPath,
                         installation.InstalledSizeBytes,
-                        steamState);
+                        steamState,
+                        activeGameIds.Contains(
+                            game.Id));
                 })
             .OrderBy(
                 item =>
@@ -263,6 +294,49 @@ public sealed class LibraryViewModel :
                     .CurrentCultureIgnoreCase)
             .ToArray();
     }
+
+    private void AttachSessionMonitor(
+        SessionMonitor sessionMonitor)
+    {
+        ArgumentNullException.ThrowIfNull(
+            sessionMonitor);
+
+        _sessionMonitor =
+            sessionMonitor;
+
+        _sessionMonitor.SnapshotUpdated +=
+            SessionMonitor_OnSnapshotUpdated;
+    }
+
+    private void SessionMonitor_OnSnapshotUpdated(
+        SessionRuntimeSnapshot snapshot)
+    {
+        var activeGameIds =
+            ActiveGameIds(
+                snapshot);
+
+        Items =
+            Items
+                .Select(
+                    item =>
+                        item with
+                        {
+                            IsSessionActive =
+                                activeGameIds.Contains(
+                                    item.GameId)
+                        })
+                .ToArray();
+    }
+
+    private static HashSet<GameId> ActiveGameIds(
+        SessionRuntimeSnapshot? snapshot) =>
+        snapshot?.ActiveSessions
+            .Select(
+                session =>
+                    new GameId(
+                        session.GameId))
+            .ToHashSet()
+        ?? [];
 
     private static string ProviderLabel(
         ProviderKind provider) =>
