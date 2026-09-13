@@ -1,0 +1,80 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Style x:Key="PlayStead.FocusVisual" TargetType="Control">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Control">
+                    <Rectangle Margin="2" StrokeThickness="2" StrokeDashArray="2,2"
+                               Stroke="{DynamicResource PlayStead.Brush.TextPrimary}"
+                               IsHitTestVisible="False"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PlayStead.ControlBase" TargetType="Control">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Body}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+        <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="{DynamicResource PlayStead.Spacing.2}"/>
+        <Setter Property="FocusVisualStyle" Value="{StaticResource PlayStead.FocusVisual}"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.CopperHover}"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.55"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <ControlTemplate x:Key="PlayStead.ButtonTemplate" TargetType="ButtonBase">
+        <Border Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{DynamicResource PlayStead.Radius.Small}"
+                Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                              RecognizesAccessKey="True"/>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Background}"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <Style TargetType="Button" BasedOn="{StaticResource PlayStead.ControlBase}">
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template" Value="{StaticResource PlayStead.ButtonTemplate}"/>
+    </Style>
+
+    <Style TargetType="ToggleButton" BasedOn="{StaticResource PlayStead.ControlBase}">
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template" Value="{StaticResource PlayStead.ButtonTemplate}"/>
+        <Style.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}"/>
+                <Setter Property="BorderThickness" Value="2"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Keep native editing, selection, popup and keyboard behavior. -->
+    <Style TargetType="TextBox" BasedOn="{StaticResource PlayStead.ControlBase}">
+        <Setter Property="CaretBrush" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+        <Setter Property="SelectionBrush" Value="{DynamicResource PlayStead.Brush.Copper}"/>
+    </Style>
+    <Style TargetType="ComboBox" BasedOn="{StaticResource PlayStead.ControlBase}"/>
+</ResourceDictionary>

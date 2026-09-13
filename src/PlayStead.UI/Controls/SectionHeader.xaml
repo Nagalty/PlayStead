@@ -3,7 +3,8 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <TextBlock Text="{Binding Title, ElementName=Root}"
-               Foreground="#E5E7EB"
+               Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+               FontFamily="{DynamicResource PlayStead.Font.Body}"
                FontSize="17"
                FontWeight="SemiBold"/>
 </UserControl>

@@ -2,13 +2,14 @@
              x:Name="Root"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Border Padding="18"
-            Background="#181B1F"
-            BorderBrush="#2C3036"
+    <Border Padding="{DynamicResource PlayStead.Spacing.3}"
+            Background="{DynamicResource PlayStead.Brush.Surface}"
+            BorderBrush="{DynamicResource PlayStead.Brush.Border}"
             BorderThickness="1"
-            CornerRadius="8">
+            CornerRadius="{DynamicResource PlayStead.Radius.Medium}">
         <TextBlock Text="{Binding Message, ElementName=Root}"
-                   Foreground="#A9AFB7"
+                   Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                   FontFamily="{DynamicResource PlayStead.Font.Body}"
                    FontSize="14"
                    TextWrapping="Wrap"/>
     </Border>

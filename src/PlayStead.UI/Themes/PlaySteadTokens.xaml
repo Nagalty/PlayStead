@@ -1,0 +1,26 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="PlayStead.Brush.Background" Color="#1B1B1D"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.Surface" Color="#222226"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.SurfaceRaised" Color="#29292E"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.Border" Color="#4A4A4F"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.TextPrimary" Color="#E6E6E6"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.TextSecondary" Color="#A7A7AC"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.Copper" Color="#C6814F"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.CopperHover" Color="#D08D5A"/>
+
+    <Thickness x:Key="PlayStead.Spacing.1">4</Thickness>
+    <Thickness x:Key="PlayStead.Spacing.2">8</Thickness>
+    <Thickness x:Key="PlayStead.Spacing.3">16</Thickness>
+    <Thickness x:Key="PlayStead.Spacing.4">24</Thickness>
+    <Thickness x:Key="PlayStead.Spacing.5">32</Thickness>
+    <Thickness x:Key="PlayStead.Spacing.6">48</Thickness>
+
+    <CornerRadius x:Key="PlayStead.Radius.Small">8</CornerRadius>
+    <CornerRadius x:Key="PlayStead.Radius.Medium">12</CornerRadius>
+    <CornerRadius x:Key="PlayStead.Radius.Large">16</CornerRadius>
+
+    <Duration x:Key="PlayStead.Duration.Fast">0:0:0.120</Duration>
+    <Duration x:Key="PlayStead.Duration.Normal">0:0:0.180</Duration>
+    <FontFamily x:Key="PlayStead.Font.Body">Segoe UI Variable, Segoe UI</FontFamily>
+</ResourceDictionary>

@@ -4,6 +4,11 @@
              xmlns:local="clr-namespace:PlayStead.UI"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/PlaySteadTokens.xaml"/>
+                <ResourceDictionary Source="Themes/PlaySteadControls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

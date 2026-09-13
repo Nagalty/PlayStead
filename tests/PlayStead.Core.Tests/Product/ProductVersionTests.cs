@@ -5,8 +5,8 @@ namespace PlayStead.Core.Tests.Product;
 public sealed class ProductVersionTests
 {
     [Fact]
-    public void Current_matches_0_3_development_version()
+    public void Current_matches_0_4_development_version()
     {
-        Assert.Equal("0.3.0-dev", ProductVersion.Current);
+        Assert.Equal("0.4.0-dev", ProductVersion.Current);
     }
 }
