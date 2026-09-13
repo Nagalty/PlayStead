@@ -15,7 +15,9 @@ using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Evidence;
 using PlayStead.Providers.Steam.Remote;
 using PlayStead.UI.Library;
+using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
+using PlayStead.UI.Shell;
 using PlayStead.UI.SingleInstance;
 using PlayStead.UI.State;
 using PlayStead.UI.Steam;
@@ -170,6 +172,12 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<
             WindowClosePolicy>();
+
+        builder.Services.AddSingleton<
+            NavigationService>();
+
+        builder.Services.AddSingleton<
+            ShellViewModel>();
 
         builder.Services.AddSingleton<
             LibraryViewModel>();

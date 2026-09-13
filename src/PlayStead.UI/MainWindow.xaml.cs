@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Media;
+using System.Windows.Input;
 using PlayStead.UI.Library;
+using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
+using PlayStead.UI.Shell;
 using PlayStead.UI.State;
 using PlayStead.UI.Tray;
 
@@ -10,54 +12,78 @@ namespace PlayStead.UI;
 
 public partial class MainWindow : Window
 {
-    private static readonly Brush ActiveNavBrush =
-        CreateFrozenBrush(
-            0xC9,
-            0x82,
-            0x4B);
-
-    private static readonly Brush InactiveNavBrush =
-        CreateFrozenBrush(
-            0xA8,
-            0xAD,
-            0xB5);
-
     private readonly WindowPlacementService? _windowPlacementService;
     private readonly WindowClosePolicy? _windowClosePolicy;
     private readonly LibraryView _libraryView;
+    private readonly NavigationService _navigationService;
+    private readonly ShellViewModel _shellViewModel;
 
     private SessionViewModel? _sessionViewModel;
     private SessionsView? _sessionsView;
 
     public MainWindow()
+        : this(
+            new NavigationService(),
+            shellViewModel: null)
     {
+    }
+
+    private MainWindow(
+        NavigationService navigationService,
+        ShellViewModel? shellViewModel)
+    {
+        ArgumentNullException.ThrowIfNull(
+            navigationService);
+
         InitializeComponent();
 
         _libraryView =
             MainContent.Content as LibraryView
             ?? throw new InvalidOperationException(
-                "The main window must start with LibraryView.");
+                "The main window must declare its LibraryView shell content.");
 
-        UpdateNavigationState(
-            sessionsSelected: false);
+        _navigationService =
+            navigationService;
+
+        _shellViewModel =
+            shellViewModel
+            ?? new ShellViewModel(
+                _navigationService);
+
+        PrimaryNavigation.DataContext =
+            _shellViewModel;
+
+        _navigationService.Changed +=
+            NavigationService_OnChanged;
+
+        PreviewKeyDown +=
+            MainWindow_OnPreviewKeyDown;
+
+        ApplyCurrentRoute();
     }
 
     public MainWindow(
         LibraryViewModel viewModel)
         : this()
     {
-        ArgumentNullException.ThrowIfNull(viewModel);
-        DataContext = viewModel;
+        ArgumentNullException.ThrowIfNull(
+            viewModel);
+
+        DataContext =
+            viewModel;
     }
 
     public MainWindow(
         LibraryViewModel viewModel,
         WindowPlacementService windowPlacementService)
-        : this(viewModel)
+        : this(
+            viewModel)
     {
-        ArgumentNullException.ThrowIfNull(windowPlacementService);
+        ArgumentNullException.ThrowIfNull(
+            windowPlacementService);
 
-        _windowPlacementService = windowPlacementService;
+        _windowPlacementService =
+            windowPlacementService;
 
         RestoreWindowPlacement();
     }
@@ -70,7 +96,8 @@ public partial class MainWindow : Window
             viewModel,
             windowPlacementService)
     {
-        ArgumentNullException.ThrowIfNull(windowClosePolicy);
+        ArgumentNullException.ThrowIfNull(
+            windowClosePolicy);
 
         _windowClosePolicy =
             windowClosePolicy;
@@ -86,10 +113,46 @@ public partial class MainWindow : Window
             windowPlacementService,
             windowClosePolicy)
     {
-        ArgumentNullException.ThrowIfNull(sessionViewModel);
+        ArgumentNullException.ThrowIfNull(
+            sessionViewModel);
 
         _sessionViewModel =
             sessionViewModel;
+    }
+
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy,
+        SessionViewModel sessionViewModel,
+        NavigationService navigationService,
+        ShellViewModel shellViewModel)
+        : this(
+            navigationService,
+            shellViewModel)
+    {
+        ArgumentNullException.ThrowIfNull(
+            viewModel);
+        ArgumentNullException.ThrowIfNull(
+            windowPlacementService);
+        ArgumentNullException.ThrowIfNull(
+            windowClosePolicy);
+        ArgumentNullException.ThrowIfNull(
+            sessionViewModel);
+
+        DataContext =
+            viewModel;
+
+        _windowPlacementService =
+            windowPlacementService;
+
+        _windowClosePolicy =
+            windowClosePolicy;
+
+        _sessionViewModel =
+            sessionViewModel;
+
+        RestoreWindowPlacement();
     }
 
     public event EventHandler? RescanRequested;
@@ -119,7 +182,8 @@ public partial class MainWindow : Window
             Hide();
         }
 
-        base.OnClosing(e);
+        base.OnClosing(
+            e);
     }
 
     private void RestoreWindowPlacement()
@@ -159,10 +223,14 @@ public partial class MainWindow : Window
         WindowStartupLocation =
             WindowStartupLocation.Manual;
 
-        Left = placement.Left;
-        Top = placement.Top;
-        Width = placement.Width;
-        Height = placement.Height;
+        Left =
+            placement.Left;
+        Top =
+            placement.Top;
+        Width =
+            placement.Width;
+        Height =
+            placement.Height;
 
         WindowState =
             placement.IsMaximized
@@ -174,7 +242,8 @@ public partial class MainWindow : Window
         CaptureWindowPlacement()
     {
         var normalBounds =
-            WindowState == WindowState.Normal
+            WindowState ==
+            WindowState.Normal
                 ? new Rect(
                     Left,
                     Top,
@@ -192,73 +261,78 @@ public partial class MainWindow : Window
                 WindowState.Maximized);
     }
 
-    private void LibraryNavButton_OnClick(
+    private void NavigationService_OnChanged(
+        object? sender,
+        EventArgs e)
+    {
+        ApplyCurrentRoute();
+    }
+
+    private void ApplyCurrentRoute()
+    {
+        switch (_navigationService.CurrentRoute)
+        {
+            case AppRoute.Library:
+                _libraryView.DataContext =
+                    DataContext;
+
+                MainContent.Content =
+                    _libraryView;
+                break;
+
+            case AppRoute.Sessions:
+                _sessionsView ??=
+                    new SessionsView();
+
+                _sessionsView.DataContext =
+                    _sessionViewModel;
+
+                MainContent.Content =
+                    _sessionsView;
+                break;
+
+            case AppRoute.Home:
+            case AppRoute.Attention:
+            case AppRoute.Settings:
+            case AppRoute.GameDetail:
+            case AppRoute.SessionDetail:
+                MainContent.Content =
+                    null;
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported route: {_navigationService.CurrentRoute}.");
+        }
+    }
+
+    private void MainWindow_OnPreviewKeyDown(
         object sender,
-        RoutedEventArgs e)
+        KeyEventArgs e)
     {
-        MainContent.Content =
-            _libraryView;
+        if (e.Key != Key.Left ||
+            (Keyboard.Modifiers &
+             ModifierKeys.Alt) !=
+            ModifierKeys.Alt)
+        {
+            return;
+        }
 
-        UpdateNavigationState(
-            sessionsSelected: false);
-    }
+        if (!_shellViewModel
+                .GoBackCommand
+                .CanExecute(
+                    null))
+        {
+            return;
+        }
 
-    private void SessionsNavButton_OnClick(
-        object sender,
-        RoutedEventArgs e)
-    {
-        _sessionsView ??=
-            new SessionsView();
+        _shellViewModel
+            .GoBackCommand
+            .Execute(
+                null);
 
-        _sessionsView.DataContext =
-            _sessionViewModel;
-
-        MainContent.Content =
-            _sessionsView;
-
-        UpdateNavigationState(
-            sessionsSelected: true);
-    }
-
-    private void UpdateNavigationState(
-        bool sessionsSelected)
-    {
-        LibraryNavIndicator.Visibility =
-            sessionsSelected
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-
-        SessionsNavIndicator.Visibility =
-            sessionsSelected
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-
-        LibraryNavText.Foreground =
-            sessionsSelected
-                ? InactiveNavBrush
-                : ActiveNavBrush;
-
-        SessionsNavText.Foreground =
-            sessionsSelected
-                ? ActiveNavBrush
-                : InactiveNavBrush;
-    }
-
-    private static Brush CreateFrozenBrush(
-        byte red,
-        byte green,
-        byte blue)
-    {
-        var brush =
-            new SolidColorBrush(
-                Color.FromRgb(
-                    red,
-                    green,
-                    blue));
-
-        brush.Freeze();
-
-        return brush;
+        e.Handled =
+            true;
     }
 
     private void LibraryView_OnRescanRequested(

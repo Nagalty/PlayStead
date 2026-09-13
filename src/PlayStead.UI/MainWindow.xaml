@@ -8,8 +8,8 @@
         MinWidth="960"
         MinHeight="640"
         WindowStartupLocation="CenterScreen"
-        Background="#111316"
-        Foreground="#F3F3F3">
+        Background="{DynamicResource PlayStead.Brush.Background}"
+        Foreground="{DynamicResource PlayStead.Brush.TextPrimary}">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -18,17 +18,13 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="#171A1F"
-                BorderBrush="#2A2E34"
+                Background="{DynamicResource PlayStead.Brush.Surface}"
+                BorderBrush="{DynamicResource PlayStead.Brush.Border}"
                 BorderThickness="0,0,0,1">
             <Grid Margin="28,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="48" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="20" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="40" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
@@ -39,63 +35,43 @@
                            VerticalAlignment="Center"
                            FontSize="24"
                            FontWeight="SemiBold"
-                           Foreground="#F5F5F5" />
+                           Foreground="{DynamicResource PlayStead.Brush.TextPrimary}" />
 
-                <TextBlock x:Name="HomeNavText"
-                           Grid.Column="2"
-                           Text="Accueil"
-                           VerticalAlignment="Center"
-                           FontSize="15"
-                           Foreground="#A8ADB5" />
+                <StackPanel x:Name="PrimaryNavigation"
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Stretch">
+                    <Button x:Name="HomeNavButton"
+                            Command="{Binding NavigateHomeCommand}"
+                            Margin="0,0,8,0"
+                            Padding="14,0"
+                            VerticalAlignment="Stretch">
+                        <TextBlock Text="Accueil" />
+                    </Button>
 
-                <Button x:Name="LibraryNavButton"
-                        Grid.Column="4"
-                        Click="LibraryNavButton_OnClick"
-                        VerticalAlignment="Stretch"
-                        Padding="0"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Cursor="Hand">
-                    <Grid VerticalAlignment="Stretch">
-                        <TextBlock x:Name="LibraryNavText"
-                                   Text="Bibliothèque"
-                                   VerticalAlignment="Center"
-                                   FontSize="15"
-                                   FontWeight="SemiBold"
-                                   Foreground="#C9824B" />
+                    <Button x:Name="LibraryNavButton"
+                            Command="{Binding NavigateLibraryCommand}"
+                            Margin="0,0,8,0"
+                            Padding="14,0"
+                            VerticalAlignment="Stretch">
+                        <TextBlock Text="Bibliothèque" />
+                    </Button>
 
-                        <Border x:Name="LibraryNavIndicator"
-                                Height="2"
-                                VerticalAlignment="Bottom"
-                                Background="#C9824B"
-                                CornerRadius="1" />
-                    </Grid>
-                </Button>
+                    <Button x:Name="AttentionNavButton"
+                            Command="{Binding NavigateAttentionCommand}"
+                            Margin="0,0,8,0"
+                            Padding="14,0"
+                            VerticalAlignment="Stretch">
+                        <TextBlock Text="À signaler" />
+                    </Button>
 
-                <Button x:Name="SessionsNavButton"
-                        Grid.Column="6"
-                        Click="SessionsNavButton_OnClick"
-                        VerticalAlignment="Stretch"
-                        Padding="0"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Cursor="Hand">
-                    <Grid VerticalAlignment="Stretch">
-                        <TextBlock x:Name="SessionsNavText"
-                                   Text="Sessions"
-                                   VerticalAlignment="Center"
-                                   FontSize="15"
-                                   FontWeight="SemiBold"
-                                   Foreground="#A8ADB5" />
-
-                        <Border x:Name="SessionsNavIndicator"
-                                Height="2"
-                                VerticalAlignment="Bottom"
-                                Background="#C9824B"
-                                CornerRadius="1"
-                                Visibility="Collapsed" />
-                    </Grid>
-                </Button>
+                    <Button x:Name="SettingsNavButton"
+                            Command="{Binding NavigateSettingsCommand}"
+                            Padding="14,0"
+                            VerticalAlignment="Stretch">
+                        <TextBlock Text="Paramètres" />
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

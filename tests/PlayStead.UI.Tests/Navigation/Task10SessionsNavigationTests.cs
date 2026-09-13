@@ -2,107 +2,161 @@ using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using PlayStead.UI.Library;
+using Microsoft.Extensions.DependencyInjection;
+using PlayStead.Platform.Paths;
+using PlayStead.UI.Bootstrap;
+using PlayStead.UI.Navigation;
 
 namespace PlayStead.UI.Tests.Navigation;
 
 public sealed class Task10SessionsNavigationTests
 {
     [Fact]
-    public void MainWindow_exposes_sessions_navigation_and_switches_between_library_and_sessions()
+    public void Shared_navigation_service_opens_Sessions_contextually_without_a_permanent_primary_nav_button()
     {
-        RunSta(() =>
+        var root =
+            Path.Combine(
+                Path.GetTempPath(),
+                "PlayStead.Tests",
+                nameof(Task10SessionsNavigationTests),
+                Guid.NewGuid().ToString("N"));
+
+        var layout =
+            UserDataLayout.FromRoot(
+                root);
+
+        layout.EnsureDirectoriesExist();
+
+        using var host =
+            PlaySteadHost.Build(
+                layout);
+
+        try
         {
-            var window = new MainWindow();
-
-            try
+            RunSta(() =>
             {
-                var content = Assert.IsType<ContentControl>(
-                    window.FindName("MainContent"));
+                var navigation =
+                    host.Services
+                        .GetRequiredService<
+                            NavigationService>();
 
-                Assert.IsType<LibraryView>(
-                    content.Content);
+                var window =
+                    host.Services
+                        .GetRequiredService<
+                            MainWindow>();
 
-                var sessionsButton = Assert.IsType<Button>(
-                    window.FindName("SessionsNavButton"));
+                try
+                {
+                    Assert.Null(
+                        window.FindName(
+                            "SessionsNavButton"));
 
-                var libraryButton = Assert.IsType<Button>(
-                    window.FindName("LibraryNavButton"));
+                    navigation.Navigate(
+                        new NavigationRequest(
+                            AppRoute.Sessions));
 
-                sessionsButton.RaiseEvent(
-                    new RoutedEventArgs(
-                        Button.ClickEvent));
+                    var content =
+                        Assert.IsType<ContentControl>(
+                            window.FindName(
+                                "MainContent"));
 
-                Assert.Equal(
-                    "PlayStead.UI.Sessions.SessionsView",
-                    content.Content?.GetType().FullName);
+                    Assert.Equal(
+                        "PlayStead.UI.Sessions.SessionsView",
+                        content.Content?
+                            .GetType()
+                            .FullName);
 
-                libraryButton.RaiseEvent(
-                    new RoutedEventArgs(
-                        Button.ClickEvent));
+                    return 0;
+                }
+                finally
+                {
+                    var policy =
+                        host.Services.GetService(
+                            typeof(
+                                PlayStead.UI.Tray.WindowClosePolicy));
 
-                Assert.IsType<LibraryView>(
-                    content.Content);
+                    policy?
+                        .GetType()
+                        .GetMethod(
+                            "RequestExit")
+                        ?.Invoke(
+                            policy,
+                            null);
 
-                return 0;
-            }
-            finally
+                    window.WindowStartupLocation =
+                        WindowStartupLocation.Manual;
+
+                    window.Left = 100;
+                    window.Top = 100;
+                    window.Width = 1280;
+                    window.Height = 800;
+
+                    window.Close();
+                }
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(
+                    root))
             {
-                window.Close();
+                Directory.Delete(
+                    root,
+                    recursive: true);
             }
-        });
+        }
     }
 
     [Fact]
-    public void MainWindow_keeps_the_existing_library_label_and_adds_a_sessions_label()
+    public void Sessions_route_can_return_to_Home_through_the_shared_navigation_history()
     {
-        RunSta(() =>
-        {
-            var window = new MainWindow();
+        var navigation =
+            new NavigationService();
 
-            try
-            {
-                var libraryText = Assert.IsType<TextBlock>(
-                    window.FindName("LibraryNavText"));
+        navigation.Navigate(
+            new NavigationRequest(
+                AppRoute.Sessions));
 
-                var sessionsText = Assert.IsType<TextBlock>(
-                    window.FindName("SessionsNavText"));
+        Assert.Equal(
+            AppRoute.Sessions,
+            navigation.CurrentRoute);
 
-                Assert.Equal(
-                    "Bibliothèque",
-                    libraryText.Text);
+        Assert.True(
+            navigation.CanGoBack);
 
-                Assert.Equal(
-                    "Sessions",
-                    sessionsText.Text);
+        Assert.True(
+            navigation.GoBack());
 
-                return 0;
-            }
-            finally
-            {
-                window.Close();
-            }
-        });
+        Assert.Equal(
+            AppRoute.Home,
+            navigation.CurrentRoute);
     }
 
     private static T RunSta<T>(
         Func<T> action)
     {
-        T? result = default;
-        Exception? error = null;
+        T? result =
+            default;
 
-        var thread = new Thread(
-            () =>
-            {
-                try
+        Exception? error =
+            null;
+
+        var thread =
+            new Thread(
+                () =>
                 {
-                    result = action();
-                }
-                catch (Exception exception)
-                {
-                    error = exception;
-                }
-            });
+                    try
+                    {
+                        result =
+                            action();
+                    }
+                    catch (
+                        Exception exception)
+                    {
+                        error =
+                            exception;
+                    }
+                });
 
         thread.SetApartmentState(
             ApartmentState.STA);

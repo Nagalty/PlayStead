@@ -1,66 +1,120 @@
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows.Controls;
-using PlayStead.UI.Library;
 
 namespace PlayStead.UI.Tests;
 
 public sealed class MainWindowShellTests
 {
     [Fact]
-    public void MainWindow_exposes_the_minimal_top_navigation_shell()
+    public void MainWindow_exposes_the_authoritative_top_navigation_shell()
     {
         RunSta(() =>
         {
-            var window = new MainWindow();
+            var window =
+                new MainWindow();
 
-            var wordmark = Assert.IsType<TextBlock>(
-                window.FindName("PlaySteadWordmark"));
+            try
+            {
+                var wordmark =
+                    Assert.IsType<TextBlock>(
+                        window.FindName(
+                            "PlaySteadWordmark"));
 
-            var home = Assert.IsType<TextBlock>(
-                window.FindName("HomeNavText"));
+                var home =
+                    Assert.IsType<Button>(
+                        window.FindName(
+                            "HomeNavButton"));
 
-            var library = Assert.IsType<TextBlock>(
-                window.FindName("LibraryNavText"));
+                var library =
+                    Assert.IsType<Button>(
+                        window.FindName(
+                            "LibraryNavButton"));
 
-            var content = Assert.IsType<ContentControl>(
-                window.FindName("MainContent"));
+                var attention =
+                    Assert.IsType<Button>(
+                        window.FindName(
+                            "AttentionNavButton"));
 
-            Assert.Equal("PlayStead", wordmark.Text);
-            Assert.Equal("Accueil", home.Text);
-            Assert.Equal("Bibliothèque", library.Text);
-            Assert.IsType<LibraryView>(content.Content);
+                var settings =
+                    Assert.IsType<Button>(
+                        window.FindName(
+                            "SettingsNavButton"));
 
-            window.Close();
+                Assert.Equal(
+                    "PlayStead",
+                    wordmark.Text);
 
-            return 0;
+                Assert.Equal(
+                    "Accueil",
+                    Assert.IsType<TextBlock>(
+                        home.Content).Text);
+
+                Assert.Equal(
+                    "Bibliothèque",
+                    Assert.IsType<TextBlock>(
+                        library.Content).Text);
+
+                Assert.Equal(
+                    "À signaler",
+                    Assert.IsType<TextBlock>(
+                        attention.Content).Text);
+
+                Assert.Equal(
+                    "Paramètres",
+                    Assert.IsType<TextBlock>(
+                        settings.Content).Text);
+
+                Assert.Null(
+                    window.FindName(
+                        "SessionsNavButton"));
+
+                return 0;
+            }
+            finally
+            {
+                window.Close();
+            }
         });
     }
 
-    private static T RunSta<T>(Func<T> action)
+    private static T RunSta<T>(
+        Func<T> action)
     {
-        T? result = default;
-        Exception? error = null;
+        T? result =
+            default;
 
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                result = action();
-            }
-            catch (Exception ex)
-            {
-                error = ex;
-            }
-        });
+        Exception? error =
+            null;
 
-        thread.SetApartmentState(ApartmentState.STA);
+        var thread =
+            new Thread(
+                () =>
+                {
+                    try
+                    {
+                        result =
+                            action();
+                    }
+                    catch (
+                        Exception exception)
+                    {
+                        error =
+                            exception;
+                    }
+                });
+
+        thread.SetApartmentState(
+            ApartmentState.STA);
+
         thread.Start();
         thread.Join();
 
         if (error is not null)
         {
-            ExceptionDispatchInfo.Capture(error).Throw();
+            ExceptionDispatchInfo
+                .Capture(error)
+                .Throw();
         }
 
         return result!;

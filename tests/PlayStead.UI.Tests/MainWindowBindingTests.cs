@@ -6,49 +6,64 @@ using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.UI.Library;
+using PlayStead.UI.Shell;
 
 namespace PlayStead.UI.Tests;
 
 public sealed class MainWindowBindingTests
 {
     [Fact]
-    public async Task MainWindow_binds_LibraryView_to_the_registered_LibraryViewModel()
+    public async Task MainWindow_binds_LibraryView_to_the_registered_LibraryViewModel_after_library_navigation()
     {
-        var now = new DateTimeOffset(
-            2026, 9, 12, 10, 0, 0, TimeSpan.Zero);
+        var now =
+            new DateTimeOffset(
+                2026,
+                9,
+                12,
+                10,
+                0,
+                0,
+                TimeSpan.Zero);
 
-        var gameId = GameId.New();
+        var gameId =
+            GameId.New();
 
-        var snapshot = new LibrarySnapshot(
-            [
-                new LogicalGame(
-                    gameId,
-                    "Arma Reforger",
-                    IsHidden: false,
-                    CreatedAtUtc: now,
-                    UpdatedAtUtc: now)
-            ],
-            [
-                new GameInstallation(
-                    InstallationId.New(),
-                    gameId,
-                    ProviderKind.Steam,
-                    "1874880",
-                    @"G:\SteamLibrary\steamapps\common\Arma Reforger",
-                    42_000_000_000,
-                    IsPreferred: true,
-                    IsPresent: true,
-                    LastSeenUtc: now)
-            ]);
+        var snapshot =
+            new LibrarySnapshot(
+                [
+                    new LogicalGame(
+                        gameId,
+                        "Arma Reforger",
+                        IsHidden: false,
+                        CreatedAtUtc: now,
+                        UpdatedAtUtc: now)
+                ],
+                [
+                    new GameInstallation(
+                        InstallationId.New(),
+                        gameId,
+                        ProviderKind.Steam,
+                        "1874880",
+                        @"G:\SteamLibrary\steamapps\common\Arma Reforger",
+                        42_000_000_000,
+                        IsPreferred: true,
+                        IsPresent: true,
+                        LastSeenUtc: now)
+                ]);
 
-        var viewModel = new LibraryViewModel(
-            new StubLibraryStore(snapshot));
+        var viewModel =
+            new LibraryViewModel(
+                new StubLibraryStore(
+                    snapshot));
 
-        await viewModel.RefreshAsync(CancellationToken.None);
+        await viewModel.RefreshAsync(
+            CancellationToken.None);
 
         RunSta(() =>
         {
-            var window = new MainWindow(viewModel);
+            var window =
+                new MainWindow(
+                    viewModel);
 
             window.Show();
 
@@ -56,20 +71,54 @@ public sealed class MainWindowBindingTests
                 () => { },
                 DispatcherPriority.DataBind);
 
-            Assert.Same(viewModel, window.DataContext);
+            Assert.Same(
+                viewModel,
+                window.DataContext);
 
-            var content = Assert.IsType<ContentControl>(
-                window.FindName("MainContent"));
+            var primaryNavigation =
+                Assert.IsAssignableFrom<
+                    System.Windows.FrameworkElement>(
+                    window.FindName(
+                        "PrimaryNavigation"));
 
-            var libraryView = Assert.IsType<LibraryView>(
-                content.Content);
+            var shell =
+                Assert.IsType<ShellViewModel>(
+                    primaryNavigation.DataContext);
 
-            Assert.Same(viewModel, libraryView.DataContext);
+            shell.NavigateLibraryCommand.Execute(
+                null);
 
-            var gameList = Assert.IsType<ItemsControl>(
-                libraryView.FindName("GameList"));
+            window.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.Loaded);
 
-            Assert.Same(viewModel.Items, gameList.ItemsSource);
+            window.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.DataBind);
+
+            window.UpdateLayout();
+
+            var content =
+                Assert.IsType<ContentControl>(
+                    window.FindName(
+                        "MainContent"));
+
+            var libraryView =
+                Assert.IsType<LibraryView>(
+                    content.Content);
+
+            Assert.Same(
+                viewModel,
+                libraryView.DataContext);
+
+            var gameList =
+                Assert.IsType<ItemsControl>(
+                    libraryView.FindName(
+                        "GameList"));
+
+            Assert.Same(
+                viewModel.Items,
+                gameList.ItemsSource);
 
             window.Close();
 
@@ -78,7 +127,8 @@ public sealed class MainWindowBindingTests
     }
 
     private sealed class StubLibraryStore(
-        LibrarySnapshot snapshot) : ILibraryStore
+        LibrarySnapshot snapshot) :
+        ILibraryStore
     {
         public Task ApplySourceScanAsync(
             SourceScanResult result,
@@ -87,33 +137,47 @@ public sealed class MainWindowBindingTests
 
         public Task<LibrarySnapshot> LoadSnapshotAsync(
             CancellationToken cancellationToken) =>
-            Task.FromResult(snapshot);
+            Task.FromResult(
+                snapshot);
     }
 
-    private static T RunSta<T>(Func<T> action)
+    private static T RunSta<T>(
+        Func<T> action)
     {
-        T? result = default;
-        Exception? error = null;
+        T? result =
+            default;
 
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                result = action();
-            }
-            catch (Exception ex)
-            {
-                error = ex;
-            }
-        });
+        Exception? error =
+            null;
 
-        thread.SetApartmentState(ApartmentState.STA);
+        var thread =
+            new Thread(
+                () =>
+                {
+                    try
+                    {
+                        result =
+                            action();
+                    }
+                    catch (
+                        Exception exception)
+                    {
+                        error =
+                            exception;
+                    }
+                });
+
+        thread.SetApartmentState(
+            ApartmentState.STA);
+
         thread.Start();
         thread.Join();
 
         if (error is not null)
         {
-            ExceptionDispatchInfo.Capture(error).Throw();
+            ExceptionDispatchInfo
+                .Capture(error)
+                .Throw();
         }
 
         return result!;

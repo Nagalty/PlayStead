@@ -2,41 +2,81 @@ using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.UI.Library;
+using PlayStead.UI.Shell;
 
 namespace PlayStead.UI.Tests;
 
 public sealed class MainWindowRescanTests
 {
     [Fact]
-    public void Nested_library_rescan_is_forwarded_by_MainWindow_exactly_once()
+    public void Nested_library_rescan_is_forwarded_by_MainWindow_exactly_once_after_library_navigation()
     {
-        var viewModel = new LibraryViewModel(
-            new EmptyStore());
+        var viewModel =
+            new LibraryViewModel(
+                new EmptyStore());
 
         RunSta(() =>
         {
-            var window = new MainWindow(viewModel);
+            var window =
+                new MainWindow(
+                    viewModel);
 
-            var count = 0;
-            window.RescanRequested += (_, _) => count++;
+            var count =
+                0;
 
-            var content = Assert.IsType<ContentControl>(
-                window.FindName("MainContent"));
+            window.RescanRequested +=
+                (_, _) =>
+                    count++;
 
-            var libraryView = Assert.IsType<LibraryView>(
-                content.Content);
+            window.Show();
 
-            var button = Assert.IsType<Button>(
-                libraryView.FindName("RescanButton"));
+            window.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.DataBind);
+
+            var primaryNavigation =
+                Assert.IsAssignableFrom<
+                    FrameworkElement>(
+                    window.FindName(
+                        "PrimaryNavigation"));
+
+            var shell =
+                Assert.IsType<ShellViewModel>(
+                    primaryNavigation.DataContext);
+
+            shell.NavigateLibraryCommand.Execute(
+                null);
+
+            window.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.DataBind);
+
+            var content =
+                Assert.IsType<ContentControl>(
+                    window.FindName(
+                        "MainContent"));
+
+            var libraryView =
+                Assert.IsType<LibraryView>(
+                    content.Content);
+
+            var button =
+                Assert.IsType<Button>(
+                    libraryView.FindName(
+                        "RescanButton"));
 
             button.RaiseEvent(
-                new RoutedEventArgs(Button.ClickEvent));
+                new RoutedEventArgs(
+                    Button.ClickEvent));
 
-            Assert.Equal(1, count);
+            Assert.Equal(
+                1,
+                count);
 
             window.Close();
 
@@ -44,7 +84,8 @@ public sealed class MainWindowRescanTests
         });
     }
 
-    private sealed class EmptyStore : ILibraryStore
+    private sealed class EmptyStore :
+        ILibraryStore
     {
         public Task ApplySourceScanAsync(
             SourceScanResult result,
@@ -59,24 +100,43 @@ public sealed class MainWindowRescanTests
                     Array.Empty<GameInstallation>()));
     }
 
-    private static T RunSta<T>(Func<T> action)
+    private static T RunSta<T>(
+        Func<T> action)
     {
-        T? result = default;
-        Exception? error = null;
+        T? result =
+            default;
 
-        var thread = new Thread(() =>
-        {
-            try { result = action(); }
-            catch (Exception ex) { error = ex; }
-        });
+        Exception? error =
+            null;
 
-        thread.SetApartmentState(ApartmentState.STA);
+        var thread =
+            new Thread(
+                () =>
+                {
+                    try
+                    {
+                        result =
+                            action();
+                    }
+                    catch (
+                        Exception exception)
+                    {
+                        error =
+                            exception;
+                    }
+                });
+
+        thread.SetApartmentState(
+            ApartmentState.STA);
+
         thread.Start();
         thread.Join();
 
         if (error is not null)
         {
-            ExceptionDispatchInfo.Capture(error).Throw();
+            ExceptionDispatchInfo
+                .Capture(error)
+                .Throw();
         }
 
         return result!;
