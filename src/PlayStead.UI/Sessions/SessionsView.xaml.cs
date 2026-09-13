@@ -31,12 +31,28 @@ public partial class SessionsView :
             SessionsView_OnUnloaded;
     }
 
-    private void SessionsView_OnLoaded(
+    private async void SessionsView_OnLoaded(
         object sender,
         RoutedEventArgs e)
     {
-        RefreshLive();
-        _liveTimer.Start();
+        try
+        {
+            if (DataContext is
+                SessionViewModel viewModel)
+            {
+                await viewModel.RefreshAsync(
+                    CancellationToken.None);
+            }
+        }
+        catch (Exception)
+        {
+            // A session-history read failure must not crash
+            // the WPF dispatcher or prevent the page from opening.
+        }
+        finally
+        {
+            _liveTimer.Start();
+        }
     }
 
     private void SessionsView_OnUnloaded(
@@ -51,6 +67,28 @@ public partial class SessionsView :
         EventArgs e)
     {
         RefreshLive();
+    }
+
+    private async void RecentSessionDetailsButton_OnClick(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (sender is not Button
+            {
+                DataContext:
+                    RecentSessionItemViewModel item
+            })
+        {
+            return;
+        }
+
+        if (DataContext is
+            SessionViewModel viewModel)
+        {
+            await viewModel.SelectRecentSessionAsync(
+                item.SessionId,
+                CancellationToken.None);
+        }
     }
 
     private void RefreshLive()

@@ -1,0 +1,85 @@
+<UserControl x:Class="PlayStead.UI.Sessions.SessionDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <TextBlock x:Name="DetailTitle"
+                   Text="{Binding Title}"/>
+
+        <TextBlock x:Name="ObservedStartText"
+                   Text="{Binding ObservedStartedAtLabel}"/>
+
+        <TextBlock x:Name="ObservedEndText"
+                   Text="{Binding ObservedEndedAtLabel}"/>
+
+        <TextBlock x:Name="ObservedDurationText"
+                   Text="{Binding ObservedDurationLabel}"/>
+
+        <TextBlock x:Name="EffectiveStartText"
+                   Text="{Binding EffectiveStartedAtLabel}"/>
+
+        <TextBlock x:Name="EffectiveEndText"
+                   Text="{Binding EffectiveEndedAtLabel}"/>
+
+        <TextBlock x:Name="EffectiveDurationText"
+                   Text="{Binding EffectiveDurationLabel}"/>
+
+        <TextBlock x:Name="EndReasonText"
+                   Text="{Binding EndReasonLabel}"/>
+
+        <Border x:Name="RecoveryBadge">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility"
+                            Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsRecovered}"
+                                     Value="True">
+                            <Setter Property="Visibility"
+                                    Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+        </Border>
+
+        <Border x:Name="CorrectionBadge">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility"
+                            Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsCorrected}"
+                                     Value="True">
+                            <Setter Property="Visibility"
+                                    Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+        </Border>
+
+        <Button x:Name="CorrectSessionButton"
+                Content="Corriger la session"
+                Click="CorrectSessionButton_OnClick"/>
+
+        <StackPanel x:Name="CorrectionPanel"
+                    Visibility="Collapsed">
+            <TextBox x:Name="CorrectionStartTextBox"
+                     Text="{Binding Correction.CorrectedStartedAtText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <TextBox x:Name="CorrectionEndTextBox"
+                     Text="{Binding Correction.CorrectedEndedAtText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <TextBox x:Name="CorrectionReasonTextBox"
+                     Text="{Binding Correction.Reason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <TextBlock x:Name="CorrectionValidationText"
+                       Text="{Binding Correction.ValidationMessage}"/>
+
+            <Button x:Name="SaveCorrectionButton"
+                    Content="Sauvegarder"
+                    IsEnabled="{Binding Correction.CanSave}"
+                    Click="SaveCorrectionButton_OnClick"/>
+        </StackPanel>
+    </StackPanel>
+</UserControl>
