@@ -1,18 +1,20 @@
 # PlayStead
 
-**Version actuelle : `0.2.0-dev`**
+**Version actuelle : `0.3.0-dev`**
 
 PlayStead est une application Windows locale destinée à construire une bibliothèque de jeux fiable à partir des installations réellement présentes sur la machine, puis à fournir des informations de référence sur leur état sans rendre le démarrage dépendant du réseau.
 
 La version 0.2 conserve la philosophie **local-first / cache-first** de la fondation 0.1 et ajoute un moteur de référence Steam fondé sur des preuves locales et distantes.
 
+La version 0.3 ajoute le suivi local des sessions à partir des processus réellement observés, avec historique, détail et corrections manuelles traçables.
+
 ## État du projet
 
-`0.2.0-dev` est une version de développement. La version `1.0` reste réservée à la première release publique complète.
+`0.3.0-dev` est une version de développement. La version `1.0` reste réservée à la première release publique complète.
 
-La portée actuelle reste volontairement limitée à **Windows 10/11** et à **Steam**. PlayStead 0.2 ne remplace pas Steam, n'installe pas de mises à jour et ne télécharge pas SteamCMD automatiquement.
+La portée actuelle reste volontairement limitée à **Windows 10/11** et à **Steam**. PlayStead ne remplace pas Steam, n'installe pas de mises à jour et ne télécharge pas SteamCMD automatiquement.
 
-L'interface de 0.2 reste volontairement fonctionnelle et minimale. Le vrai travail de refonte UX/UI est prévu dans une étape ultérieure.
+La version 0.3 ajoute des composants UI réutilisables et les vues nécessaires aux sessions. **La version 0.4 reste dédiée à la refonte visuelle globale.**
 
 ## Fonctionnalités validées
 
@@ -49,6 +51,17 @@ Les états exposés sont :
 - `Checking` — état UI temporaire pendant une vérification manuelle.
 
 Le **BuildID est un signal secondaire**. Il ne suffit jamais, à lui seul, à déclarer `UpdateAvailable`.
+
+### Sessions locales ajoutées en 0.3
+
+- processus observés comme **source de vérité**, identifiés par des signatures de processus ;
+- polling toutes les **2 s**, confirmation après **2 snapshots** et heartbeat persisté toutes les **5 s** ;
+- récupération après crash ou reboot à partir des dernières observations persistées, **sans temps inventé** ;
+- fonctionnement en **systray** ;
+- corrections manuelles traçables, séparées des observations d'origine ;
+- séparation du **temps local PlayStead** et du **temps provider**, sans assimilation des deux mesures ;
+- page **Sessions**, historique récent et détail des temps observés/effectifs ;
+- badge live dans la **Bibliothèque** et composants UI réutilisables.
 
 ## SteamCMD
 
@@ -120,7 +133,11 @@ Baseline automatisée observée avant le gate final 0.2 :
 Release build: 0 error / 0 warning
 ```
 
-Le gate final doit reproduire ces résultats avant fermeture de la version.
+Cette baseline 0.2 est conservée comme référence historique.
+
+Baseline 0.3 fraîche déjà validée : **349/349 tests PASS**, build Release à **0 warning / 0 error**. Les smokes runtime et recovery sont **PASS** ; une baseline de performance a été réalisée, sans SLA inventé.
+
+**Task 13 reste IN PROGRESS** : le final gate 0.3 n'a pas encore été exécuté et le commit final n'a pas encore été effectué. Voir la [checklist d'acceptation 0.3](docs/PLAYSTEAD_0.3_ACCEPTANCE_CHECKLIST.md). Les checklists [0.1](docs/PLAYSTEAD_0.1_ACCEPTANCE_CHECKLIST.md) et [0.2](docs/PLAYSTEAD_0.2_ACCEPTANCE_CHECKLIST.md) restent des références historiques protégées.
 
 ## Validation runtime 0.2
 
@@ -153,6 +170,6 @@ Ces nombres constituent une **baseline de développement**, pas une SLA.
 
 ## Portée actuelle
 
-PlayStead 0.2 n'est pas encore un launcher universel et ne gère pas l'installation, la mise à jour ou le modding des jeux. Cette version établit la référence Steam : preuves locales, preuve distante anonyme optionnelle, cache 6 h, évaluation conservatrice et exposition UI minimale.
+PlayStead 0.3 n'est pas encore un launcher universel et ne gère pas l'installation, la mise à jour ou le modding des jeux. Cette version conserve la référence Steam de 0.2 et ajoute le suivi local des sessions. La refonte visuelle globale reste prévue pour **0.4**.
 
 Les fonctionnalités ultérieures seront ajoutées progressivement dans les versions `0.x`.
