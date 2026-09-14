@@ -1,9 +1,11 @@
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
+using PlayStead.UI.Settings;
 using PlayStead.UI.Shell;
 using PlayStead.UI.State;
 using PlayStead.UI.Tray;
@@ -20,6 +22,9 @@ public partial class MainWindow : Window
 
     private SessionViewModel? _sessionViewModel;
     private SessionsView? _sessionsView;
+    private readonly SettingsViewModel? _settingsViewModel;
+    private SettingsView? _settingsView;
+    private readonly UiMotionPreferenceCoordinator? _uiMotionPreferenceCoordinator;
 
     public MainWindow()
         : this(
@@ -155,7 +160,91 @@ public partial class MainWindow : Window
         RestoreWindowPlacement();
     }
 
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy,
+        SessionViewModel sessionViewModel,
+        NavigationService navigationService,
+        ShellViewModel shellViewModel,
+        SettingsViewModel settingsViewModel)
+        : this(
+            viewModel,
+            windowPlacementService,
+            windowClosePolicy,
+            sessionViewModel,
+            navigationService,
+            shellViewModel)
+    {
+        ArgumentNullException.ThrowIfNull(settingsViewModel);
+
+        _settingsViewModel = settingsViewModel;
+        ApplyCurrentRoute();
+    }
+
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy,
+        SessionViewModel sessionViewModel,
+        NavigationService navigationService,
+        ShellViewModel shellViewModel,
+        SettingsViewModel settingsViewModel,
+        UiMotionController uiMotionController)
+        : this(
+            viewModel,
+            windowPlacementService,
+            windowClosePolicy,
+            sessionViewModel,
+            navigationService,
+            shellViewModel,
+            settingsViewModel)
+    {
+        ArgumentNullException.ThrowIfNull(uiMotionController);
+
+        if (Application.Current is not null)
+        {
+            _uiMotionPreferenceCoordinator =
+                new UiMotionPreferenceCoordinator(
+                    settingsViewModel,
+                    uiMotionController,
+                    Application.Current.Resources);
+
+            IsEnabled = false;
+            Loaded += MainWindow_OnMotionFirstLoaded;
+        }
+    }
+
     public event EventHandler? RescanRequested;
+
+    private async void MainWindow_OnMotionFirstLoaded(
+        object sender,
+        RoutedEventArgs e)
+    {
+        Loaded -= MainWindow_OnMotionFirstLoaded;
+
+        try
+        {
+            if (_uiMotionPreferenceCoordinator is not null)
+            {
+                await _uiMotionPreferenceCoordinator.InitializeAsync(CancellationToken.None);
+            }
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(
+                this,
+                "Impossible de charger les préférences d’animation. Vérifiez l’accès au dossier de données locales.",
+                "Paramètres",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            IsEnabled = true;
+        }
+    }
 
     protected override void OnClosing(
         CancelEventArgs e)
@@ -291,9 +380,25 @@ public partial class MainWindow : Window
                     _sessionsView;
                 break;
 
+            case AppRoute.Settings:
+                if (_settingsViewModel is null)
+                {
+                    break;
+                }
+
+                if (_settingsView is null)
+                {
+                    _settingsView =
+                        new SettingsView(
+                            _settingsViewModel);
+                    _settingsView.Loaded += SettingsView_OnFirstLoaded;
+                }
+
+                MainContent.Content = _settingsView;
+                break;
+
             case AppRoute.Home:
             case AppRoute.Attention:
-            case AppRoute.Settings:
             case AppRoute.GameDetail:
             case AppRoute.SessionDetail:
                 MainContent.Content =
@@ -303,6 +408,44 @@ public partial class MainWindow : Window
             default:
                 throw new InvalidOperationException(
                     $"Unsupported route: {_navigationService.CurrentRoute}.");
+        }
+    }
+
+    private async void SettingsView_OnFirstLoaded(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_settingsView is null || _settingsViewModel is null)
+        {
+            return;
+        }
+
+        _settingsView.Loaded -= SettingsView_OnFirstLoaded;
+
+        if (_uiMotionPreferenceCoordinator is not null)
+        {
+            return;
+        }
+
+        _settingsView.IsEnabled = false;
+
+        try
+        {
+            await _settingsViewModel.LoadAsync(CancellationToken.None);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(
+                this,
+                "Impossible de lire les préférences. Vérifiez l’accès au dossier de données locales.",
+                "Paramètres",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _settingsView.IsEnabled = true;
         }
     }
 

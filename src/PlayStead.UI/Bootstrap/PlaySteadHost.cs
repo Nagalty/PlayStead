@@ -17,6 +17,7 @@ using PlayStead.Providers.Steam.Remote;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
+using PlayStead.UI.Settings;
 using PlayStead.UI.Shell;
 using PlayStead.UI.SingleInstance;
 using PlayStead.UI.State;
@@ -169,6 +170,19 @@ public static class PlaySteadHost
                     Path.GetDirectoryName(
                         layout.DatabasePath)!,
                     "window-placement.json")));
+
+        builder.Services.AddSingleton(
+            new UiPreferencesStore(
+                Path.Combine(
+                    Path.GetDirectoryName(
+                        layout.DatabasePath)!,
+                    "ui-preferences.json")));
+
+        builder.Services.AddSingleton<
+            SettingsViewModel>();
+
+        builder.Services.AddSingleton<
+            UiMotionController>();
 
         builder.Services.AddSingleton<
             WindowClosePolicy>();
