@@ -17,6 +17,7 @@ using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Evidence;
 using PlayStead.Providers.Steam.Remote;
 using PlayStead.UI.Home;
+using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
@@ -204,6 +205,9 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<
             HomeViewModel>();
+
+        builder.Services.AddSingleton<
+            AttentionViewModel>();
 
         builder.Services.AddSingleton<
             MainWindow>();

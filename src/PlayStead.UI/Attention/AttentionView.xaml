@@ -1,0 +1,12 @@
+<UserControl x:Class="PlayStead.UI.Attention.AttentionView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:PlayStead.UI.Controls"
+             Background="{DynamicResource PlayStead.Brush.Background}"
+             Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+             FontFamily="{DynamicResource PlayStead.Font.Body}">
+    <StackPanel Margin="{DynamicResource PlayStead.Spacing.4}">
+        <TextBlock Text="À signaler" FontSize="26" FontWeight="SemiBold"/>
+        <controls:EmptyState Message="{Binding EmptyMessage}" Margin="0,24,0,0"/>
+    </StackPanel>
+</UserControl>

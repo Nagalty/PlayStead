@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Input;
 using PlayStead.Core.Library;
 using PlayStead.UI.Home;
+using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
 using PlayStead.UI.Launching;
 using PlayStead.UI.Navigation;
@@ -31,6 +32,8 @@ public partial class MainWindow : Window
     private readonly HomeViewModel? _homeViewModel;
     private HomeView? _homeView;
     private readonly GameLaunchService? _gameLaunchService;
+    private readonly AttentionViewModel? _attentionViewModel;
+    private AttentionView? _attentionView;
 
     public MainWindow()
         : this(
@@ -272,6 +275,27 @@ public partial class MainWindow : Window
         viewModel.PropertyChanged += LibraryViewModel_OnPropertyChanged;
         Closed += (_, _) => viewModel.PropertyChanged -= LibraryViewModel_OnPropertyChanged;
         UpdateQuickPanel();
+        ApplyCurrentRoute();
+    }
+
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy,
+        SessionViewModel sessionViewModel,
+        NavigationService navigationService,
+        ShellViewModel shellViewModel,
+        SettingsViewModel settingsViewModel,
+        UiMotionController uiMotionController,
+        HomeViewModel homeViewModel,
+        GameLaunchService gameLaunchService,
+        AttentionViewModel attentionViewModel)
+        : this(viewModel, windowPlacementService, windowClosePolicy,
+            sessionViewModel, navigationService, shellViewModel,
+            settingsViewModel, uiMotionController, homeViewModel, gameLaunchService)
+    {
+        ArgumentNullException.ThrowIfNull(attentionViewModel);
+        _attentionViewModel = attentionViewModel;
         ApplyCurrentRoute();
     }
 
@@ -527,6 +551,15 @@ public partial class MainWindow : Window
                 break;
 
             case AppRoute.Attention:
+                if (_attentionViewModel is null)
+                {
+                    break;
+                }
+
+                _attentionView ??= new AttentionView(_attentionViewModel);
+                MainContent.Content = _attentionView;
+                break;
+
             case AppRoute.SessionDetail:
                 MainContent.Content =
                     null;
