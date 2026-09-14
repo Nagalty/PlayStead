@@ -5,6 +5,7 @@ using PlayStead.Core.Persistence;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
 using PlayStead.UI.Sessions;
+using PlayStead.UI.Settings;
 using PlayStead.UI.Steam;
 
 namespace PlayStead.UI.Library;
@@ -13,6 +14,7 @@ public sealed class LibraryViewModel :
     INotifyPropertyChanged
 {
     private readonly ILibraryStore _libraryStore;
+    private readonly UiPreferencesStore? _uiPreferencesStore;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly object _verifySteamGate = new();
 
@@ -23,6 +25,13 @@ public sealed class LibraryViewModel :
 
     private bool _isSteamChecking;
     private Task? _verifySteamTask;
+
+    private LibraryViewMode _viewMode = LibraryViewMode.Grid;
+    private string _sortKey = "Title";
+    private string? _filterKey;
+    private GameId? _selectedGameId;
+    private double _verticalOffset;
+    private int _gridColumnCount = 1;
 
     public LibraryViewModel(
         ILibraryStore libraryStore)
@@ -65,6 +74,21 @@ public sealed class LibraryViewModel :
             sessionMonitor);
     }
 
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        SessionMonitor sessionMonitor,
+        UiPreferencesStore uiPreferencesStore)
+        : this(
+            libraryStore,
+            steamReferenceRuntime,
+            sessionMonitor)
+    {
+        ArgumentNullException.ThrowIfNull(uiPreferencesStore);
+
+        _uiPreferencesStore = uiPreferencesStore;
+    }
+
     public event PropertyChangedEventHandler?
         PropertyChanged;
 
@@ -85,6 +109,7 @@ public sealed class LibraryViewModel :
             OnPropertyChanged();
             OnPropertyChanged(
                 nameof(HasItems));
+            OnPropertyChanged(nameof(GridRows));
         }
     }
 
@@ -112,6 +137,173 @@ public sealed class LibraryViewModel :
     public bool CanVerifySteam =>
         _steamReferenceRuntime is not null &&
         !IsSteamChecking;
+
+    public LibraryViewMode ViewMode => _viewMode;
+
+    public int GridColumnCount => _gridColumnCount;
+
+    public IReadOnlyList<LibraryGridRow> GridRows =>
+        LibraryGridRowBuilder.Build(
+            Items,
+            GridColumnCount);
+
+    public bool IsGridMode => ViewMode == LibraryViewMode.Grid;
+
+    public bool IsListMode => ViewMode == LibraryViewMode.List;
+
+    public void SetGridColumnCount(int columnCount)
+    {
+        if (columnCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(columnCount));
+        }
+
+        if (_gridColumnCount == columnCount)
+        {
+            return;
+        }
+
+        _gridColumnCount = columnCount;
+        OnPropertyChanged(nameof(GridColumnCount));
+        OnPropertyChanged(nameof(GridRows));
+    }
+
+    public string SortKey => _sortKey;
+
+    public string? FilterKey => _filterKey;
+
+    public GameId? SelectedGameId => _selectedGameId;
+
+    public double VerticalOffset => _verticalOffset;
+
+    public void SetViewMode(LibraryViewMode viewMode)
+    {
+        if (_viewMode == viewMode)
+        {
+            return;
+        }
+
+        _viewMode = viewMode;
+        OnPropertyChanged(nameof(ViewMode));
+        OnPropertyChanged(nameof(IsGridMode));
+        OnPropertyChanged(nameof(IsListMode));
+    }
+
+    public void SetSortKey(string sortKey)
+    {
+        ArgumentNullException.ThrowIfNull(sortKey);
+
+        if (sortKey is not ("Title" or "Provider"))
+        {
+            throw new ArgumentOutOfRangeException(nameof(sortKey));
+        }
+
+        if (_sortKey == sortKey)
+        {
+            return;
+        }
+
+        _sortKey = sortKey;
+        OnPropertyChanged(nameof(SortKey));
+    }
+
+    public void SetFilterKey(string? filterKey)
+    {
+        if (filterKey is not (null or "Steam" or "Epic" or "GOG" or "Manual"))
+        {
+            throw new ArgumentOutOfRangeException(nameof(filterKey));
+        }
+
+        if (_filterKey == filterKey)
+        {
+            return;
+        }
+
+        _filterKey = filterKey;
+        OnPropertyChanged(nameof(FilterKey));
+    }
+
+    public async Task LoadUiPreferencesAsync(CancellationToken cancellationToken)
+    {
+        var store = _uiPreferencesStore
+            ?? throw new InvalidOperationException("A UiPreferencesStore is required to load Library preferences.");
+
+        var preferences = await store.LoadAsync(cancellationToken);
+
+        SetViewMode(preferences.LibraryViewMode);
+        SetSortKey(preferences.LibrarySortKey);
+        SetFilterKey(preferences.LibraryFilterKey);
+    }
+
+    public async Task SaveUiPreferencesAsync(CancellationToken cancellationToken)
+    {
+        var store = _uiPreferencesStore
+            ?? throw new InvalidOperationException("A UiPreferencesStore is required to save Library preferences.");
+
+        var existing = await store.LoadAsync(cancellationToken);
+
+        await store.SaveAsync(
+            new UiPreferences(
+                existing.ReduceMotion,
+                ViewMode,
+                SortKey,
+                FilterKey),
+            cancellationToken);
+    }
+
+    public void SetSelectedGame(GameId? gameId)
+    {
+        if (_selectedGameId == gameId)
+        {
+            return;
+        }
+
+        _selectedGameId = gameId;
+        OnPropertyChanged(nameof(SelectedGameId));
+    }
+
+    public void SetVerticalOffset(double verticalOffset)
+    {
+        if (_verticalOffset.Equals(verticalOffset))
+        {
+            return;
+        }
+
+        _verticalOffset = verticalOffset;
+        OnPropertyChanged(nameof(VerticalOffset));
+    }
+
+    public LibraryUiState CaptureUiState()
+    {
+        return new LibraryUiState(
+            ViewMode,
+            SortKey,
+            FilterKey,
+            SelectedGameId,
+            VerticalOffset);
+    }
+
+    public void RestoreUiState(LibraryUiState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        SetViewMode(state.ViewMode);
+
+        if (_sortKey != state.SortKey)
+        {
+            _sortKey = state.SortKey;
+            OnPropertyChanged(nameof(SortKey));
+        }
+
+        if (_filterKey != state.FilterKey)
+        {
+            _filterKey = state.FilterKey;
+            OnPropertyChanged(nameof(FilterKey));
+        }
+
+        SetSelectedGame(state.SelectedGameId);
+        SetVerticalOffset(state.VerticalOffset);
+    }
 
     public async Task RefreshAsync(
         CancellationToken cancellationToken)

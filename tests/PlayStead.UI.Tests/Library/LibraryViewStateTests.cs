@@ -42,7 +42,7 @@ public sealed class LibraryViewStateTests
     }
 
     [Fact]
-    public async Task Populated_library_shows_game_list_and_hides_empty_state()
+    public async Task Populated_library_shows_default_grid_and_hides_list_and_empty_state()
     {
         var now = DateTimeOffset.UtcNow;
         var gameId = GameId.New();
@@ -78,13 +78,17 @@ public sealed class LibraryViewStateTests
             var view = new LibraryView { DataContext = vm };
             using var host = Show(view);
 
+            var grid = Assert.IsType<ItemsControl>(
+                view.FindName("GameGridRows"));
+
             var list = Assert.IsType<ItemsControl>(
                 view.FindName("GameList"));
 
             var empty = Assert.IsType<StackPanel>(
                 view.FindName("EmptyStatePanel"));
 
-            Assert.Equal(Visibility.Visible, list.Visibility);
+            Assert.Equal(Visibility.Visible, grid.Visibility);
+            Assert.Equal(Visibility.Collapsed, list.Visibility);
             Assert.Equal(Visibility.Collapsed, empty.Visibility);
 
             return 0;

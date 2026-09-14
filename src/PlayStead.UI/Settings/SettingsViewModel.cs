@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using CommunityToolkit.Mvvm.Input;
+using PlayStead.UI.Library;
 
 namespace PlayStead.UI.Settings;
 
@@ -9,6 +10,9 @@ public sealed class SettingsViewModel :
 {
     private readonly UiPreferencesStore _store;
     private bool _reduceMotion;
+    private LibraryViewMode _libraryViewMode = LibraryViewMode.Grid;
+    private string _librarySortKey = "Title";
+    private string? _libraryFilterKey;
 
     public SettingsViewModel(
         UiPreferencesStore store)
@@ -41,6 +45,21 @@ public sealed class SettingsViewModel :
         }
     }
 
+    public LibraryViewMode LibraryViewMode
+    {
+        get => _libraryViewMode;
+        set
+        {
+            if (_libraryViewMode == value)
+            {
+                return;
+            }
+
+            _libraryViewMode = value;
+            OnPropertyChanged();
+        }
+    }
+
     public IAsyncRelayCommand SaveCommand
     {
         get;
@@ -54,13 +73,20 @@ public sealed class SettingsViewModel :
                 cancellationToken);
 
         ReduceMotion = preferences.ReduceMotion;
+        LibraryViewMode = preferences.LibraryViewMode;
+        _librarySortKey = preferences.LibrarySortKey;
+        _libraryFilterKey = preferences.LibraryFilterKey;
     }
 
     public Task SaveAsync(
         CancellationToken cancellationToken)
     {
         return _store.SaveAsync(
-            new UiPreferences(ReduceMotion),
+            new UiPreferences(
+                ReduceMotion,
+                LibraryViewMode,
+                _librarySortKey,
+                _libraryFilterKey),
             cancellationToken);
     }
 

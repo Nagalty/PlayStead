@@ -2,7 +2,8 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:PlayStead.UI.Controls"
-             Background="Transparent">
+             Background="Transparent"
+             SizeChanged="LibraryView_OnSizeChanged">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
@@ -29,35 +30,109 @@
                        FontWeight="SemiBold"
                        VerticalAlignment="Center"/>
 
-            <Button x:Name="VerifySteamButton"
-                    Grid.Column="1"
-                    Content="Vérifier Steam"
-                    IsEnabled="{Binding CanVerifySteam}"
-                    Click="VerifySteamButton_OnClick"
-                    Padding="14,8"
-                    Margin="16,0,0,0"
-                    Background="#262A2F"
-                    Foreground="#E9EAEC"
-                    BorderBrush="#8D623E"
-                    BorderThickness="1"/>
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Button x:Name="GridModeButton"
+                        Tag="Grid"
+                        Content="Grille"
+                        Click="GridModeButton_OnClick"
+                        Padding="12,8"
+                        Background="#262A2F"
+                        Foreground="#E9EAEC"
+                        BorderBrush="#555B63"
+                        BorderThickness="1"/>
+
+                <Button x:Name="ListModeButton"
+                        Tag="List"
+                        Content="Liste"
+                        Click="ListModeButton_OnClick"
+                        Margin="8,0,0,0"
+                        Padding="12,8"
+                        Background="#262A2F"
+                        Foreground="#E9EAEC"
+                        BorderBrush="#555B63"
+                        BorderThickness="1"/>
+
+                <Button x:Name="VerifySteamButton"
+                        Content="Vérifier Steam"
+                        IsEnabled="{Binding CanVerifySteam}"
+                        Click="VerifySteamButton_OnClick"
+                        Padding="14,8"
+                        Margin="16,0,0,0"
+                        Background="#262A2F"
+                        Foreground="#E9EAEC"
+                        BorderBrush="#8D623E"
+                        BorderThickness="1"/>
+            </StackPanel>
         </Grid>
+
+        <ItemsControl x:Name="GameGridRows"
+                      Grid.Row="2"
+                      ItemsSource="{Binding GridRows}"
+                      Visibility="{Binding IsGridMode, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.CanContentScroll="True">
+            <ItemsControl.Template>
+                <ControlTemplate TargetType="ItemsControl">
+                    <ScrollViewer x:Name="GridScrollViewer"
+                                  CanContentScroll="True"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ItemsPresenter/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </ItemsControl.Template>
+
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <controls:GameCard/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
         <ItemsControl x:Name="GameList"
                       Grid.Row="2"
-                      ItemsSource="{Binding Items}">
-            <ItemsControl.Style>
-                <Style TargetType="ItemsControl">
-                    <Setter Property="Visibility"
-                            Value="Collapsed"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding HasItems}"
-                                     Value="True">
-                            <Setter Property="Visibility"
-                                    Value="Visible"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </ItemsControl.Style>
+                      ItemsSource="{Binding Items}"
+                      Visibility="{Binding IsListMode, Converter={StaticResource BooleanToVisibilityConverter}}"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.CanContentScroll="True">
+            <ItemsControl.Template>
+                <ControlTemplate TargetType="ItemsControl">
+                    <ScrollViewer x:Name="ListScrollViewer"
+                                  CanContentScroll="True"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ItemsPresenter/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </ItemsControl.Template>
+
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
 
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
