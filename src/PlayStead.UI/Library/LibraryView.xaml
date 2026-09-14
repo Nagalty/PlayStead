@@ -50,7 +50,17 @@
                          BorderBrush="#3A3F46"
                          BorderThickness="1"
                          TextChanged="LibrarySearchBox_OnTextChanged"
+                         GotKeyboardFocus="LibrarySearchBox_OnGotKeyboardFocus"
+                         LostKeyboardFocus="LibrarySearchBox_OnLostKeyboardFocus"
                          ToolTip="Rechercher dans la bibliothèque (Ctrl+K)"/>
+
+                <TextBlock x:Name="LibrarySearchPlaceholder"
+                           Grid.Column="0"
+                           Margin="11,0,0,0"
+                           VerticalAlignment="Center"
+                           Text="Rechercher un jeu"
+                           Foreground="#7F8791"
+                           IsHitTestVisible="False"/>
 
                 <Button x:Name="ClearSearchButton"
                         Grid.Column="1"

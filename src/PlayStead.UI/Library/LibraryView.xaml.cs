@@ -67,6 +67,32 @@ public partial class LibraryView :
 
         viewModel.SetSearchQuery(
             LibrarySearchBox.Text);
+
+        UpdateSearchPlaceholder();
+    }
+
+    private void LibrarySearchBox_OnGotKeyboardFocus(
+        object sender,
+        System.Windows.Input.KeyboardFocusChangedEventArgs e)
+    {
+        LibrarySearchPlaceholder.Visibility =
+            Visibility.Collapsed;
+    }
+
+    private void LibrarySearchBox_OnLostKeyboardFocus(
+        object sender,
+        System.Windows.Input.KeyboardFocusChangedEventArgs e)
+    {
+        UpdateSearchPlaceholder();
+    }
+
+    private void UpdateSearchPlaceholder()
+    {
+        LibrarySearchPlaceholder.Visibility =
+            LibrarySearchBox.IsKeyboardFocusWithin ||
+            !string.IsNullOrEmpty(LibrarySearchBox.Text)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
     }
 
     private void ClearSearchButton_OnClick(

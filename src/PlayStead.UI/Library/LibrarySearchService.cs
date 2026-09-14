@@ -6,13 +6,10 @@ public static class LibrarySearchService
         IEnumerable<LibraryItemViewModel> items,
         string query)
     {
-        ArgumentNullException.ThrowIfNull(
-            items);
-        ArgumentNullException.ThrowIfNull(
-            query);
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(query);
 
-        var normalizedQuery =
-            query.Trim();
+        var normalizedQuery = query.Trim();
 
         if (normalizedQuery.Length == 0)
         {
@@ -21,17 +18,10 @@ public static class LibrarySearchService
         }
 
         return items
-            .Where(
-                item =>
-                    item.Title.Contains(
-                        normalizedQuery,
-                        StringComparison.CurrentCultureIgnoreCase) ||
-                    item.ProviderLabel.Contains(
-                        normalizedQuery,
-                        StringComparison.CurrentCultureIgnoreCase) ||
-                    item.InstallPath.Contains(
-                        normalizedQuery,
-                        StringComparison.CurrentCultureIgnoreCase))
+            .Where(item =>
+                item.Title.StartsWith(
+                    normalizedQuery,
+                    StringComparison.CurrentCultureIgnoreCase))
             .ToArray();
     }
 }

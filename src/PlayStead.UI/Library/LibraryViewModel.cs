@@ -322,6 +322,8 @@ public sealed class LibraryViewModel :
             nameof(IsSearchActive));
         OnPropertyChanged(
             nameof(VisibleItems));
+        OnPropertyChanged(
+            nameof(GridRows));
     }
 
     public void ClearSearch()

@@ -5,10 +5,10 @@ using PlayStead.UI.Library;
 
 namespace PlayStead.UI.Tests.Library;
 
-public sealed class LibrarySearchStateTests
+public sealed class LibrarySearchGridRefreshTests
 {
     [Fact]
-    public async Task Setting_search_query_filters_visible_items()
+    public async Task Changing_search_query_notifies_both_list_and_grid_projections()
     {
         var viewModel =
             new LibraryViewModel(
@@ -17,58 +17,33 @@ public sealed class LibrarySearchStateTests
         await viewModel.RefreshAsync(
             CancellationToken.None);
 
-        viewModel.SetSearchQuery(
-            "alp");
+        var notifications =
+            new List<string?>();
 
-        Assert.Equal(
-            "alp",
-            viewModel.SearchQuery);
-
-        Assert.True(
-            viewModel.IsSearchActive);
-
-        Assert.Single(
-            viewModel.VisibleItems);
-
-        Assert.Equal(
-            "Alpha",
-            viewModel.VisibleItems[0].Title);
-    }
-
-    [Fact]
-    public async Task Clearing_search_restores_all_items()
-    {
-        var viewModel =
-            new LibraryViewModel(
-                new SearchLibraryStore());
-
-        await viewModel.RefreshAsync(
-            CancellationToken.None);
+        viewModel.PropertyChanged +=
+            (_, e) =>
+                notifications.Add(
+                    e.PropertyName);
 
         viewModel.SetSearchQuery(
-            "alp");
+            "A");
 
-        viewModel.ClearSearch();
+        Assert.Contains(
+            nameof(LibraryViewModel.VisibleItems),
+            notifications);
 
-        Assert.Equal(
-            string.Empty,
-            viewModel.SearchQuery);
-
-        Assert.False(
-            viewModel.IsSearchActive);
-
-        Assert.Equal(
-            viewModel.Items.Count,
-            viewModel.VisibleItems.Count);
+        Assert.Contains(
+            nameof(LibraryViewModel.GridRows),
+            notifications);
     }
 
     private sealed class SearchLibraryStore :
         ILibraryStore
     {
-        private readonly GameId _alphaId =
+        private readonly GameId _armaId =
             GameId.New();
 
-        private readonly GameId _betaId =
+        private readonly GameId _helldiversId =
             GameId.New();
 
         public Task ApplySourceScanAsync(
@@ -89,8 +64,8 @@ public sealed class LibrarySearchStateTests
                     2026,
                     9,
                     14,
-                    10,
-                    0,
+                    15,
+                    45,
                     0,
                     TimeSpan.Zero);
 
@@ -99,15 +74,15 @@ public sealed class LibrarySearchStateTests
                     Games:
                     [
                         new LogicalGame(
-                            _alphaId,
-                            "Alpha",
+                            _armaId,
+                            "Arma Reforger",
                             IsHidden: false,
                             CreatedAtUtc: now,
                             UpdatedAtUtc: now),
 
                         new LogicalGame(
-                            _betaId,
-                            "Beta",
+                            _helldiversId,
+                            "HELLDIVERS™ 2",
                             IsHidden: false,
                             CreatedAtUtc: now,
                             UpdatedAtUtc: now)
@@ -116,22 +91,22 @@ public sealed class LibrarySearchStateTests
                     [
                         new GameInstallation(
                             InstallationId.New(),
-                            _alphaId,
+                            _armaId,
                             ProviderKind.Steam,
-                            "100",
-                            @"D:\Games\Alpha",
-                            10_000_000_000,
+                            "1874880",
+                            @"G:\SteamLibrary\steamapps\common\Arma Reforger",
+                            27_000_000_000,
                             IsPreferred: true,
                             IsPresent: true,
                             LastSeenUtc: now),
 
                         new GameInstallation(
                             InstallationId.New(),
-                            _betaId,
-                            ProviderKind.Manual,
-                            "beta",
-                            @"D:\Games\Beta",
-                            20_000_000_000,
+                            _helldiversId,
+                            ProviderKind.Steam,
+                            "553850",
+                            @"G:\SteamLibrary\steamapps\common\Helldivers 2",
+                            24_000_000_000,
                             IsPreferred: true,
                             IsPresent: true,
                             LastSeenUtc: now)

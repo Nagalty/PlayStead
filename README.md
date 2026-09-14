@@ -1,6 +1,6 @@
 # PlayStead
 
-**Version actuelle : `0.3.0-dev`**
+**Version actuelle : `0.4.0-dev`**
 
 PlayStead est une application Windows locale destinée à construire une bibliothèque de jeux fiable à partir des installations réellement présentes sur la machine, puis à fournir des informations de référence sur leur état sans rendre le démarrage dépendant du réseau.
 
@@ -8,13 +8,15 @@ La version 0.2 conserve la philosophie **local-first / cache-first** de la fonda
 
 La version 0.3 ajoute le suivi local des sessions à partir des processus réellement observés, avec historique, détail et corrections manuelles traçables.
 
+La version 0.4 modernise l'expérience utilisateur et la direction visuelle sans casser les fondations 0.1–0.3 : shell horizontal, Accueil, Bibliothèque Grille/Liste, recherche locale, panneau rapide, fiche jeu, lancement Steam, À signaler, Paramètres et Sessions.
+
 ## État du projet
 
-`0.3.0-dev` est une version de développement. La version `1.0` reste réservée à la première release publique complète.
+`0.4.0-dev` est une version de développement. La version `1.0` reste réservée à la première release publique complète.
 
 La portée actuelle reste volontairement limitée à **Windows 10/11** et à **Steam**. PlayStead ne remplace pas Steam, n'installe pas de mises à jour et ne télécharge pas SteamCMD automatiquement.
 
-La version 0.3 ajoute des composants UI réutilisables et les vues nécessaires aux sessions. **La version 0.4 reste dédiée à la refonte visuelle globale.**
+La version 0.4 applique la refonte visuelle globale validée en conservant les moteurs locaux, Steam et Sessions existants.
 
 ## Fonctionnalités validées
 
@@ -62,6 +64,22 @@ Le **BuildID est un signal secondaire**. Il ne suffit jamais, à lui seul, à d�
 - séparation du **temps local PlayStead** et du **temps provider**, sans assimilation des deux mesures ;
 - page **Sessions**, historique récent et détail des temps observés/effectifs ;
 - badge live dans la **Bibliothèque** et composants UI réutilisables.
+
+## Expérience utilisateur ajoutée en 0.4
+
+- shell WPF horizontal sans sidebar, avec navigation principale **Accueil / Bibliothèque / À signaler / Paramètres** ;
+- **Accueil** recentré sur les données locales réellement disponibles ;
+- **Bibliothèque** disponible en modes **Grille** et **Liste**, avec état de vue restaurable ;
+- recherche dynamique locale sur le **début du titre affiché** du jeu, insensible à la casse ;
+- placeholder **« Rechercher un jeu »** et raccourci `Ctrl+K` pour focaliser la recherche ;
+- panneau rapide de jeu et fiche détaillée avec retour vers le contexte de Bibliothèque ;
+- bouton **Jouer** fondé sur les installations réellement lançables ; lancement Steam via URI `steam://rungameid/...` ;
+- page **À signaler** limitée aux décisions/vérifications réellement déductibles des données existantes ;
+- paramètres d'animation avec **réduction des mouvements** ;
+- modernisation visuelle de **Sessions** sans modifier son moteur 0.3 ;
+- retours d'erreur locaux et progressifs, sans spinner plein écran imposé.
+
+Le **media preview n'est pas implémenté dans 0.4** (`MEDIA_PREVIEW_IMPLEMENTED=False`). Cette absence est volontaire : aucune source média suffisamment fiable n'a été introduite artificiellement pour remplir l'interface.
 
 ## SteamCMD
 
@@ -135,9 +153,22 @@ Release build: 0 error / 0 warning
 
 Cette baseline 0.2 est conservée comme référence historique.
 
-Baseline 0.3 fraîche déjà validée : **349/349 tests PASS**, build Release à **0 warning / 0 error**. Les smokes runtime et recovery sont **PASS** ; une baseline de performance a été réalisée, sans SLA inventé.
+Baseline 0.3 historique validée : **349/349 tests PASS**, build Release à **0 warning / 0 error**.
 
-**Task 13 reste IN PROGRESS** : le final gate 0.3 n'a pas encore été exécuté et le commit final n'a pas encore été effectué. Voir la [checklist d'acceptation 0.3](docs/PLAYSTEAD_0.3_ACCEPTANCE_CHECKLIST.md). Les checklists [0.1](docs/PLAYSTEAD_0.1_ACCEPTANCE_CHECKLIST.md) et [0.2](docs/PLAYSTEAD_0.2_ACCEPTANCE_CHECKLIST.md) restent des références historiques protégées.
+Baseline 0.4 pré-finale fraîche : **507/507 tests PASS**, **0 échec**, **0 skipped/not executed**. Le Launch smoke utilise un `IExternalUriLauncher` factice et confirme l'URI Steam sans ouvrir réellement Steam ni un jeu.
+
+Baseline performance 0.4 enregistrée sans SLA inventé :
+
+```text
+Warm window readiness            : 645 ms
+Idle shell                       : ~173 Mio working set / ~131 Mio private
+Bibliothèque Grille              : ~235 Mio working set / ~191 Mio private
+Sessions                         : ~240 Mio working set / ~195 Mio private
+Recherche 5000 jeux (p95)        : A 1,775 ms / AR 1,818 ms / ARM 2,156 ms
+Projection grille 5000 jeux p95  : 0,043 ms
+```
+
+La Task 12 0.4 est finalisée : gate final PASS, commit final créé et post-vérification PASS. Voir la [checklist d'acceptation 0.4](docs/PLAYSTEAD_0.4_ACCEPTANCE_CHECKLIST.md). Les checklists [0.1](docs/PLAYSTEAD_0.1_ACCEPTANCE_CHECKLIST.md), [0.2](docs/PLAYSTEAD_0.2_ACCEPTANCE_CHECKLIST.md) et [0.3](docs/PLAYSTEAD_0.3_ACCEPTANCE_CHECKLIST.md) restent des références historiques.
 
 ## Validation runtime 0.2
 
@@ -170,6 +201,7 @@ Ces nombres constituent une **baseline de développement**, pas une SLA.
 
 ## Portée actuelle
 
-PlayStead 0.3 n'est pas encore un launcher universel et ne gère pas l'installation, la mise à jour ou le modding des jeux. Cette version conserve la référence Steam de 0.2 et ajoute le suivi local des sessions. La refonte visuelle globale reste prévue pour **0.4**.
+PlayStead 0.4 n'est pas encore un launcher universel et ne gère pas l'installation, la mise à jour ou le modding des jeux. Cette version conserve la référence Steam de 0.2 et le suivi local des sessions de 0.3, tout en livrant la refonte UX/visuelle 0.4.
 
 Les fonctionnalités ultérieures seront ajoutées progressivement dans les versions `0.x`.
+
