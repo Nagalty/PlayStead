@@ -1,4 +1,5 @@
 using PlayStead.Core.Library;
+using PlayStead.UI.Launching;
 
 namespace PlayStead.UI.Library;
 
@@ -33,6 +34,16 @@ public sealed class GameDetailViewModel
     }
 
     public GameId GameId { get; }
+
+    public GameDetailViewModel(
+        LibraryItemViewModel game,
+        GameLaunchViewModel? launch)
+        : this(game)
+    {
+        Launch = launch;
+    }
+
+    public GameLaunchViewModel? Launch { get; }
 
     public string Title { get; }
 

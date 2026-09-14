@@ -4,6 +4,7 @@ using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
+using PlayStead.UI.Launching;
 using PlayStead.UI.Sessions;
 using PlayStead.UI.Settings;
 using PlayStead.UI.Steam;
@@ -22,6 +23,9 @@ public sealed class LibraryViewModel :
 
     private IReadOnlyList<LibraryItemViewModel> _items =
         Array.Empty<LibraryItemViewModel>();
+
+    private IReadOnlyList<GameInstallation> _installations =
+        Array.Empty<GameInstallation>();
 
     private bool _isSteamChecking;
     private Task? _verifySteamTask;
@@ -441,12 +445,26 @@ public sealed class LibraryViewModel :
             state.VerticalOffset);
     }
 
+    public GameInstallation? GetDefaultLaunchInstallation(
+        GameId gameId)
+    {
+        return GameLaunchInstallationSelector.SelectDefault(
+            gameId,
+            _installations);
+    }
+
+    public IReadOnlyList<GameInstallation> GetLaunchInstallations(GameId gameId) =>
+        _installations.Where(installation => installation.GameId == gameId).ToArray();
+
     public async Task RefreshAsync(
         CancellationToken cancellationToken)
     {
         var snapshot =
             await _libraryStore.LoadSnapshotAsync(
                 cancellationToken);
+
+        _installations =
+            snapshot.Installations.ToArray();
 
         Items =
             BuildItems(

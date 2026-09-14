@@ -5,6 +5,7 @@ using System.Windows.Input;
 using PlayStead.Core.Library;
 using PlayStead.UI.Home;
 using PlayStead.UI.Library;
+using PlayStead.UI.Launching;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
 using PlayStead.UI.Settings;
@@ -29,6 +30,7 @@ public partial class MainWindow : Window
     private readonly UiMotionPreferenceCoordinator? _uiMotionPreferenceCoordinator;
     private readonly HomeViewModel? _homeViewModel;
     private HomeView? _homeView;
+    private readonly GameLaunchService? _gameLaunchService;
 
     public MainWindow()
         : this(
@@ -250,6 +252,53 @@ public partial class MainWindow : Window
 
     public event EventHandler? RescanRequested;
 
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy,
+        SessionViewModel sessionViewModel,
+        NavigationService navigationService,
+        ShellViewModel shellViewModel,
+        SettingsViewModel settingsViewModel,
+        UiMotionController uiMotionController,
+        HomeViewModel homeViewModel,
+        GameLaunchService gameLaunchService)
+        : this(viewModel, windowPlacementService, windowClosePolicy,
+            sessionViewModel, navigationService, shellViewModel,
+            settingsViewModel, uiMotionController, homeViewModel)
+    {
+        ArgumentNullException.ThrowIfNull(gameLaunchService);
+        _gameLaunchService = gameLaunchService;
+        viewModel.PropertyChanged += LibraryViewModel_OnPropertyChanged;
+        Closed += (_, _) => viewModel.PropertyChanged -= LibraryViewModel_OnPropertyChanged;
+        UpdateQuickPanel();
+        ApplyCurrentRoute();
+    }
+
+    private GameLaunchViewModel? CreateLaunchModel(
+        LibraryViewModel libraryViewModel, GameId gameId) =>
+        _gameLaunchService is null
+            ? null
+            : new GameLaunchViewModel(gameId,
+                libraryViewModel.GetLaunchInstallations(gameId), _gameLaunchService);
+
+    private void LibraryViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LibraryViewModel.SelectedItem))
+        {
+            UpdateQuickPanel();
+        }
+    }
+
+    private void UpdateQuickPanel()
+    {
+        _libraryView.QuickPanelViewModel =
+            DataContext is LibraryViewModel viewModel && viewModel.SelectedItem is { } game
+                ? new GameQuickPanelViewModel(game, _navigationService,
+                    CreateLaunchModel(viewModel, game.GameId))
+                : null;
+    }
+
     private async void MainWindow_OnMotionFirstLoaded(
         object sender,
         RoutedEventArgs e)
@@ -469,7 +518,8 @@ public partial class MainWindow : Window
 
                 var gameDetailViewModel =
                     new GameDetailViewModel(
-                        game);
+                        game,
+                        CreateLaunchModel(libraryViewModel, gameId));
 
                 MainContent.Content =
                     new GameDetailView(
@@ -586,7 +636,8 @@ public partial class MainWindow : Window
         var quickPanelViewModel =
             new GameQuickPanelViewModel(
                 viewModel.SelectedItem,
-                _navigationService);
+                _navigationService,
+                CreateLaunchModel(viewModel, viewModel.SelectedItem.GameId));
 
         quickPanelViewModel.OpenDetails();
     }

@@ -1,4 +1,5 @@
 using PlayStead.UI.Navigation;
+using PlayStead.UI.Launching;
 
 namespace PlayStead.UI.Library;
 
@@ -25,6 +26,17 @@ public sealed class GameQuickPanelViewModel
     }
 
     public LibraryItemViewModel Game { get; }
+
+    public GameQuickPanelViewModel(
+        LibraryItemViewModel game,
+        NavigationService navigationService,
+        GameLaunchViewModel? launch)
+        : this(game, navigationService)
+    {
+        Launch = launch;
+    }
+
+    public GameLaunchViewModel? Launch { get; }
 
     public void OpenDetails()
     {

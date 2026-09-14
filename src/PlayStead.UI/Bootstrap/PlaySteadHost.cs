@@ -1,4 +1,6 @@
 using System.IO;
+using System.Diagnostics;
+using PlayStead.UI.Launching;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PlayStead.Core.Persistence;
@@ -205,6 +207,13 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<
             MainWindow>();
+
+        builder.Services.AddSingleton<IExternalUriLauncher>(
+            _ => new ShellExternalUriLauncher(startInfo =>
+            {
+                using var process = Process.Start(startInfo);
+            }));
+        builder.Services.AddSingleton<GameLaunchService>();
 
         builder.Services.AddSingleton<
             IWindowActivator,

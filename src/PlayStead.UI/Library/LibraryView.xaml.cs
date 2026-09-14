@@ -37,6 +37,18 @@ public partial class LibraryView :
     public event EventHandler?
         GameDetailsRequested;
 
+    public static readonly DependencyProperty QuickPanelViewModelProperty =
+        DependencyProperty.Register(
+            nameof(QuickPanelViewModel),
+            typeof(GameQuickPanelViewModel),
+            typeof(LibraryView));
+
+    public GameQuickPanelViewModel? QuickPanelViewModel
+    {
+        get => (GameQuickPanelViewModel?)GetValue(QuickPanelViewModelProperty);
+        set => SetValue(QuickPanelViewModelProperty, value);
+    }
+
     public void FocusSearch()
     {
         LibrarySearchBox.Focus();
