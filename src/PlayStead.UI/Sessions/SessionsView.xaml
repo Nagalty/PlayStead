@@ -28,12 +28,13 @@
                        FontSize="26"
                        FontWeight="SemiBold"/>
 
+            <controls:SectionHeader Grid.Row="2"
+                                    Title="Sessions en cours"/>
+
             <TextBlock x:Name="ActiveSessionsHeading"
                        Grid.Row="2"
                        Text="Sessions en cours"
-                       Foreground="#E5E7EB"
-                       FontSize="17"
-                       FontWeight="SemiBold"/>
+                       Visibility="Collapsed"/>
 
             <Grid Grid.Row="4">
                 <ItemsControl x:Name="ActiveSessionsList"
@@ -117,12 +118,13 @@
                 </Border>
             </Grid>
 
+            <controls:SectionHeader Grid.Row="6"
+                                    Title="Historique récent"/>
+
             <TextBlock x:Name="RecentHistoryHeading"
                        Grid.Row="6"
                        Text="Historique récent"
-                       Foreground="#E5E7EB"
-                       FontSize="17"
-                       FontWeight="SemiBold"/>
+                       Visibility="Collapsed"/>
 
             <Border x:Name="RecentHistoryHost"
                     Grid.Row="8"

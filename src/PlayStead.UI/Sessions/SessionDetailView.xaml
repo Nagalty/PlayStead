@@ -3,30 +3,72 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <StackPanel>
         <TextBlock x:Name="DetailTitle"
-                   Text="{Binding Title}"/>
+                   Text="{Binding Title}"
+                   Foreground="#F2F4F7"
+                   FontSize="22"
+                   FontWeight="SemiBold"/>
 
+        <TextBlock Margin="0,20,0,8"
+                   Text="Données observées"
+                   Foreground="#E5E7EB"
+                   FontSize="16"
+                   FontWeight="SemiBold"/>
+
+        <TextBlock Text="Début observé"
+                   Foreground="#8F969F"/>
         <TextBlock x:Name="ObservedStartText"
-                   Text="{Binding ObservedStartedAtLabel}"/>
+                   Text="{Binding ObservedStartedAtLabel}"
+                   Foreground="#F2F4F7"/>
 
+        <TextBlock Margin="0,8,0,0"
+                   Text="Fin observée"
+                   Foreground="#8F969F"/>
         <TextBlock x:Name="ObservedEndText"
-                   Text="{Binding ObservedEndedAtLabel}"/>
+                   Text="{Binding ObservedEndedAtLabel}"
+                   Foreground="#F2F4F7"/>
 
+        <TextBlock Margin="0,8,0,0"
+                   Text="Durée observée"
+                   Foreground="#8F969F"/>
         <TextBlock x:Name="ObservedDurationText"
-                   Text="{Binding ObservedDurationLabel}"/>
+                   Text="{Binding ObservedDurationLabel}"
+                   Foreground="#F2F4F7"/>
 
+        <TextBlock Margin="0,20,0,8"
+                   Text="Données effectives"
+                   Foreground="#E5E7EB"
+                   FontSize="16"
+                   FontWeight="SemiBold"/>
+
+        <TextBlock Text="Début effectif"
+                   Foreground="#8F969F"/>
         <TextBlock x:Name="EffectiveStartText"
-                   Text="{Binding EffectiveStartedAtLabel}"/>
+                   Text="{Binding EffectiveStartedAtLabel}"
+                   Foreground="#F2F4F7"/>
 
+        <TextBlock Margin="0,8,0,0"
+                   Text="Fin effective"
+                   Foreground="#8F969F"/>
         <TextBlock x:Name="EffectiveEndText"
-                   Text="{Binding EffectiveEndedAtLabel}"/>
+                   Text="{Binding EffectiveEndedAtLabel}"
+                   Foreground="#F2F4F7"/>
 
+        <TextBlock Margin="0,8,0,0"
+                   Text="Durée effective"
+                   Foreground="#8F969F"/>
         <TextBlock x:Name="EffectiveDurationText"
-                   Text="{Binding EffectiveDurationLabel}"/>
+                   Text="{Binding EffectiveDurationLabel}"
+                   Foreground="#F2F4F7"/>
 
+        <TextBlock Margin="0,16,0,0"
+                   Text="État"
+                   Foreground="#8F969F"/>
         <TextBlock x:Name="EndReasonText"
-                   Text="{Binding EndReasonLabel}"/>
+                   Text="{Binding EndReasonLabel}"
+                   Foreground="#F2F4F7"/>
 
-        <Border x:Name="RecoveryBadge">
+        <Border x:Name="RecoveryBadge"
+                Margin="0,12,0,0">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility"
@@ -40,9 +82,14 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
+
+            <TextBlock Text="Récupérée"
+                       Foreground="#C98A5A"
+                       FontWeight="SemiBold"/>
         </Border>
 
-        <Border x:Name="CorrectionBadge">
+        <Border x:Name="CorrectionBadge"
+                Margin="0,8,0,0">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility"
@@ -56,27 +103,43 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
+
+            <TextBlock Text="Corrigée"
+                       Foreground="#C98A5A"
+                       FontWeight="SemiBold"/>
         </Border>
 
         <Button x:Name="CorrectSessionButton"
+                Margin="0,20,0,0"
                 Content="Corriger la session"
                 Click="CorrectSessionButton_OnClick"/>
 
         <StackPanel x:Name="CorrectionPanel"
+                    Margin="0,12,0,0"
                     Visibility="Collapsed">
+            <TextBlock Text="Correction"
+                       Foreground="#E5E7EB"
+                       FontSize="16"
+                       FontWeight="SemiBold"/>
+
             <TextBox x:Name="CorrectionStartTextBox"
+                     Margin="0,8,0,0"
                      Text="{Binding Correction.CorrectedStartedAtText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBox x:Name="CorrectionEndTextBox"
+                     Margin="0,8,0,0"
                      Text="{Binding Correction.CorrectedEndedAtText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBox x:Name="CorrectionReasonTextBox"
+                     Margin="0,8,0,0"
                      Text="{Binding Correction.Reason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock x:Name="CorrectionValidationText"
+                       Margin="0,8,0,0"
                        Text="{Binding Correction.ValidationMessage}"/>
 
             <Button x:Name="SaveCorrectionButton"
+                    Margin="0,12,0,0"
                     Content="Sauvegarder"
                     IsEnabled="{Binding Correction.CanSave}"
                     Click="SaveCorrectionButton_OnClick"/>
