@@ -97,6 +97,39 @@ public sealed class FileGameMediaCacheTests : IDisposable
         Assert.Equal(logo, cache.TryGetPath(Identity(), GameMediaAssetType.Logo));
     }
 
+
+    [Fact]
+    public async Task Replacing_asset_with_a_different_format_removes_stale_previous_file()
+    {
+        var cache = new FileGameMediaCache(_root);
+
+        var jpegPath = await cache.StoreAsync(
+            Identity(),
+            ValidCoverPayload(),
+            CancellationToken.None);
+
+        var pngPayload = new GameMediaPayload(
+            GameMediaAssetType.Cover,
+            "steam-remote",
+            "1874880",
+            ValidPngBytes(),
+            "image/png",
+            new Uri("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900.png"));
+
+        var pngPath = await cache.StoreAsync(
+            Identity(),
+            pngPayload,
+            CancellationToken.None);
+
+        Assert.EndsWith("cover.png", pngPath, StringComparison.Ordinal);
+        Assert.False(File.Exists(jpegPath));
+        Assert.Equal(
+            pngPath,
+            cache.TryGetPath(
+                Identity(),
+                GameMediaAssetType.Cover));
+    }
+
     [Theory]
     [InlineData("../1874880")]
     [InlineData("..")]

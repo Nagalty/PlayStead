@@ -98,6 +98,11 @@ public sealed class FileGameMediaCache : IGameMediaCache
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            DeleteAlternativeAssetFiles(
+                directory,
+                assetName,
+                extension);
+
             return finalPath;
         }
         finally
@@ -315,6 +320,28 @@ public sealed class FileGameMediaCache : IGameMediaCache
         }
 
         return false;
+    }
+
+    private static void DeleteAlternativeAssetFiles(
+        string directory,
+        string assetName,
+        string currentExtension)
+    {
+        foreach (var extension in new[] { ".jpg", ".png" })
+        {
+            if (string.Equals(
+                    extension,
+                    currentExtension,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            File.Delete(
+                Path.Combine(
+                    directory,
+                    assetName + extension));
+        }
     }
 
     private static async Task WriteAtomicallyAsync(
