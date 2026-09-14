@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using PlayStead.UI.Home;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
@@ -25,6 +26,8 @@ public partial class MainWindow : Window
     private readonly SettingsViewModel? _settingsViewModel;
     private SettingsView? _settingsView;
     private readonly UiMotionPreferenceCoordinator? _uiMotionPreferenceCoordinator;
+    private readonly HomeViewModel? _homeViewModel;
+    private HomeView? _homeView;
 
     public MainWindow()
         : this(
@@ -215,6 +218,32 @@ public partial class MainWindow : Window
         }
     }
 
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy,
+        SessionViewModel sessionViewModel,
+        NavigationService navigationService,
+        ShellViewModel shellViewModel,
+        SettingsViewModel settingsViewModel,
+        UiMotionController uiMotionController,
+        HomeViewModel homeViewModel)
+        : this(
+            viewModel,
+            windowPlacementService,
+            windowClosePolicy,
+            sessionViewModel,
+            navigationService,
+            shellViewModel,
+            settingsViewModel,
+            uiMotionController)
+    {
+        ArgumentNullException.ThrowIfNull(homeViewModel);
+
+        _homeViewModel = homeViewModel;
+        ApplyCurrentRoute();
+    }
+
     public event EventHandler? RescanRequested;
 
     private async void MainWindow_OnMotionFirstLoaded(
@@ -398,6 +427,19 @@ public partial class MainWindow : Window
                 break;
 
             case AppRoute.Home:
+                if (_homeViewModel is null)
+                {
+                    break;
+                }
+
+                _homeView ??=
+                    new HomeView(
+                        _homeViewModel);
+
+                MainContent.Content =
+                    _homeView;
+                break;
+
             case AppRoute.Attention:
             case AppRoute.GameDetail:
             case AppRoute.SessionDetail:
