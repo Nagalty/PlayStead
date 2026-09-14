@@ -13,7 +13,7 @@
     <Grid Margin="28">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="20"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -101,6 +101,15 @@
                         BorderThickness="1"/>
             </StackPanel>
         </Grid>
+
+        <TextBlock x:Name="SteamVerificationErrorText"
+                   Grid.Row="1"
+                   Margin="0,10,0,10"
+                   Text="{Binding SteamVerificationError}"
+                   Visibility="{Binding HasSteamVerificationError, Converter={StaticResource BooleanToVisibilityConverter}}"
+                   Foreground="#D7B08C"
+                   FontSize="13"
+                   TextWrapping="Wrap"/>
 
         <ItemsControl x:Name="GameGridRows"
                       Grid.Row="2"
@@ -287,7 +296,9 @@
                                         Background="Transparent"
                                         Foreground="#A9AFB7"
                                         BorderBrush="#3A3F46"
-                                        BorderThickness="1"/>
+                                        BorderThickness="1"
+                                        ToolTip="Fermer le panneau rapide"
+                                        AutomationProperties.Name="Fermer le panneau rapide"/>
                             </Grid>
 
                             <TextBlock Grid.Row="1"

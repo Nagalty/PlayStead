@@ -28,6 +28,7 @@ public sealed class LibraryViewModel :
         Array.Empty<GameInstallation>();
 
     private bool _isSteamChecking;
+    private string _steamVerificationError = string.Empty;
     private Task? _verifySteamTask;
 
     private LibraryViewMode _viewMode = LibraryViewMode.Grid;
@@ -148,6 +149,31 @@ public sealed class LibraryViewModel :
     public bool CanVerifySteam =>
         _steamReferenceRuntime is not null &&
         !IsSteamChecking;
+
+    public string SteamVerificationError
+    {
+        get => _steamVerificationError;
+        private set
+        {
+            if (string.Equals(
+                    _steamVerificationError,
+                    value,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _steamVerificationError = value;
+
+            OnPropertyChanged();
+            OnPropertyChanged(
+                nameof(HasSteamVerificationError));
+        }
+    }
+
+    public bool HasSteamVerificationError =>
+        !string.IsNullOrWhiteSpace(
+            SteamVerificationError);
 
     public LibraryViewMode ViewMode => _viewMode;
 
@@ -506,6 +532,9 @@ public sealed class LibraryViewModel :
             ?? throw new InvalidOperationException(
                 "Steam reference runtime is unavailable.");
 
+        SteamVerificationError =
+            string.Empty;
+
         IsSteamChecking = true;
 
         Items =
@@ -529,6 +558,16 @@ public sealed class LibraryViewModel :
 
             await RefreshAsync(
                 cancellationToken);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            SteamVerificationError =
+                "La vérification Steam a échoué. Réessaie dans quelques instants.";
         }
         finally
         {
