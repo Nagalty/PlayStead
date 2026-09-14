@@ -13,8 +13,8 @@ public sealed class LibraryVirtualizationContractTests
     private const string GridRowsBinding =
         "{Binding GridRows}";
 
-    private const string ItemsBinding =
-        "{Binding Items}";
+    private const string VisibleItemsBinding =
+        "{Binding VisibleItems}";
 
     [Fact]
     public void Library_declares_separate_grid_and_list_hosts()
@@ -43,7 +43,7 @@ public sealed class LibraryVirtualizationContractTests
                 "ItemsSource"));
 
         Assert.Equal(
-            ItemsBinding,
+            VisibleItemsBinding,
             AttributeValue(
                 listHost,
                 "ItemsSource"));

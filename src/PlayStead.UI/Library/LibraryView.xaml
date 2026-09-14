@@ -19,6 +19,7 @@
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="340"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
@@ -30,7 +31,40 @@
                        FontWeight="SemiBold"
                        VerticalAlignment="Center"/>
 
-            <StackPanel Grid.Column="1"
+            <Grid Grid.Column="1"
+                  Margin="24,0,24,0"
+                  VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="LibrarySearchBox"
+                         Grid.Column="0"
+                         Height="36"
+                         Padding="10,6"
+                         VerticalContentAlignment="Center"
+                         Background="#202429"
+                         Foreground="#F2F4F7"
+                         BorderBrush="#3A3F46"
+                         BorderThickness="1"
+                         TextChanged="LibrarySearchBox_OnTextChanged"
+                         ToolTip="Rechercher dans la bibliothèque (Ctrl+K)"/>
+
+                <Button x:Name="ClearSearchButton"
+                        Grid.Column="1"
+                        Margin="8,0,0,0"
+                        Padding="10,6"
+                        Content="Effacer"
+                        Click="ClearSearchButton_OnClick"
+                        Visibility="{Binding IsSearchActive, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Background="#262A2F"
+                        Foreground="#E9EAEC"
+                        BorderBrush="#555B63"
+                        BorderThickness="1"/>
+            </Grid>
+
+            <StackPanel Grid.Column="2"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
                 <Button x:Name="GridModeButton"
@@ -112,7 +146,7 @@
 
         <ItemsControl x:Name="GameList"
                       Grid.Row="2"
-                      ItemsSource="{Binding Items}"
+                      ItemsSource="{Binding VisibleItems}"
                       Visibility="{Binding IsListMode, Converter={StaticResource BooleanToVisibilityConverter}}"
                       VirtualizingPanel.IsVirtualizing="True"
                       VirtualizingPanel.VirtualizationMode="Recycling"

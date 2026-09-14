@@ -37,6 +37,41 @@ public partial class LibraryView :
     public event EventHandler?
         GameDetailsRequested;
 
+    public void FocusSearch()
+    {
+        LibrarySearchBox.Focus();
+        LibrarySearchBox.SelectAll();
+    }
+
+    private void LibrarySearchBox_OnTextChanged(
+        object sender,
+        TextChangedEventArgs e)
+    {
+        if (DataContext is not
+            LibraryViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.SetSearchQuery(
+            LibrarySearchBox.Text);
+    }
+
+    private void ClearSearchButton_OnClick(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (DataContext is not
+            LibraryViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.ClearSearch();
+        LibrarySearchBox.Clear();
+        FocusSearch();
+    }
+
     private void GameCard_OnSelectionRequested(
         object? sender,
         EventArgs e)

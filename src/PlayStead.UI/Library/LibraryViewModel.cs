@@ -29,6 +29,7 @@ public sealed class LibraryViewModel :
     private LibraryViewMode _viewMode = LibraryViewMode.Grid;
     private string _sortKey = "Title";
     private string? _filterKey;
+    private string _searchQuery = string.Empty;
     private GameId? _selectedGameId;
     private LibraryItemViewModel? _selectedItem;
     private double _verticalOffset;
@@ -112,6 +113,8 @@ public sealed class LibraryViewModel :
                 nameof(HasItems));
             OnPropertyChanged(
                 nameof(GridRows));
+            OnPropertyChanged(
+                nameof(VisibleItems));
 
             ReconcileSelectedItem();
         }
@@ -148,7 +151,7 @@ public sealed class LibraryViewModel :
 
     public IReadOnlyList<LibraryGridRow> GridRows =>
         LibraryGridRowBuilder.Build(
-            Items,
+            VisibleItems,
             GridColumnCount);
 
     public bool IsGridMode =>
@@ -182,6 +185,18 @@ public sealed class LibraryViewModel :
     public string SortKey => _sortKey;
 
     public string? FilterKey => _filterKey;
+
+    public string SearchQuery =>
+        _searchQuery;
+
+    public bool IsSearchActive =>
+        !string.IsNullOrWhiteSpace(
+            SearchQuery);
+
+    public IReadOnlyList<LibraryItemViewModel> VisibleItems =>
+        LibrarySearchService.Search(
+            Items,
+            SearchQuery);
 
     public GameId? SelectedGameId =>
         _selectedGameId;
@@ -255,6 +270,34 @@ public sealed class LibraryViewModel :
 
         OnPropertyChanged(
             nameof(FilterKey));
+    }
+
+    public void SetSearchQuery(
+        string searchQuery)
+    {
+        ArgumentNullException.ThrowIfNull(
+            searchQuery);
+
+        if (_searchQuery == searchQuery)
+        {
+            return;
+        }
+
+        _searchQuery =
+            searchQuery;
+
+        OnPropertyChanged(
+            nameof(SearchQuery));
+        OnPropertyChanged(
+            nameof(IsSearchActive));
+        OnPropertyChanged(
+            nameof(VisibleItems));
+    }
+
+    public void ClearSearch()
+    {
+        SetSearchQuery(
+            string.Empty);
     }
 
     public async Task LoadUiPreferencesAsync(

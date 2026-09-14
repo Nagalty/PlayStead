@@ -530,6 +530,23 @@ public partial class MainWindow : Window
         object sender,
         KeyEventArgs e)
     {
+        if (e.Key == Key.K &&
+            (Keyboard.Modifiers &
+             ModifierKeys.Control) ==
+            ModifierKeys.Control)
+        {
+            _navigationService.Navigate(
+                new NavigationRequest(
+                    AppRoute.Library));
+
+            _libraryView.FocusSearch();
+
+            e.Handled =
+                true;
+
+            return;
+        }
+
         if (e.Key != Key.Left ||
             (Keyboard.Modifiers &
              ModifierKeys.Alt) !=
