@@ -9,6 +9,9 @@ public sealed record UserDataLayout(
     string LogsDirectory,
     string BackupsDirectory)
 {
+    public string MediaDirectory =>
+        Path.Combine(Root, "Media");
+
     public static UserDataLayout FromRoot(string root)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
@@ -33,5 +36,6 @@ public sealed record UserDataLayout(
         Directory.CreateDirectory(RegistryDirectory);
         Directory.CreateDirectory(LogsDirectory);
         Directory.CreateDirectory(BackupsDirectory);
+        Directory.CreateDirectory(MediaDirectory);
     }
 }

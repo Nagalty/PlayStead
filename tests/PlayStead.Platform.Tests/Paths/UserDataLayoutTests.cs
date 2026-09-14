@@ -16,5 +16,6 @@ public sealed class UserDataLayoutTests
         Assert.Equal(@"C:\Users\Test\AppData\Local\PlayStead\Registry", layout.RegistryDirectory);
         Assert.Equal(@"C:\Users\Test\AppData\Local\PlayStead\Logs", layout.LogsDirectory);
         Assert.Equal(@"C:\Users\Test\AppData\Local\PlayStead\Backups", layout.BackupsDirectory);
+        Assert.Equal(@"C:\Users\Test\AppData\Local\PlayStead\Media", layout.MediaDirectory);
     }
 }

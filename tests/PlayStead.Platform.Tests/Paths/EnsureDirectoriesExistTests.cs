@@ -24,6 +24,7 @@ public sealed class EnsureDirectoriesExistTests
             Assert.True(Directory.Exists(layout.RegistryDirectory));
             Assert.True(Directory.Exists(layout.LogsDirectory));
             Assert.True(Directory.Exists(layout.BackupsDirectory));
+            Assert.True(Directory.Exists(layout.MediaDirectory));
             Assert.False(File.Exists(layout.DatabasePath));
         }
         finally
