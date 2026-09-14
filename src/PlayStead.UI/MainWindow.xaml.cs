@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using PlayStead.Core.Library;
 using PlayStead.UI.Home;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
@@ -49,6 +50,9 @@ public partial class MainWindow : Window
             MainContent.Content as LibraryView
             ?? throw new InvalidOperationException(
                 "The main window must declare its LibraryView shell content.");
+
+        _libraryView.GameDetailsRequested +=
+            LibraryView_OnGameDetailsRequested;
 
         _navigationService =
             navigationService;
@@ -440,8 +444,39 @@ public partial class MainWindow : Window
                     _homeView;
                 break;
 
-            case AppRoute.Attention:
             case AppRoute.GameDetail:
+                if (DataContext is not
+                        LibraryViewModel libraryViewModel ||
+                    _navigationService.CurrentParameter is not
+                        GameId gameId)
+                {
+                    MainContent.Content =
+                        null;
+                    break;
+                }
+
+                var game =
+                    libraryViewModel.Items.FirstOrDefault(
+                        item =>
+                            item.GameId == gameId);
+
+                if (game is null)
+                {
+                    MainContent.Content =
+                        null;
+                    break;
+                }
+
+                var gameDetailViewModel =
+                    new GameDetailViewModel(
+                        game);
+
+                MainContent.Content =
+                    new GameDetailView(
+                        gameDetailViewModel);
+                break;
+
+            case AppRoute.Attention:
             case AppRoute.SessionDetail:
                 MainContent.Content =
                     null;
@@ -518,6 +553,25 @@ public partial class MainWindow : Window
 
         e.Handled =
             true;
+    }
+
+    private void LibraryView_OnGameDetailsRequested(
+        object? sender,
+        EventArgs e)
+    {
+        if (DataContext is not
+            LibraryViewModel viewModel ||
+            viewModel.SelectedItem is null)
+        {
+            return;
+        }
+
+        var quickPanelViewModel =
+            new GameQuickPanelViewModel(
+                viewModel.SelectedItem,
+                _navigationService);
+
+        quickPanelViewModel.OpenDetails();
     }
 
     private void LibraryView_OnRescanRequested(

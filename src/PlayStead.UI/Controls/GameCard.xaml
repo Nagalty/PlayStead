@@ -4,7 +4,8 @@
              xmlns:controls="clr-namespace:PlayStead.UI.Controls"
              Width="260"
              Margin="0,0,12,12"
-             Background="Transparent">
+             Background="Transparent"
+             MouseLeftButtonUp="GameCard_OnMouseLeftButtonUp">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </UserControl.Resources>

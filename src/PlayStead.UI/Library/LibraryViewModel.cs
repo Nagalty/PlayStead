@@ -30,6 +30,7 @@ public sealed class LibraryViewModel :
     private string _sortKey = "Title";
     private string? _filterKey;
     private GameId? _selectedGameId;
+    private LibraryItemViewModel? _selectedItem;
     private double _verticalOffset;
     private int _gridColumnCount = 1;
 
@@ -109,7 +110,10 @@ public sealed class LibraryViewModel :
             OnPropertyChanged();
             OnPropertyChanged(
                 nameof(HasItems));
-            OnPropertyChanged(nameof(GridRows));
+            OnPropertyChanged(
+                nameof(GridRows));
+
+            ReconcileSelectedItem();
         }
     }
 
@@ -147,15 +151,19 @@ public sealed class LibraryViewModel :
             Items,
             GridColumnCount);
 
-    public bool IsGridMode => ViewMode == LibraryViewMode.Grid;
+    public bool IsGridMode =>
+        ViewMode == LibraryViewMode.Grid;
 
-    public bool IsListMode => ViewMode == LibraryViewMode.List;
+    public bool IsListMode =>
+        ViewMode == LibraryViewMode.List;
 
-    public void SetGridColumnCount(int columnCount)
+    public void SetGridColumnCount(
+        int columnCount)
     {
         if (columnCount <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(columnCount));
+            throw new ArgumentOutOfRangeException(
+                nameof(columnCount));
         }
 
         if (_gridColumnCount == columnCount)
@@ -164,19 +172,31 @@ public sealed class LibraryViewModel :
         }
 
         _gridColumnCount = columnCount;
-        OnPropertyChanged(nameof(GridColumnCount));
-        OnPropertyChanged(nameof(GridRows));
+
+        OnPropertyChanged(
+            nameof(GridColumnCount));
+        OnPropertyChanged(
+            nameof(GridRows));
     }
 
     public string SortKey => _sortKey;
 
     public string? FilterKey => _filterKey;
 
-    public GameId? SelectedGameId => _selectedGameId;
+    public GameId? SelectedGameId =>
+        _selectedGameId;
 
-    public double VerticalOffset => _verticalOffset;
+    public LibraryItemViewModel? SelectedItem =>
+        _selectedItem;
 
-    public void SetViewMode(LibraryViewMode viewMode)
+    public bool HasSelectedItem =>
+        SelectedItem is not null;
+
+    public double VerticalOffset =>
+        _verticalOffset;
+
+    public void SetViewMode(
+        LibraryViewMode viewMode)
     {
         if (_viewMode == viewMode)
         {
@@ -184,18 +204,25 @@ public sealed class LibraryViewModel :
         }
 
         _viewMode = viewMode;
-        OnPropertyChanged(nameof(ViewMode));
-        OnPropertyChanged(nameof(IsGridMode));
-        OnPropertyChanged(nameof(IsListMode));
+
+        OnPropertyChanged(
+            nameof(ViewMode));
+        OnPropertyChanged(
+            nameof(IsGridMode));
+        OnPropertyChanged(
+            nameof(IsListMode));
     }
 
-    public void SetSortKey(string sortKey)
+    public void SetSortKey(
+        string sortKey)
     {
-        ArgumentNullException.ThrowIfNull(sortKey);
+        ArgumentNullException.ThrowIfNull(
+            sortKey);
 
         if (sortKey is not ("Title" or "Provider"))
         {
-            throw new ArgumentOutOfRangeException(nameof(sortKey));
+            throw new ArgumentOutOfRangeException(
+                nameof(sortKey));
         }
 
         if (_sortKey == sortKey)
@@ -204,14 +231,19 @@ public sealed class LibraryViewModel :
         }
 
         _sortKey = sortKey;
-        OnPropertyChanged(nameof(SortKey));
+
+        OnPropertyChanged(
+            nameof(SortKey));
     }
 
-    public void SetFilterKey(string? filterKey)
+    public void SetFilterKey(
+        string? filterKey)
     {
-        if (filterKey is not (null or "Steam" or "Epic" or "GOG" or "Manual"))
+        if (filterKey is not
+            (null or "Steam" or "Epic" or "GOG" or "Manual"))
         {
-            throw new ArgumentOutOfRangeException(nameof(filterKey));
+            throw new ArgumentOutOfRangeException(
+                nameof(filterKey));
         }
 
         if (_filterKey == filterKey)
@@ -220,27 +252,44 @@ public sealed class LibraryViewModel :
         }
 
         _filterKey = filterKey;
-        OnPropertyChanged(nameof(FilterKey));
+
+        OnPropertyChanged(
+            nameof(FilterKey));
     }
 
-    public async Task LoadUiPreferencesAsync(CancellationToken cancellationToken)
+    public async Task LoadUiPreferencesAsync(
+        CancellationToken cancellationToken)
     {
-        var store = _uiPreferencesStore
-            ?? throw new InvalidOperationException("A UiPreferencesStore is required to load Library preferences.");
+        var store =
+            _uiPreferencesStore
+            ?? throw new InvalidOperationException(
+                "A UiPreferencesStore is required to load Library preferences.");
 
-        var preferences = await store.LoadAsync(cancellationToken);
+        var preferences =
+            await store.LoadAsync(
+                cancellationToken);
 
-        SetViewMode(preferences.LibraryViewMode);
-        SetSortKey(preferences.LibrarySortKey);
-        SetFilterKey(preferences.LibraryFilterKey);
+        SetViewMode(
+            preferences.LibraryViewMode);
+
+        SetSortKey(
+            preferences.LibrarySortKey);
+
+        SetFilterKey(
+            preferences.LibraryFilterKey);
     }
 
-    public async Task SaveUiPreferencesAsync(CancellationToken cancellationToken)
+    public async Task SaveUiPreferencesAsync(
+        CancellationToken cancellationToken)
     {
-        var store = _uiPreferencesStore
-            ?? throw new InvalidOperationException("A UiPreferencesStore is required to save Library preferences.");
+        var store =
+            _uiPreferencesStore
+            ?? throw new InvalidOperationException(
+                "A UiPreferencesStore is required to save Library preferences.");
 
-        var existing = await store.LoadAsync(cancellationToken);
+        var existing =
+            await store.LoadAsync(
+                cancellationToken);
 
         await store.SaveAsync(
             new UiPreferences(
@@ -251,7 +300,30 @@ public sealed class LibraryViewModel :
             cancellationToken);
     }
 
-    public void SetSelectedGame(GameId? gameId)
+    public void SelectGame(
+        LibraryItemViewModel item)
+    {
+        ArgumentNullException.ThrowIfNull(
+            item);
+
+        SetSelectedGame(
+            item.GameId);
+
+        SetSelectedItem(
+            item);
+    }
+
+    public void ClearSelection()
+    {
+        SetSelectedItem(
+            null);
+
+        SetSelectedGame(
+            null);
+    }
+
+    public void SetSelectedGame(
+        GameId? gameId)
     {
         if (_selectedGameId == gameId)
         {
@@ -259,18 +331,27 @@ public sealed class LibraryViewModel :
         }
 
         _selectedGameId = gameId;
-        OnPropertyChanged(nameof(SelectedGameId));
+
+        OnPropertyChanged(
+            nameof(SelectedGameId));
+
+        ReconcileSelectedItem();
     }
 
-    public void SetVerticalOffset(double verticalOffset)
+    public void SetVerticalOffset(
+        double verticalOffset)
     {
-        if (_verticalOffset.Equals(verticalOffset))
+        if (_verticalOffset.Equals(
+                verticalOffset))
         {
             return;
         }
 
-        _verticalOffset = verticalOffset;
-        OnPropertyChanged(nameof(VerticalOffset));
+        _verticalOffset =
+            verticalOffset;
+
+        OnPropertyChanged(
+            nameof(VerticalOffset));
     }
 
     public LibraryUiState CaptureUiState()
@@ -283,26 +364,38 @@ public sealed class LibraryViewModel :
             VerticalOffset);
     }
 
-    public void RestoreUiState(LibraryUiState state)
+    public void RestoreUiState(
+        LibraryUiState state)
     {
-        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(
+            state);
 
-        SetViewMode(state.ViewMode);
+        SetViewMode(
+            state.ViewMode);
 
         if (_sortKey != state.SortKey)
         {
-            _sortKey = state.SortKey;
-            OnPropertyChanged(nameof(SortKey));
+            _sortKey =
+                state.SortKey;
+
+            OnPropertyChanged(
+                nameof(SortKey));
         }
 
         if (_filterKey != state.FilterKey)
         {
-            _filterKey = state.FilterKey;
-            OnPropertyChanged(nameof(FilterKey));
+            _filterKey =
+                state.FilterKey;
+
+            OnPropertyChanged(
+                nameof(FilterKey));
         }
 
-        SetSelectedGame(state.SelectedGameId);
-        SetVerticalOffset(state.VerticalOffset);
+        SetSelectedGame(
+            state.SelectedGameId);
+
+        SetVerticalOffset(
+            state.VerticalOffset);
     }
 
     public async Task RefreshAsync(
@@ -518,6 +611,39 @@ public sealed class LibraryViewModel :
                                     item.GameId)
                         })
                 .ToArray();
+    }
+
+    private void ReconcileSelectedItem()
+    {
+        var selectedItem =
+            _selectedGameId is GameId selectedGameId
+                ? Items.FirstOrDefault(
+                    item =>
+                        item.GameId == selectedGameId)
+                : null;
+
+        SetSelectedItem(
+            selectedItem);
+    }
+
+    private void SetSelectedItem(
+        LibraryItemViewModel? item)
+    {
+        if (ReferenceEquals(
+                _selectedItem,
+                item))
+        {
+            return;
+        }
+
+        _selectedItem =
+            item;
+
+        OnPropertyChanged(
+            nameof(SelectedItem));
+
+        OnPropertyChanged(
+            nameof(HasSelectedItem));
     }
 
     private static HashSet<GameId> ActiveGameIds(

@@ -34,6 +34,56 @@ public partial class LibraryView :
     public event EventHandler?
         RescanRequested;
 
+    public event EventHandler?
+        GameDetailsRequested;
+
+    private void GameCard_OnSelectionRequested(
+        object? sender,
+        EventArgs e)
+    {
+        if (DataContext is not
+            LibraryViewModel viewModel ||
+            sender is not
+            PlayStead.UI.Controls.GameCard gameCard ||
+            gameCard.DataContext is not
+            LibraryItemViewModel item)
+        {
+            return;
+        }
+
+        viewModel.SelectGame(
+            item);
+    }
+
+    private void CloseQuickPanelButton_OnClick(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (DataContext is not
+            LibraryViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.ClearSelection();
+    }
+
+    private void OpenGameDetailButton_OnClick(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (DataContext is not
+            LibraryViewModel viewModel ||
+            viewModel.SelectedItem is null)
+        {
+            return;
+        }
+
+        GameDetailsRequested?.Invoke(
+            this,
+            EventArgs.Empty);
+    }
+
     private void RescanButton_OnClick(
         object sender,
         RoutedEventArgs e)

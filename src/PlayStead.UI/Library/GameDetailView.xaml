@@ -1,0 +1,133 @@
+<UserControl x:Class="PlayStead.UI.Library.GameDetailView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Padding="24"
+                    Background="#1D2024"
+                    BorderBrush="#30343A"
+                    BorderThickness="1"
+                    CornerRadius="10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding Title}"
+                                   Foreground="#F2F4F7"
+                                   FontSize="28"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"/>
+
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="{Binding ProviderLabel}"
+                                   Foreground="#D7B08C"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <Border Grid.Column="1"
+                            Margin="24,0,0,0"
+                            Padding="14,8"
+                            VerticalAlignment="Top"
+                            Background="#25292E"
+                            BorderBrush="#3A3F46"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <TextBlock Text="{Binding SessionStatusLabel}"
+                                   Foreground="#F2F4F7"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1"
+                  Margin="0,18,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Margin="0,0,9,0"
+                        Padding="20"
+                        Background="#1D2024"
+                        BorderBrush="#30343A"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock Text="Installation"
+                                   Foreground="#A9AFB7"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"/>
+
+                        <TextBlock Margin="0,10,0,0"
+                                   Text="{Binding InstallPath}"
+                                   Foreground="#F2F4F7"
+                                   FontSize="14"
+                                   TextWrapping="Wrap"/>
+
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="{Binding InstalledSizeLabel}"
+                                   Foreground="#7F8791"
+                                   FontSize="13"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1"
+                        Margin="9,0,0,0"
+                        Padding="20"
+                        Background="#1D2024"
+                        BorderBrush="#30343A"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock Text="État"
+                                   Foreground="#A9AFB7"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"/>
+
+                        <TextBlock Margin="0,10,0,0"
+                                   Text="{Binding SteamStatusLabel}"
+                                   Foreground="#F2F4F7"
+                                   FontSize="14"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Grid.Row="2"
+                    Margin="0,18,0,0"
+                    Padding="20"
+                    Background="#202429"
+                    BorderBrush="#30343A"
+                    BorderThickness="1"
+                    CornerRadius="10">
+                <StackPanel>
+                    <TextBlock Text="Données disponibles"
+                               Foreground="#A9AFB7"
+                               FontSize="12"
+                               FontWeight="SemiBold"/>
+
+                    <TextBlock Margin="0,10,0,0"
+                               Text="Cette fiche affiche uniquement les métadonnées locales actuellement connues par PlayStead."
+                               Foreground="#7F8791"
+                               FontSize="13"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</UserControl>
