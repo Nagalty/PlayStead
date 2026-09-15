@@ -26,6 +26,23 @@ public sealed class ProcessSignatureLearningCoordinatorQualityTests
     }
 
     [Fact]
+    public async Task Preexisting_null_path_pid_with_changed_start_invalidates_candidate_episode()
+    {
+        var d = new Driver();
+        await d.PrepareAsync();
+        var original = new ProcessSnapshot(900, "Other.exe", null, Epoch.AddSeconds(1));
+        var reusedPid = new ProcessSnapshot(900, "Other.exe", null, Epoch.AddSeconds(4));
+        var game = d.Game(100);
+        await d.ObserveAsync(1, [original]);
+        await d.ObserveAsync(2, [original]);
+        await d.ObserveAsync(3, [original, game]);
+        var decision = await d.ObserveAsync(4, [reusedPid, game]);
+        Assert.NotNull(decision);
+        Assert.Equal([DiscoveryReason.UnknownProcessIdentity], decision.Reasons);
+        Assert.Null(d.Store.State!.Reference);
+    }
+
+    [Fact]
     public async Task Same_named_executable_outside_installation_root_is_unrelated()
     {
         var d = new Driver();

@@ -183,6 +183,47 @@ public sealed class ProcessDiscoveryCaptureObserverTests
     }
 
     [Fact]
+    public async Task Changed_new_under_root_path_refreshes_even_when_known_game_is_first()
+    {
+        var d = new Driver();
+        await d.InitializeAsync();
+        var game = d.Process(100, 1);
+        var first = new ProcessSnapshot(500, "New.exe", d.First.InstallPath + @"\New.exe",
+            Epoch.AddSeconds(1));
+        var changed = new ProcessSnapshot(501, "New.exe", d.First.InstallPath + @"\Changed\New.exe",
+            Epoch.AddSeconds(2));
+        await d.TickAsync([game, first], 1);
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.Equal(1, d.Inventory.ExtraCalls);
+        await d.TickAsync([game, changed], 2);
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.Equal(2, d.Inventory.ExtraCalls);
+        Assert.Null(d.Store.Signature);
+    }
+
+    [Fact]
+    public async Task Pending_publication_during_decision_discards_old_generation_actions()
+    {
+        var d = new Driver();
+        await d.InitializeAsync();
+        await d.TickAsync([], 1);
+        await d.TickAsync([], 2);
+        await d.TickAsync([d.Process(100, 3)], 3);
+        await d.TickAsync([d.Process(100, 3)], 4);
+        await d.TickAsync([], 5);
+        d.Store.HoldNextSignatureRead();
+        var lastTick = d.TickAsync([], 6);
+        await d.Store.WaitForSignatureReadAsync();
+        d.Manager.MarkRefreshing();
+        d.Store.ReleaseSignatureRead();
+        await lastTick;
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.DoesNotContain(d.Logger.Messages, message => message.Contains("AwaitingIndependentEpisode"));
+        Assert.Equal(0, d.Inventory.ExtraCalls);
+        Assert.Null(d.Store.Signature);
+    }
+
+    [Fact]
     public async Task Capture_quality_transition_is_logged_once_not_per_tick()
     {
         var d = new Driver();
@@ -326,6 +367,9 @@ public sealed class ProcessDiscoveryCaptureObserverTests
     private sealed class TestStore : IProcessSignatureLearningStore, IProcessSignatureStore,
         IProcessSignatureDiscoveryStore, IExecutableRevisionSource
     {
+        private TaskCompletionSource<bool>? _signatureReadEntered;
+        private TaskCompletionSource<bool>? _signatureReadObserved;
+        private TaskCompletionSource<bool>? _signatureReadRelease;
         private readonly Dictionary<InstallationId, ProcessSignatureLearningState> _states = [];
         private readonly object _stateGate = new();
         public ProcessSignature? Signature { get; private set; }
@@ -334,6 +378,15 @@ public sealed class ProcessDiscoveryCaptureObserverTests
         public int LearningWrites { get; private set; }
         public bool RejectWrite { get; set; }
         public bool ThrowOnWrite { get; set; }
+        public void HoldNextSignatureRead()
+        {
+            _signatureReadEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _signatureReadObserved = _signatureReadEntered;
+            _signatureReadRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+        public Task WaitForSignatureReadAsync() =>
+            _signatureReadObserved!.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        public void ReleaseSignatureRead() => _signatureReadRelease!.TrySetResult(true);
         public ProcessSignatureLearningState? State(InstallationId id)
         {
             lock (_stateGate) return _states.GetValueOrDefault(id);
@@ -356,8 +409,16 @@ public sealed class ProcessDiscoveryCaptureObserverTests
                 return Task.FromResult(true);
             }
         }
-        public Task<ProcessSignature?> GetAsync(Guid gameId, CancellationToken token) =>
-            Task.FromResult(Signature?.GameId == gameId ? Signature : null);
+        public async Task<ProcessSignature?> GetAsync(Guid gameId, CancellationToken token)
+        {
+            var entered = Interlocked.Exchange(ref _signatureReadEntered, null);
+            if (entered is not null)
+            {
+                entered.TrySetResult(true);
+                await _signatureReadRelease!.Task.WaitAsync(token);
+            }
+            return Signature?.GameId == gameId ? Signature : null;
+        }
         public Task<IReadOnlyList<ProcessSignature>> GetAllAsync(CancellationToken token) =>
             Task.FromResult<IReadOnlyList<ProcessSignature>>(Signature is null ? [] : [Signature]);
         public Task UpsertAsync(ProcessSignature signature, CancellationToken token) =>

@@ -50,7 +50,7 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                 quality |= EpisodeQuality.CaptureGap;
             var batch = new ProcessObservationBatch(sequence, observedAtUtc, quality,
                 capture.Processes);
-            var preparation = new HashSet<InstallationId>();
+            var preparation = new Dictionary<InstallationId, DiscoveryInventoryContext>();
             foreach (var context in _inventory.GetCurrentContexts())
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -69,16 +69,18 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                 var decision = await _coordinator.ObserveAsync(scope.InstallationId, batch,
                     cancellationToken);
                 if (decision is null) continue;
+                if (!IsCurrentContext(context)) continue;
                 if (decision.Kind != DiscoveryDecisionKind.PromoteMain)
                     LogTransition(scope.InstallationId, scope.GenerationId, decision);
                 if (decision.Kind == DiscoveryDecisionKind.PromoteMain)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (await _acceptance.TryAcceptAsync(scope.InstallationId, cancellationToken))
+                    if (await _acceptance.TryAcceptAsync(scope.InstallationId, cancellationToken) &&
+                        IsCurrentContext(context))
                         _logger.LogInformation(
                             "Discovery signature accepted for installation {InstallationId} generation {GenerationId}",
                             scope.InstallationId, scope.GenerationId);
-                    preparation.Add(scope.InstallationId);
+                    preparation[scope.InstallationId] = context;
                 }
                 else if (decision.Reasons.Contains(DiscoveryReason.AwaitingIndependentEpisode) ||
                     decision.Reasons.Contains(DiscoveryReason.IncompleteInventory) ||
@@ -87,10 +89,19 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                 {
                     var reason = decision.Reasons[0];
                     if (reason == DiscoveryReason.AwaitingIndependentEpisode)
-                        preparation.Add(scope.InstallationId);
+                        preparation[scope.InstallationId] = context;
                     else
                     {
                         var triggerProcess = capture.Processes.FirstOrDefault(process =>
+                            process.ExecutablePath is not null &&
+                            process.ExecutablePath.StartsWith(
+                                scope.RootPath.TrimEnd('\\', '/') + "\\",
+                                StringComparison.OrdinalIgnoreCase) &&
+                            !context.Inventory.Candidates.Any(candidate => string.Equals(
+                                candidate.ExecutablePath, process.ExecutablePath,
+                                StringComparison.OrdinalIgnoreCase)));
+                        triggerProcess ??= capture.Processes.FirstOrDefault(process =>
+                            reason != DiscoveryReason.IncompleteInventory &&
                             process.ExecutablePath is not null &&
                             process.ExecutablePath.StartsWith(
                                 scope.RootPath.TrimEnd('\\', '/') + "\\",
@@ -109,20 +120,29 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                             !string.Equals(previous.Trigger, trigger, StringComparison.OrdinalIgnoreCase))
                         {
                             _refreshTriggers[scope.InstallationId] = (reason, trigger, byName);
-                            preparation.Add(scope.InstallationId);
+                            preparation[scope.InstallationId] = context;
                         }
                     }
                 }
             }
             // RequestEpisodePreparation only enqueues inventory work. It runs after every
             // scope has consumed this exact shared batch, outside the observation loop.
-            foreach (var id in preparation)
+            foreach (var (id, context) in preparation)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                _inventory.RequestEpisodePreparation(id, cancellationToken);
+                if (IsCurrentContext(context))
+                    _inventory.RequestEpisodePreparation(id, cancellationToken);
             }
         }
         finally { _gate.Release(); }
+    }
+
+    private bool IsCurrentContext(DiscoveryInventoryContext context)
+    {
+        var scope = context.Inventory.Scope;
+        var current = _inventory.GetCurrent(scope.InstallationId);
+        return ReferenceEquals(current, context) &&
+            current?.Inventory.Scope.GenerationId == scope.GenerationId;
     }
 
     private void LogTransition(InstallationId id, Guid generation, DiscoveryDecision decision)

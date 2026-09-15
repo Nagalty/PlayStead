@@ -488,10 +488,11 @@ public sealed class ProcessSignatureLearningCoordinator
         return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static (int ProcessId, string Name) UnknownIdentity(ProcessSnapshot process) =>
-        (process.ProcessId, process.ExecutableName.ToUpperInvariant());
+    private static (int ProcessId, string Name, DateTimeOffset? StartedAtUtc) UnknownIdentity(
+        ProcessSnapshot process) =>
+        (process.ProcessId, process.ExecutableName.ToUpperInvariant(), process.StartedAtUtc);
 
-    private static HashSet<(int ProcessId, string Name)> BaselineUnknownIdentities(
+    private static HashSet<(int ProcessId, string Name, DateTimeOffset? StartedAtUtc)> BaselineUnknownIdentities(
         ProcessObservationBatch batch, ExecutableInventory inventory) => batch.Processes
         .Where(process => process.ProcessId > 0 &&
             (string.IsNullOrWhiteSpace(process.ExecutablePath) || process.StartedAtUtc is null) &&
@@ -508,7 +509,7 @@ public sealed class ProcessSignatureLearningCoordinator
         public int KnownAbsence { get; set; }
         public long? LastCaptureSequence { get; set; }
         public DateTimeOffset LastCaptureAt { get; set; }
-        public HashSet<(int ProcessId, string Name)> BaselineUnknown { get; } = [];
+        public HashSet<(int ProcessId, string Name, DateTimeOffset? StartedAtUtc)> BaselineUnknown { get; } = [];
 
         public void AbandonCurrent()
         {
