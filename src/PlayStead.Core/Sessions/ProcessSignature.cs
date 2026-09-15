@@ -4,4 +4,5 @@ public sealed record ProcessSignature(
     Guid GameId,
     IReadOnlyList<ProcessSignatureEntry> Entries,
     ProcessSignatureOrigin Origin,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    DiscoveredSignatureMetadata? Discovery = null);
