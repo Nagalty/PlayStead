@@ -14,6 +14,7 @@ public sealed class SessionRuntime : ISessionRuntime
     private readonly SessionCorrectionPolicy _correctionPolicy;
     private readonly TimeProvider _timeProvider;
     private readonly IDiscoveredSignatureValidator? _discoveredSignatureValidator;
+    private readonly IProcessCaptureObserver? _captureObserver;
     private readonly HashSet<Guid> _unresolvedRecovered = [];
 
     private readonly Dictionary<Guid, PendingObservation>
@@ -58,6 +59,41 @@ public sealed class SessionRuntime : ISessionRuntime
         _discoveredSignatureValidator = discoveredSignatureValidator;
     }
 
+    public static SessionRuntime CreateWithObserver(
+        IProcessSnapshotSource processSource,
+        IProcessSignatureStore signatureStore,
+        ISessionStore sessionStore,
+        ProcessSignatureMatcher matcher,
+        SessionTransitionPolicy transitions,
+        ISessionCorrectionStore correctionStore,
+        SessionCorrectionPolicy correctionPolicy,
+        TimeProvider timeProvider,
+        IProcessCaptureObserver captureObserver,
+        IDiscoveredSignatureValidator? discoveredSignatureValidator = null)
+    {
+        ArgumentNullException.ThrowIfNull(captureObserver);
+        return new(processSource, signatureStore, sessionStore, matcher, transitions,
+            correctionStore, correctionPolicy, timeProvider, discoveredSignatureValidator,
+            captureObserver);
+    }
+
+    private SessionRuntime(
+        IProcessSnapshotSource processSource,
+        IProcessSignatureStore signatureStore,
+        ISessionStore sessionStore,
+        ProcessSignatureMatcher matcher,
+        SessionTransitionPolicy transitions,
+        ISessionCorrectionStore correctionStore,
+        SessionCorrectionPolicy correctionPolicy,
+        TimeProvider timeProvider,
+        IDiscoveredSignatureValidator? discoveredSignatureValidator,
+        IProcessCaptureObserver captureObserver)
+        : this(processSource, signatureStore, sessionStore, matcher, transitions,
+            correctionStore, correctionPolicy, timeProvider, discoveredSignatureValidator)
+    {
+        _captureObserver = captureObserver;
+    }
+
     public async Task<SessionRuntimeSnapshot> RefreshAsync(
         CancellationToken cancellationToken)
     {
@@ -97,9 +133,36 @@ public sealed class SessionRuntime : ISessionRuntime
         }
 
         // A deferred validation must resolve before the observation it authorizes.
-        var processes = await _processSource.CaptureAsync(cancellationToken);
+        ProcessCaptureResult capture;
+        try
+        {
+            capture = await _processSource.CaptureWithQualityAsync(cancellationToken);
+        }
+        catch
+        {
+            try
+            {
+                _captureObserver?.MarkCaptureGap();
+            }
+            catch
+            {
+                // The capture failure remains the refresh failure.
+            }
+            throw;
+        }
         cancellationToken.ThrowIfCancellationRequested();
         var nowUtc = _timeProvider.GetUtcNow();
+
+        if (_captureObserver is not null)
+        {
+            await _captureObserver.ObserveAsync(capture, nowUtc, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        if (!capture.IsComplete)
+            return ProjectSnapshot(nowUtc);
+
+        var processes = capture.Processes;
 
         var matchedMainGames =
             new HashSet<Guid>();
@@ -269,7 +332,11 @@ public sealed class SessionRuntime : ISessionRuntime
 
         _unresolvedRecovered.ExceptWith(matchedMainGames);
 
-        return new SessionRuntimeSnapshot(
+        return ProjectSnapshot(nowUtc);
+    }
+
+    private SessionRuntimeSnapshot ProjectSnapshot(DateTimeOffset nowUtc)
+        => new(
             nowUtc,
             _active.Values
                 .OrderBy(
@@ -279,7 +346,6 @@ public sealed class SessionRuntime : ISessionRuntime
                     session =>
                         session.SessionId)
                 .ToArray());
-    }
 
     public async Task CorrectSessionAsync(
         SessionCorrectionRequest correction,

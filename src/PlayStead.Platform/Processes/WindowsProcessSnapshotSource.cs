@@ -84,6 +84,10 @@ public sealed class WindowsProcessSnapshotSource :
             snapshots);
     }
 
+    public async Task<ProcessCaptureResult> CaptureWithQualityAsync(
+        CancellationToken cancellationToken)
+        => new(await CaptureAsync(cancellationToken), true);
+
     private static string? ResolveExecutableName(
         Process process,
         string? executablePath)
