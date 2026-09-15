@@ -8,8 +8,10 @@ namespace PlayStead.UI.Bootstrap;
 public sealed class ApplicationStartupCoordinator
 {
     private readonly Operations _operations;
-
-    private int _stopStarted;
+    private readonly object _lifecycleGate = new();
+    private readonly HashSet<Task> _refreshTasks = [];
+    private Task? _shutdownTask;
+    private bool _stopping;
     private bool _primaryAcquired;
     private bool _hostBuilt;
 
@@ -95,32 +97,43 @@ public sealed class ApplicationStartupCoordinator
         return StartResult.Started;
     }
 
-    public async Task StopAsync(
+    public Task StopAsync(
         CancellationToken cancellationToken)
     {
-        if (Interlocked.Exchange(
-                ref _stopStarted,
-                1) != 0)
+        Task shutdown;
+        lock (_lifecycleGate)
         {
-            return;
+            if (_shutdownTask is null)
+            {
+                _stopping = true;
+                var refreshes = _refreshTasks.Where(task => !task.IsCompleted).ToList();
+                if (BackgroundRefreshTask is { } startup && !refreshes.Contains(startup))
+                    refreshes.Add(startup);
+                _shutdownTask = Task.Run(() => StopCoreAsync(refreshes.ToArray()),
+                    CancellationToken.None);
+            }
+            shutdown = _shutdownTask;
         }
+        return shutdown.WaitAsync(cancellationToken);
+    }
 
+    private async Task StopCoreAsync(Task[] refreshes)
+    {
         if (!_primaryAcquired)
-        {
             return;
-        }
 
         try
         {
-            await _operations.StopPipeAsync(cancellationToken);
+            await _operations.StopPipeAsync(CancellationToken.None);
 
-            if (BackgroundRefreshTask is { } refresh)
+            if (refreshes.Length != 0)
             {
                 try
                 {
-                    await refresh.WaitAsync(cancellationToken);
+                    await Task.WhenAll(refreshes);
                 }
-                catch (OperationCanceledException) when (refresh.IsCanceled)
+                catch (OperationCanceledException) when (
+                    refreshes.All(task => task.IsCompleted && !task.IsFaulted))
                 {
                     // Application cancellation leaves no durable refresh to publish.
                 }
@@ -131,18 +144,18 @@ public sealed class ApplicationStartupCoordinator
             try
             {
                 if (_hostBuilt && _operations.StopDiscoveryAsync is { } stopDiscovery)
-                    await stopDiscovery(cancellationToken);
+                    await stopDiscovery(CancellationToken.None);
             }
             finally
             {
                 try
                 {
                     if (_hostBuilt)
-                        await _operations.StopHostAsync(cancellationToken);
+                        await _operations.StopHostAsync(CancellationToken.None);
                 }
                 finally
                 {
-                    await _operations.ReleaseSingleInstanceAsync(cancellationToken);
+                    await _operations.ReleaseSingleInstanceAsync(CancellationToken.None);
                 }
             }
         }
@@ -155,16 +168,44 @@ public sealed class ApplicationStartupCoordinator
             invocation,
             cancellationToken);
 
-    private async Task RefreshAndApplyAsync(
+    private Task RefreshAndApplyAsync(
         CancellationToken cancellationToken)
     {
-        var snapshot =
-            await _operations.RefreshAsync(
-                cancellationToken);
+        var completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_lifecycleGate)
+        {
+            if (_stopping)
+                return Task.FromCanceled(new CancellationToken(canceled: true));
+            _refreshTasks.Add(completion.Task);
+        }
+        _ = CompleteRefreshAndApplyAsync(completion, cancellationToken);
+        return completion.Task;
+    }
 
-        await _operations.ApplySnapshotOnUiAsync(
-            snapshot,
-            cancellationToken);
+    private async Task CompleteRefreshAndApplyAsync(
+        TaskCompletionSource completion,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var snapshot = await _operations.RefreshAsync(cancellationToken);
+            await _operations.ApplySnapshotOnUiAsync(snapshot, cancellationToken);
+            completion.TrySetResult();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            completion.TrySetCanceled(cancellationToken);
+        }
+        catch (Exception error)
+        {
+            completion.TrySetException(error);
+        }
+        finally
+        {
+            lock (_lifecycleGate)
+                _refreshTasks.Remove(completion.Task);
+        }
     }
 
     public enum StartResult

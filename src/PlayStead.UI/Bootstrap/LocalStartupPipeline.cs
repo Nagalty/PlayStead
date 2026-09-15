@@ -19,6 +19,9 @@ public sealed class LocalStartupPipeline
     private readonly LocalScanCoordinator _scanCoordinator;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly DiscoveryInventoryManager? _discoveryInventory;
+    private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
+    private readonly object _refreshRequestGate = new();
+    private long _latestRefreshRequest;
 
     public LocalStartupPipeline(
         DatabaseInitializer databaseInitializer,
@@ -100,30 +103,49 @@ public sealed class LocalStartupPipeline
     public async Task<LibrarySnapshot> RefreshAsync(
         CancellationToken cancellationToken)
     {
-        _discoveryInventory?.MarkRefreshing();
-
-        var results =
-            await _scanCoordinator.ScanAllAsync(
-                cancellationToken);
-
-        foreach (var result in results)
+        cancellationToken.ThrowIfCancellationRequested();
+        long request;
+        lock (_refreshRequestGate)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            await _libraryStore.ApplySourceScanAsync(
-                result,
-                cancellationToken);
+            request = ++_latestRefreshRequest;
+            _discoveryInventory?.MarkRefreshing();
         }
 
-        if (_steamReferenceRuntime is not null)
+        await _refreshSemaphore.WaitAsync(cancellationToken);
+        try
         {
-            await _steamReferenceRuntime.RefreshStaleAsync(
-                cancellationToken);
-        }
+            var results =
+                await _scanCoordinator.ScanAllAsync(
+                    cancellationToken);
 
-        var snapshot = await _libraryStore.LoadSnapshotAsync(
-            cancellationToken);
-        _discoveryInventory?.Schedule(snapshot, cancellationToken);
-        return snapshot;
+            foreach (var result in results)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                await _libraryStore.ApplySourceScanAsync(
+                    result,
+                    cancellationToken);
+            }
+
+            if (_steamReferenceRuntime is not null)
+            {
+                await _steamReferenceRuntime.RefreshStaleAsync(
+                    cancellationToken);
+            }
+
+            var snapshot = await _libraryStore.LoadSnapshotAsync(
+                cancellationToken);
+            lock (_refreshRequestGate)
+            {
+                if (request == _latestRefreshRequest)
+                    _discoveryInventory?.Schedule(snapshot, cancellationToken);
+            }
+
+            return snapshot;
+        }
+        finally
+        {
+            _refreshSemaphore.Release();
+        }
     }
 }

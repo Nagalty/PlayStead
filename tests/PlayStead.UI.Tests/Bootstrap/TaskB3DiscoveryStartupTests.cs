@@ -203,6 +203,216 @@ public sealed class TaskB3DiscoveryStartupTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Stop_joins_held_manual_rescan_and_rejects_new_refreshes()
+    {
+        var snapshot = new LibrarySnapshot([], []);
+        var held = new TaskCompletionSource<LibrarySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var manualEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Func<CancellationToken, Task>? rescan = null;
+        var calls = 0;
+        var stoppedInventory = false;
+        var stoppedHost = false;
+        var operations = CreateCoordinatorOperations() with
+        {
+            BindRescanRequested = handler => rescan = handler,
+            RefreshAsync = _ =>
+            {
+                if (Interlocked.Increment(ref calls) == 1) return Task.FromResult(snapshot);
+                manualEntered.TrySetResult();
+                return held.Task;
+            },
+            StopDiscoveryAsync = _ => { stoppedInventory = true; return Task.CompletedTask; },
+            StopHostAsync = _ => { stoppedHost = true; return Task.CompletedTask; }
+        };
+        var coordinator = new ApplicationStartupCoordinator(operations);
+        await coordinator.StartAsync([], CancellationToken.None);
+        await coordinator.BackgroundRefreshTask!.WaitAsync(TimeSpan.FromSeconds(2));
+        var manual = rescan!(CancellationToken.None);
+        await manualEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var stop = coordinator.StopAsync(CancellationToken.None);
+        Assert.False(stoppedInventory);
+        Assert.False(stoppedHost);
+        Assert.False(stop.IsCompleted);
+        var rejectedWhileStopping = rescan!(CancellationToken.None);
+        Assert.True(rejectedWhileStopping.IsCanceled);
+        Assert.Equal(2, calls);
+        held.SetResult(snapshot);
+        await manual.WaitAsync(TimeSpan.FromSeconds(2));
+        await stop.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(stoppedInventory);
+        Assert.True(stoppedHost);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rescan!(CancellationToken.None));
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task Canceled_first_stop_can_retry_and_join_inventory_before_host_disposal()
+    {
+        Directory.CreateDirectory(_root);
+        var install = Path.Combine(_root, "InstalledGame");
+        Directory.CreateDirectory(install);
+        var layout = UserDataLayout.FromRoot(_root);
+        layout.EnsureDirectoriesExist();
+        using var host = PlaySteadHost.Build(layout);
+        var services = host.Services;
+        var store = services.GetRequiredService<ILibraryStore>();
+        var observed = new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+        await services.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        await store.ApplySourceScanAsync(SourceScanResult.Success(ProviderKind.Steam, observed,
+            [DiscoveredInstallation.Create(ProviderKind.Steam, "b3-stop-retry", "Installed Game",
+                install, null, observed)]), CancellationToken.None);
+        var source = new StubbornInventorySource();
+        var manager = new DiscoveryInventoryManager(source,
+            services.GetRequiredService<IProcessSignatureLearningStore>(),
+            services.GetRequiredService<ProcessSignatureLearningCoordinator>(),
+            services.GetRequiredService<ILogger<DiscoveryInventoryManager>>());
+        manager.Schedule(await store.LoadSnapshotAsync(CancellationToken.None), CancellationToken.None);
+        await source.Entered.WaitAsync(TimeSpan.FromSeconds(2));
+        var hostDisposed = false;
+        var operations = CreateCoordinatorOperations() with
+        {
+            StopDiscoveryAsync = manager.StopAsync,
+            StopHostAsync = _ => { hostDisposed = true; return Task.CompletedTask; }
+        };
+        var coordinator = new ApplicationStartupCoordinator(operations);
+        await coordinator.StartAsync([], CancellationToken.None);
+        await coordinator.BackgroundRefreshTask!.WaitAsync(TimeSpan.FromSeconds(2));
+        try
+        {
+            using var canceled = new CancellationTokenSource();
+            canceled.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => coordinator.StopAsync(canceled.Token));
+            Assert.False(hostDisposed);
+            source.Release();
+            await coordinator.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.True(hostDisposed);
+            await manager.AwaitIdleAsync(CancellationToken.None);
+        }
+        finally
+        {
+            source.Release();
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task Overlapping_rescan_never_republishes_old_inventory_after_newer_request()
+    {
+        Directory.CreateDirectory(_root);
+        var install = Path.Combine(_root, "InstalledGame");
+        Directory.CreateDirectory(install);
+        await File.WriteAllTextAsync(Path.Combine(install, "Game.exe"), "binary");
+        var layout = UserDataLayout.FromRoot(_root);
+        layout.EnsureDirectoriesExist();
+        using var host = PlaySteadHost.Build(layout);
+        var services = host.Services;
+        var store = services.GetRequiredService<ILibraryStore>();
+        var observed = new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+        await services.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        var discovered = DiscoveredInstallation.Create(ProviderKind.Steam, "b3-overlap",
+            "Installed Game", install, 6, observed);
+        await store.ApplySourceScanAsync(SourceScanResult.Success(ProviderKind.Steam, observed,
+            [discovered]), CancellationToken.None);
+        var installation = Assert.Single((await store.LoadSnapshotAsync(CancellationToken.None)).Installations);
+        var manager = services.GetRequiredService<DiscoveryInventoryManager>();
+        var source = new OverlappingSource(discovered, observed);
+        var pipeline = new LocalStartupPipeline(
+            services.GetRequiredService<DatabaseInitializer>(),
+            services.GetRequiredService<DatabaseHealthChecker>(), store,
+            new LocalScanCoordinator([source]), new EmptySteamReferenceRuntime(), manager);
+        await pipeline.InitializeAsync(CancellationToken.None);
+        await manager.AwaitIdleAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.NotNull(manager.GetCurrent(installation.Id));
+        Task<LibrarySnapshot>? older = null;
+        Task<LibrarySnapshot>? newer = null;
+        try
+        {
+            older = pipeline.RefreshAsync(CancellationToken.None);
+            await source.FirstEntered.WaitAsync(TimeSpan.FromSeconds(2));
+            newer = pipeline.RefreshAsync(CancellationToken.None);
+            Assert.False(source.SecondEntered.IsCompleted);
+            source.ReleaseFirst();
+            await older.WaitAsync(TimeSpan.FromSeconds(5));
+            await manager.AwaitIdleAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Null(manager.GetCurrent(installation.Id));
+            source.ReleaseSecond();
+            await source.SecondEntered.WaitAsync(TimeSpan.FromSeconds(2));
+            var latest = await newer.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(Assert.Single(latest.Installations).IsPresent);
+        }
+        finally
+        {
+            source.ReleaseFirst();
+            source.ReleaseSecond();
+            if (older is not null) await older;
+            if (newer is not null) await newer;
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    private ApplicationStartupCoordinator.Operations CreateCoordinatorOperations()
+    {
+        var snapshot = new LibrarySnapshot([], []);
+        return new ApplicationStartupCoordinator.Operations(
+            _ => new AppInvocation(true, null),
+            (_, _) => Task.FromResult(SingleInstanceResult.Primary),
+            () => UserDataLayout.FromRoot(_root), _ => { },
+            (_, _) => Task.CompletedTask,
+            _ => Task.FromResult(new LocalStartupState(new DatabaseHealthResult(true, "ok"), snapshot)),
+            _ => Task.CompletedTask, (_, _) => Task.CompletedTask,
+            (_, _) => Task.CompletedTask, _ => { }, _ => { },
+            (_, _) => Task.CompletedTask, _ => Task.FromResult(snapshot),
+            (_, _) => Task.CompletedTask, _ => Task.CompletedTask,
+            _ => Task.CompletedTask, _ => Task.CompletedTask);
+    }
+
+    private sealed class StubbornInventorySource : IExecutableInventorySource
+    {
+        private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task Entered => _entered.Task;
+        public void Release() => _release.TrySetResult();
+        public async Task<ExecutableInventory> InventoryAsync(InstallationScope scope,
+            CancellationToken cancellationToken)
+        {
+            _entered.TrySetResult();
+            await _release.Task;
+            return new ExecutableInventory(scope, InventoryCompleteness.Complete, [], []);
+        }
+    }
+
+    private sealed class OverlappingSource(DiscoveredInstallation discovered,
+        DateTimeOffset observed) : ILocalLibrarySource
+    {
+        private readonly TaskCompletionSource _firstEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _firstRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _secondEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _secondRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _calls;
+        public ProviderKind Provider => ProviderKind.Steam;
+        public Task FirstEntered => _firstEntered.Task;
+        public Task SecondEntered => _secondEntered.Task;
+        public void ReleaseFirst() => _firstRelease.TrySetResult();
+        public void ReleaseSecond() => _secondRelease.TrySetResult();
+        public async Task<SourceScanResult> ScanAsync(CancellationToken cancellationToken)
+        {
+            var call = Interlocked.Increment(ref _calls);
+            if (call == 1)
+            {
+                _firstEntered.TrySetResult();
+                await _firstRelease.Task.WaitAsync(cancellationToken);
+                return SourceScanResult.Success(ProviderKind.Steam, observed.AddMinutes(1),
+                    [discovered with { ObservedAtUtc = observed.AddMinutes(1) }]);
+            }
+            _secondEntered.TrySetResult();
+            await _secondRelease.Task.WaitAsync(cancellationToken);
+            return SourceScanResult.Success(ProviderKind.Steam, observed.AddMinutes(2), []);
+        }
+    }
+
     private sealed class BlockedInventorySource : IExecutableInventorySource
     {
         private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
