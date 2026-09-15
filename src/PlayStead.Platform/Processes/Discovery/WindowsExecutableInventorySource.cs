@@ -30,8 +30,8 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
     public Task<ExecutableInventory> InventoryAsync(
         InstallationScope scope, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(scope);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var candidates = new List<ExecutableCandidate>();
         var issues = new List<InventoryIssue>();
@@ -48,6 +48,11 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
 
         var canonicalScope = new InstallationScope(scope.GameId, scope.InstallationId,
             root, scope.GenerationId, scope.IsPresent);
+        if (!scope.IsPresent)
+        {
+            issues.Add(new InventoryIssue(root, InventoryIssueKind.MissingRoot));
+            return Task.FromResult(BuildInventory(canonicalScope, candidates, issues, cancellationToken));
+        }
         if (!CheckDirectoryComponents(root, root, issues, cancellationToken))
             return Task.FromResult(BuildInventory(canonicalScope, candidates, issues, cancellationToken));
 

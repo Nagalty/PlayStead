@@ -69,6 +69,70 @@ public sealed class WindowsExecutableInventorySourceTests
         Assert.False(Directory.Exists(missing));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Absent_scope_with_existing_root_is_incomplete_without_filesystem_access(bool containsExecutable)
+    {
+        using var directory = new ExecutableInventoryTestDirectory();
+        if (containsExecutable)
+            directory.Write("game.exe", [1]);
+        var scope = new InstallationScope(GameId.New(), InstallationId.New(),
+            directory.Root.Replace('\\', '/') + "/", Guid.NewGuid(), false);
+        var calls = 0;
+        var source = new WindowsExecutableInventorySource(
+            path => { calls++; return Directory.EnumerateFileSystemEntries(path); },
+            path => { calls++; return File.GetAttributes(path); },
+            path => { calls++; return Revision(path); });
+
+        var result = await source.InventoryAsync(scope, CancellationToken.None);
+
+        Assert.Equal(InventoryCompleteness.Incomplete, result.Completeness);
+        Assert.Empty(result.Candidates);
+        var issue = Assert.Single(result.Issues);
+        Assert.Equal(InventoryIssueKind.MissingRoot, issue.Kind);
+        Assert.Equal(directory.Root, issue.Path);
+        Assert.Equal(scope.GameId, result.Scope.GameId);
+        Assert.Equal(scope.InstallationId, result.Scope.InstallationId);
+        Assert.Equal(scope.GenerationId, result.Scope.GenerationId);
+        Assert.False(result.Scope.IsPresent);
+        Assert.Equal(directory.Root, result.Scope.RootPath);
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task Null_scope_precedes_cancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var source = new WindowsExecutableInventorySource();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            source.InventoryAsync(null!, cancellation.Token));
+    }
+
+    [Fact]
+    public async Task Absent_scope_with_invalid_root_stays_invalid_root()
+    {
+        var scope = new InstallationScope(GameId.New(), InstallationId.New(),
+            @"C:relative", Guid.NewGuid(), false);
+        var calls = 0;
+        var source = new WindowsExecutableInventorySource(
+            _ => { calls++; return []; },
+            _ => { calls++; return FileAttributes.Directory; },
+            _ => { calls++; return new FileRevision(1, DateTimeOffset.UtcNow); });
+
+        var result = await source.InventoryAsync(scope, CancellationToken.None);
+
+        Assert.Equal(InventoryCompleteness.Incomplete, result.Completeness);
+        Assert.Empty(result.Candidates);
+        var issue = Assert.Single(result.Issues);
+        Assert.Equal(InventoryIssueKind.InvalidRoot, issue.Kind);
+        Assert.Equal(scope.RootPath, issue.Path);
+        Assert.Equal(scope, result.Scope);
+        Assert.Equal(0, calls);
+    }
+
     [Fact]
     public async Task File_denied_keeps_other_candidates()
     {
