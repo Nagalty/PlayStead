@@ -167,6 +167,10 @@ public sealed class ProcessSignatureLearningCoordinator
             }
 
             var observed = new Dictionary<string, ProcessSnapshot>(StringComparer.OrdinalIgnoreCase);
+            var startsEpisode = installation.Current is null && installation.Prepared &&
+                installation.KnownAbsence >= 2 && batch.Processes.Any(process =>
+                    state.Inventory.Candidates.Any(candidate => string.Equals(candidate.ExecutablePath,
+                        process.ExecutablePath, StringComparison.OrdinalIgnoreCase)));
             foreach (var process in batch.Processes)
             {
                 var candidate = state.Inventory.Candidates.FirstOrDefault(item =>
@@ -183,11 +187,16 @@ public sealed class ProcessSignatureLearningCoordinator
                             DiscoveryReason.IncompleteInventory, cancellationToken);
                     }
                     if (state.Inventory.Candidates.Any(item => string.Equals(item.ExecutableName,
-                            process.ExecutableName, StringComparison.OrdinalIgnoreCase)))
+                            process.ExecutableName, StringComparison.OrdinalIgnoreCase)) &&
+                        (string.IsNullOrWhiteSpace(process.ExecutablePath) ||
+                         installation.Current?.Identities.Values.Any(identity =>
+                             identity.ProcessId == process.ProcessId) == true))
                         return await InvalidateAsync(installation, DiscoveryReason.UnreliablePath, cancellationToken);
-                    if (installation.Current is not null &&
+                    if ((installation.Current is not null || startsEpisode) &&
                         (string.IsNullOrWhiteSpace(process.ExecutablePath) || process.ProcessId <= 0 ||
-                         process.StartedAtUtc is null))
+                         process.StartedAtUtc is null) &&
+                        (process.ProcessId <= 0 ||
+                         !installation.BaselineUnknown.Contains(UnknownIdentity(process))))
                         return await InvalidateAsync(installation, DiscoveryReason.UnknownProcessIdentity,
                             cancellationToken);
                     continue;
@@ -207,8 +216,22 @@ public sealed class ProcessSignatureLearningCoordinator
                         DiscoveryReason.RevisionChanged, cancellationToken);
             }
 
+            if (installation.Current is not null || startsEpisode)
+                installation.BaselineUnknown.IntersectWith(
+                    BaselineUnknownIdentities(batch, state.Inventory));
+
             if (observed.Count == 0)
             {
+                if (installation.Current is null)
+                {
+                    var unknown = BaselineUnknownIdentities(batch, state.Inventory);
+                    if (installation.KnownAbsence == 0)
+                    {
+                        installation.BaselineUnknown.Clear();
+                        installation.BaselineUnknown.UnionWith(unknown);
+                    }
+                    else installation.BaselineUnknown.IntersectWith(unknown);
+                }
                 installation.KnownAbsence = Math.Min(2, installation.KnownAbsence + 1);
                 if (installation.Current is null) return null;
                 installation.Current.FinalAbsences++;
@@ -465,6 +488,17 @@ public sealed class ProcessSignatureLearningCoordinator
         return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static (int ProcessId, string Name) UnknownIdentity(ProcessSnapshot process) =>
+        (process.ProcessId, process.ExecutableName.ToUpperInvariant());
+
+    private static HashSet<(int ProcessId, string Name)> BaselineUnknownIdentities(
+        ProcessObservationBatch batch, ExecutableInventory inventory) => batch.Processes
+        .Where(process => process.ProcessId > 0 &&
+            (string.IsNullOrWhiteSpace(process.ExecutablePath) || process.StartedAtUtc is null) &&
+            !inventory.Candidates.Any(candidate => string.Equals(candidate.ExecutableName,
+                process.ExecutableName, StringComparison.OrdinalIgnoreCase)))
+        .Select(UnknownIdentity).ToHashSet();
+
     private sealed class InstallationLearning(ProcessSignatureLearningState state)
     {
         public ProcessSignatureLearningState State { get; set; } = state;
@@ -474,12 +508,14 @@ public sealed class ProcessSignatureLearningCoordinator
         public int KnownAbsence { get; set; }
         public long? LastCaptureSequence { get; set; }
         public DateTimeOffset LastCaptureAt { get; set; }
+        public HashSet<(int ProcessId, string Name)> BaselineUnknown { get; } = [];
 
         public void AbandonCurrent()
         {
             Current = null;
             KnownAbsence = 0;
             Prepared = false;
+            BaselineUnknown.Clear();
         }
 
         public void ResetCapture()

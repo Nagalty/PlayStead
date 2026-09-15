@@ -48,6 +48,11 @@ public sealed class DiscoveryInventoryManager
         lock (_gate) return _published.GetValueOrDefault(installationId);
     }
 
+    public IReadOnlyList<DiscoveryInventoryContext> GetCurrentContexts()
+    {
+        lock (_gate) return Array.AsReadOnly(_published.Values.ToArray());
+    }
+
     public void MarkRefreshing()
     {
         lock (_gate)
