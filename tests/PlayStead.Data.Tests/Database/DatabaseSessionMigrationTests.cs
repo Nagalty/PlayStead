@@ -35,7 +35,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            5,
+            6,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
@@ -89,7 +89,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            5,
+            6,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
@@ -127,6 +127,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
         string databasePath,
         Guid gameId)
     {
+        await DiscoveryDatabaseFixture.CreateSchemaAsync(databasePath, 2, CancellationToken.None);
         await using var connection = new SqliteConnection(
             $"Data Source={databasePath};Pooling=False");
 
@@ -134,24 +135,6 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
 
         var command = connection.CreateCommand();
         command.CommandText = """
-            CREATE TABLE schema_migrations (
-                version INTEGER PRIMARY KEY,
-                applied_utc TEXT NOT NULL
-            );
-
-            INSERT INTO schema_migrations(version, applied_utc)
-            VALUES
-                (1, '2026-09-12T00:00:00.0000000+00:00'),
-                (2, '2026-09-12T01:00:00.0000000+00:00');
-
-            CREATE TABLE games (
-                game_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                is_hidden INTEGER NOT NULL DEFAULT 0,
-                created_utc TEXT NOT NULL,
-                updated_utc TEXT NOT NULL
-            );
-
             INSERT INTO games(
                 game_id,
                 title,

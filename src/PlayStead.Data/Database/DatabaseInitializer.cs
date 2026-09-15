@@ -4,7 +4,7 @@ namespace PlayStead.Data.Database;
 
 public sealed class DatabaseInitializer
 {
-    private const int TargetVersion = 5;
+    private const int TargetVersion = 6;
 
     private static readonly IReadOnlyDictionary<int, string> MigrationFiles =
         new Dictionary<int, string>
@@ -13,7 +13,8 @@ public sealed class DatabaseInitializer
             [2] = "002_steam_evidence.sql",
             [3] = "003_sessions.sql",
             [4] = "004_session_corrections.sql",
-            [5] = "005_session_corrections_traceable.sql"
+            [5] = "005_session_corrections_traceable.sql",
+            [6] = "006_process_signature_discovery.sql"
         };
 
     private readonly DatabaseOptions _options;
@@ -147,7 +148,12 @@ public sealed class DatabaseInitializer
         migration.CommandText =
             ReadEmbeddedMigration(migrationFile);
 
-        await migration.ExecuteNonQueryAsync(cancellationToken);
+        await using (var result = await migration.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await result.NextResultAsync(cancellationToken))
+            {
+            }
+        }
 
         var record = connection.CreateCommand();
         record.Transaction = (SqliteTransaction)transaction;

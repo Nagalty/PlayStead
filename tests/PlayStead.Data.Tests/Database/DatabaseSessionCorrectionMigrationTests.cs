@@ -11,7 +11,7 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task Initialize_fresh_database_creates_schema_v5_with_traceable_session_corrections()
+    public async Task Initialize_fresh_database_creates_current_schema_with_traceable_session_corrections()
     {
         Directory.CreateDirectory(_root);
 
@@ -44,7 +44,7 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            5,
+            6,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
@@ -65,7 +65,7 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
     }
 
     [Fact]
-    public async Task Initialize_upgrades_v3_to_v5_without_mutating_observed_session_data()
+    public async Task Initialize_upgrades_v3_to_current_schema_without_mutating_observed_session_data()
     {
         Directory.CreateDirectory(_root);
 
@@ -111,7 +111,7 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            5,
+            6,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
@@ -150,6 +150,7 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
         Guid gameId,
         Guid sessionId)
     {
+        await DiscoveryDatabaseFixture.CreateSchemaAsync(databasePath, 3, CancellationToken.None);
         await using var connection =
             new SqliteConnection(
                 $"Data Source={databasePath};Pooling=False");
@@ -160,43 +161,6 @@ public sealed class DatabaseSessionCorrectionMigrationTests : IDisposable
             connection.CreateCommand();
 
         command.CommandText = """
-            PRAGMA foreign_keys = ON;
-
-            CREATE TABLE schema_migrations (
-                version INTEGER PRIMARY KEY,
-                applied_utc TEXT NOT NULL
-            );
-
-            INSERT INTO schema_migrations(version, applied_utc)
-            VALUES
-                (1, '2026-09-12T00:00:00.0000000+00:00'),
-                (2, '2026-09-12T01:00:00.0000000+00:00'),
-                (3, '2026-09-13T00:00:00.0000000+00:00');
-
-            CREATE TABLE games (
-                game_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                is_hidden INTEGER NOT NULL DEFAULT 0,
-                created_utc TEXT NOT NULL,
-                updated_utc TEXT NOT NULL
-            );
-
-            CREATE TABLE game_sessions (
-                session_id TEXT PRIMARY KEY,
-                game_id TEXT NOT NULL,
-                observed_started_at_utc TEXT NOT NULL,
-                last_seen_at_utc TEXT NOT NULL,
-                observed_ended_at_utc TEXT NULL,
-                state INTEGER NOT NULL,
-                end_reason INTEGER NULL,
-                detection_source INTEGER NOT NULL,
-                created_at_utc TEXT NOT NULL,
-                updated_at_utc TEXT NOT NULL,
-                FOREIGN KEY (game_id)
-                    REFERENCES games(game_id)
-                    ON DELETE CASCADE
-            );
-
             INSERT INTO games(
                 game_id,
                 title,

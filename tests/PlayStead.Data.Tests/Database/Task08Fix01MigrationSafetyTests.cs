@@ -54,7 +54,7 @@ public sealed class Task08Fix01MigrationSafetyTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            5,
+            6,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
@@ -177,6 +177,7 @@ public sealed class Task08Fix01MigrationSafetyTests : IDisposable
     private static async Task CreateV4DatabaseAsync(
         string databasePath)
     {
+        await DiscoveryDatabaseFixture.CreateSchemaAsync(databasePath, 4, CancellationToken.None);
         await using var connection =
             new SqliteConnection(
                 $"Data Source={databasePath};Pooling=False");
@@ -187,58 +188,6 @@ public sealed class Task08Fix01MigrationSafetyTests : IDisposable
             connection.CreateCommand();
 
         command.CommandText = """
-            PRAGMA foreign_keys = ON;
-
-            CREATE TABLE schema_migrations (
-                version INTEGER PRIMARY KEY,
-                applied_utc TEXT NOT NULL
-            );
-
-            INSERT INTO schema_migrations(version, applied_utc)
-            VALUES
-                (1, '2026-09-12T00:00:00.0000000+00:00'),
-                (2, '2026-09-12T01:00:00.0000000+00:00'),
-                (3, '2026-09-13T00:00:00.0000000+00:00'),
-                (4, '2026-09-13T01:00:00.0000000+00:00');
-
-            CREATE TABLE games (
-                game_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                is_hidden INTEGER NOT NULL DEFAULT 0,
-                created_utc TEXT NOT NULL,
-                updated_utc TEXT NOT NULL
-            );
-
-            CREATE TABLE game_sessions (
-                session_id TEXT PRIMARY KEY,
-                game_id TEXT NOT NULL,
-                observed_started_at_utc TEXT NOT NULL,
-                last_seen_at_utc TEXT NOT NULL,
-                observed_ended_at_utc TEXT NULL,
-                state INTEGER NOT NULL,
-                end_reason INTEGER NULL,
-                detection_source INTEGER NOT NULL,
-                created_at_utc TEXT NOT NULL,
-                updated_at_utc TEXT NOT NULL,
-                FOREIGN KEY (game_id)
-                    REFERENCES games(game_id)
-                    ON DELETE CASCADE
-            );
-
-            CREATE TABLE session_corrections (
-                session_id TEXT PRIMARY KEY,
-                corrected_started_at_utc TEXT NULL,
-                corrected_ended_at_utc TEXT NULL,
-                corrected_at_utc TEXT NOT NULL,
-                CHECK (
-                    corrected_started_at_utc IS NOT NULL
-                    OR corrected_ended_at_utc IS NOT NULL
-                ),
-                FOREIGN KEY (session_id)
-                    REFERENCES game_sessions(session_id)
-                    ON DELETE CASCADE
-            );
-
             INSERT INTO games(
                 game_id,
                 title,

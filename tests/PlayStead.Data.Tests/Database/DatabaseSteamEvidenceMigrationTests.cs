@@ -37,7 +37,7 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
         var version = Convert.ToInt32(
             await versionCommand.ExecuteScalarAsync());
 
-        Assert.Equal(5, version);
+        Assert.Equal(6, version);
 
         var tablesCommand = connection.CreateCommand();
         tablesCommand.CommandText = """
@@ -85,7 +85,7 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
         var version = Convert.ToInt32(
             await versionCommand.ExecuteScalarAsync());
 
-        Assert.Equal(5, version);
+        Assert.Equal(6, version);
 
         var titleCommand = connection.CreateCommand();
         titleCommand.CommandText =
@@ -116,6 +116,7 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
     private static async Task CreateV1DatabaseAsync(
         string databasePath)
     {
+        await DiscoveryDatabaseFixture.CreateSchemaAsync(databasePath, 1, CancellationToken.None);
         await using var connection = new SqliteConnection(
             $"Data Source={databasePath};Pooling=False");
 
@@ -123,22 +124,6 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
 
         var command = connection.CreateCommand();
         command.CommandText = """
-            CREATE TABLE schema_migrations (
-                version INTEGER PRIMARY KEY,
-                applied_utc TEXT NOT NULL
-            );
-
-            INSERT INTO schema_migrations(version, applied_utc)
-            VALUES (1, '2026-09-12T00:00:00.0000000+00:00');
-
-            CREATE TABLE games (
-                game_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                is_hidden INTEGER NOT NULL DEFAULT 0,
-                created_utc TEXT NOT NULL,
-                updated_utc TEXT NOT NULL
-            );
-
             INSERT INTO games(
                 game_id,
                 title,
