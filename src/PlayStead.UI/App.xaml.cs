@@ -146,7 +146,8 @@ public partial class App : Application
                     "The WPF dispatcher shut down before PlayStead could join its background refreshes.");
 
             var frame = new DispatcherFrame();
-            _ = shutdown.ContinueWith(
+            var join = Task.Run(() => shutdown.GetAwaiter().GetResult());
+            _ = join.ContinueWith(
                 completed =>
                 {
                     if (!Dispatcher.HasShutdownStarted)
@@ -158,9 +159,11 @@ public partial class App : Application
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
             Dispatcher.PushFrame(frame);
-            if (!shutdown.IsCompleted)
+            if (!join.IsCompleted)
                 throw new InvalidOperationException(
                     "The WPF dispatcher stopped before PlayStead could join its background refreshes.");
+            join.GetAwaiter().GetResult();
+            return;
         }
 
         shutdown.GetAwaiter().GetResult();
