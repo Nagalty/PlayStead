@@ -104,6 +104,7 @@ public partial class App : Application
             _trayIconService = null;
         }
 
+        Task? shutdown = null;
         try
         {
             var coordinator =
@@ -111,18 +112,18 @@ public partial class App : Application
 
             if (coordinator is not null)
             {
-                Task.Run(
-                        () => coordinator.StopAsync(
-                            CancellationToken.None))
-                    .GetAwaiter()
-                    .GetResult();
+                shutdown = coordinator.StopAsync(CancellationToken.None);
+                JoinShutdownOnDispatcher(shutdown);
             }
         }
         finally
         {
-            _host?.Dispose();
-            _host = null;
-            _hostStarted = false;
+            if (shutdown is null || shutdown.IsCompleted)
+            {
+                _host?.Dispose();
+                _host = null;
+                _hostStarted = false;
+            }
 
             _invocationServer = null;
 
@@ -133,6 +134,36 @@ public partial class App : Application
 
             base.OnExit(e);
         }
+    }
+
+    private void JoinShutdownOnDispatcher(Task shutdown)
+    {
+        Dispatcher.VerifyAccess();
+        if (!shutdown.IsCompleted)
+        {
+            if (Dispatcher.HasShutdownStarted)
+                throw new InvalidOperationException(
+                    "The WPF dispatcher shut down before PlayStead could join its background refreshes.");
+
+            var frame = new DispatcherFrame();
+            _ = shutdown.ContinueWith(
+                completed =>
+                {
+                    if (!Dispatcher.HasShutdownStarted)
+                        _ = Dispatcher.BeginInvoke(
+                            new Action(() => frame.Continue = false),
+                            DispatcherPriority.Send);
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            Dispatcher.PushFrame(frame);
+            if (!shutdown.IsCompleted)
+                throw new InvalidOperationException(
+                    "The WPF dispatcher stopped before PlayStead could join its background refreshes.");
+        }
+
+        shutdown.GetAwaiter().GetResult();
     }
 
     private ApplicationStartupCoordinator.Operations

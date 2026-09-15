@@ -2,6 +2,7 @@ using PlayStead.Core.Library;
 using PlayStead.Data.Database;
 using PlayStead.Platform.Paths;
 using PlayStead.Platform.SingleInstance;
+using System.Runtime.ExceptionServices;
 
 namespace PlayStead.UI.Bootstrap;
 
@@ -124,7 +125,15 @@ public sealed class ApplicationStartupCoordinator
 
         try
         {
-            await _operations.StopPipeAsync(CancellationToken.None);
+            Exception? pipeFailure = null;
+            try
+            {
+                await _operations.StopPipeAsync(CancellationToken.None);
+            }
+            catch (Exception error)
+            {
+                pipeFailure = error;
+            }
 
             if (refreshes.Length != 0)
             {
@@ -137,7 +146,14 @@ public sealed class ApplicationStartupCoordinator
                 {
                     // Application cancellation leaves no durable refresh to publish.
                 }
+                catch (Exception refreshFailure) when (pipeFailure is not null)
+                {
+                    throw new AggregateException(pipeFailure, refreshFailure);
+                }
             }
+
+            if (pipeFailure is not null)
+                ExceptionDispatchInfo.Capture(pipeFailure).Throw();
         }
         finally
         {

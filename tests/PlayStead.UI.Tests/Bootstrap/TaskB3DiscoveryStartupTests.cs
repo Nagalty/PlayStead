@@ -163,6 +163,59 @@ public sealed class TaskB3DiscoveryStartupTests : IDisposable
     }
 
     [Fact]
+    public async Task Faulted_pipe_stop_still_joins_admitted_manual_refresh_before_inventory_and_host()
+    {
+        var snapshot = new LibrarySnapshot([], []);
+        var manualEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseManual = new TaskCompletionSource<LibrarySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pipeEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Func<CancellationToken, Task>? rescan = null;
+        var refreshCalls = 0;
+        var stoppedInventory = false;
+        var stoppedHost = false;
+        var operations = CreateCoordinatorOperations() with
+        {
+            BindRescanRequested = handler => rescan = handler,
+            RefreshAsync = _ =>
+            {
+                if (Interlocked.Increment(ref refreshCalls) == 1) return Task.FromResult(snapshot);
+                manualEntered.TrySetResult();
+                return releaseManual.Task;
+            },
+            StopPipeAsync = _ =>
+            {
+                pipeEntered.TrySetResult();
+                throw new InvalidOperationException("pipe stop failed");
+            },
+            StopDiscoveryAsync = _ => { stoppedInventory = true; return Task.CompletedTask; },
+            StopHostAsync = _ => { stoppedHost = true; return Task.CompletedTask; }
+        };
+        var coordinator = new ApplicationStartupCoordinator(operations);
+        await coordinator.StartAsync([], CancellationToken.None);
+        await coordinator.BackgroundRefreshTask!.WaitAsync(TimeSpan.FromSeconds(2));
+        var manual = rescan!(CancellationToken.None);
+        await manualEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        try
+        {
+            var stop = coordinator.StopAsync(CancellationToken.None);
+            await pipeEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.False(stoppedInventory);
+            Assert.False(stoppedHost);
+            Assert.False(stop.IsCompleted);
+            releaseManual.TrySetResult(snapshot);
+            await manual.WaitAsync(TimeSpan.FromSeconds(2));
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => stop);
+            Assert.Equal("pipe stop failed", error.Message);
+            Assert.True(stoppedInventory);
+            Assert.True(stoppedHost);
+        }
+        finally
+        {
+            releaseManual.TrySetResult(snapshot);
+        }
+    }
+
+    [Fact]
     public async Task Cached_snapshot_returns_while_inventory_source_is_blocked()
     {
         Directory.CreateDirectory(_root);
