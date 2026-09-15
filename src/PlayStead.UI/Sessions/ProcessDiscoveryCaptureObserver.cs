@@ -1,3 +1,5 @@
+using System.Data.Common;
+using System.IO;
 using Microsoft.Extensions.Logging;
 using PlayStead.Core.Library;
 using PlayStead.Core.Sessions;
@@ -14,6 +16,7 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
     private readonly ILogger<ProcessDiscoveryCaptureObserver> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<InstallationId, (Guid Generation, DiscoveryReason Reason)> _logged = [];
+    private readonly Dictionary<InstallationId, Guid> _loggedPersistence = [];
     private readonly Dictionary<InstallationId, (DiscoveryReason Reason, string Trigger, bool Name)> _refreshTriggers = [];
     private long _sequence;
     private int _captureGap;
@@ -41,6 +44,10 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
     {
         ArgumentNullException.ThrowIfNull(capture);
         await _gate.WaitAsync(cancellationToken);
+        InstallationId? processingId = null;
+        Guid processingGeneration = Guid.Empty;
+        DiscoveryInventoryContext? processingContext = null;
+        var preparation = new Dictionary<InstallationId, DiscoveryInventoryContext>();
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -50,17 +57,20 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                 quality |= EpisodeQuality.CaptureGap;
             var batch = new ProcessObservationBatch(sequence, observedAtUtc, quality,
                 capture.Processes);
-            var preparation = new Dictionary<InstallationId, DiscoveryInventoryContext>();
             foreach (var context in _inventory.GetCurrentContexts())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var scope = context.Inventory.Scope;
+                processingId = scope.InstallationId;
+                processingGeneration = scope.GenerationId;
+                processingContext = context;
                 if (!scope.IsPresent || context.HasAmbiguousInstallation ||
                     context.Inventory.Completeness != InventoryCompleteness.Complete)
                     continue;
                 if (_inventory.GetCurrent(scope.InstallationId) is null ||
                     _coordinator.GetState(scope.InstallationId) is null)
                     continue;
+                _loggedPersistence.Remove(scope.InstallationId);
                 if (_refreshTriggers.TryGetValue(scope.InstallationId, out var priorRefresh) &&
                     (priorRefresh.Reason == DiscoveryReason.IncompleteInventory
                         ? UnknownUnderRootPaths(context, capture).Length == 0
@@ -74,6 +84,8 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                 if (!IsCurrentContext(context)) continue;
                 if (decision.Kind != DiscoveryDecisionKind.PromoteMain)
                     LogTransition(scope.InstallationId, scope.GenerationId, decision);
+                if (decision.Reasons.Contains(DiscoveryReason.CaptureGap))
+                    preparation[scope.InstallationId] = context;
                 if (decision.Kind == DiscoveryDecisionKind.PromoteMain)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -136,6 +148,30 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                 if (IsCurrentContext(context))
                     _inventory.RequestEpisodePreparation(id, cancellationToken);
             }
+        }
+        catch (Exception error) when (processingId is not null && processingContext is not null &&
+            error is (IOException or UnauthorizedAccessException or DbException))
+        {
+            var id = processingId.Value;
+            var suspended = _inventory.MarkPending(id, processingContext);
+            preparation.Remove(id);
+            // Other scopes skipped this shared batch; their next observation is nonqualifying.
+            Interlocked.Exchange(ref _captureGap, 1);
+            if (!suspended)
+                _logger.LogInformation(error,
+                    "Stale discovery persistence failure ignored for installation {InstallationId} generation {GenerationId}",
+                    id, processingGeneration);
+            else if (!_loggedPersistence.TryGetValue(id, out var prior) ||
+                     prior != processingGeneration)
+            {
+                _loggedPersistence[id] = processingGeneration;
+                _logger.LogWarning(error,
+                    "Discovery persistence unavailable for installation {InstallationId} generation {GenerationId}",
+                    id, processingGeneration);
+            }
+            foreach (var (preparedId, context) in preparation)
+                if (IsCurrentContext(context))
+                    _inventory.RequestEpisodePreparation(preparedId, cancellationToken);
         }
         finally { _gate.Release(); }
     }

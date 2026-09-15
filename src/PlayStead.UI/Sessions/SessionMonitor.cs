@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PlayStead.Core.Sessions;
 
 namespace PlayStead.UI.Sessions;
@@ -7,6 +9,8 @@ public sealed class SessionMonitor : BackgroundService
 {
     private readonly ISessionRuntime _runtime;
     private readonly SessionMonitorOptions _options;
+    private readonly ILogger<SessionMonitor> _logger;
+    private bool _captureUnavailable;
     private readonly Func<
         TimeSpan,
         CancellationToken,
@@ -21,7 +25,15 @@ public sealed class SessionMonitor : BackgroundService
             static (delay, cancellationToken) =>
                 Task.Delay(
                     delay,
-                    cancellationToken))
+                    cancellationToken),
+            NullLogger<SessionMonitor>.Instance)
+    {
+    }
+
+    public SessionMonitor(ISessionRuntime runtime, SessionMonitorOptions options,
+        ILogger<SessionMonitor> logger)
+        : this(runtime, options, static (delay, cancellationToken) =>
+            Task.Delay(delay, cancellationToken), logger)
     {
     }
 
@@ -32,10 +44,18 @@ public sealed class SessionMonitor : BackgroundService
             TimeSpan,
             CancellationToken,
             Task> delayAsync)
+        : this(runtime, options, delayAsync, NullLogger<SessionMonitor>.Instance)
+    {
+    }
+
+    public SessionMonitor(ISessionRuntime runtime, SessionMonitorOptions options,
+        Func<TimeSpan, CancellationToken, Task> delayAsync,
+        ILogger<SessionMonitor> logger)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(delayAsync);
+        ArgumentNullException.ThrowIfNull(logger);
 
         if (options.PollInterval <= TimeSpan.Zero)
         {
@@ -48,6 +68,7 @@ public sealed class SessionMonitor : BackgroundService
         _runtime = runtime;
         _options = options;
         _delayAsync = delayAsync;
+        _logger = logger;
     }
 
     public SessionRuntimeSnapshot? LatestSnapshot
@@ -64,15 +85,26 @@ public sealed class SessionMonitor : BackgroundService
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            var snapshot =
-                await _runtime.RefreshAsync(
-                    cancellationToken);
-
-            LatestSnapshot =
-                snapshot;
-
-            SnapshotUpdated?.Invoke(
-                snapshot);
+            SessionRuntimeSnapshot? snapshot = null;
+            try
+            {
+                snapshot = await _runtime.RefreshAsync(cancellationToken);
+                _captureUnavailable = false;
+            }
+            catch (ProcessCaptureUnavailableException error)
+            {
+                // SessionRuntime has marked this failed capture as a discovery gap.
+                // No snapshot means no false process absence or persisted heartbeat.
+                if (!_captureUnavailable)
+                    _logger.LogWarning(error,
+                        "Process capture unavailable; session monitor will retry next cycle");
+                _captureUnavailable = true;
+            }
+            if (snapshot is not null)
+            {
+                LatestSnapshot = snapshot;
+                SnapshotUpdated?.Invoke(snapshot);
+            }
 
             try
             {

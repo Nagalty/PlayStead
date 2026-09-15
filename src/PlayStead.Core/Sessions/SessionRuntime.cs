@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace PlayStead.Core.Sessions;
 
 public sealed class SessionRuntime : ISessionRuntime
@@ -138,7 +140,7 @@ public sealed class SessionRuntime : ISessionRuntime
         {
             capture = await _processSource.CaptureWithQualityAsync(cancellationToken);
         }
-        catch
+        catch (Exception error)
         {
             try
             {
@@ -148,6 +150,8 @@ public sealed class SessionRuntime : ISessionRuntime
             {
                 // The capture failure remains the refresh failure.
             }
+            if (error is Win32Exception captureError)
+                throw new ProcessCaptureUnavailableException(captureError);
             throw;
         }
         cancellationToken.ThrowIfCancellationRequested();

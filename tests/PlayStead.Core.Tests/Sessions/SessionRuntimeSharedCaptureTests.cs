@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using PlayStead.Core.Sessions;
 
 namespace PlayStead.Core.Tests.Sessions;
@@ -98,6 +99,35 @@ public sealed class SessionRuntimeSharedCaptureTests
         Assert.Equal(1, f.Observer.Gaps);
         f.Source.Fault = null;
         Assert.Equal(active.SessionId, Assert.Single((await f.Refresh()).ActiveSessions).SessionId);
+    }
+
+    [Fact]
+    public async Task Expected_Windows_capture_fault_is_classified_only_after_gap()
+    {
+        var f = new Fixture();
+        await f.Refresh();
+        var active = Assert.Single((await f.Refresh()).ActiveSessions);
+        f.Source.Fault = new Win32Exception("Enumeration unavailable.");
+
+        var fault = await Assert.ThrowsAsync<ProcessCaptureUnavailableException>(() => f.Refresh());
+
+        Assert.IsType<Win32Exception>(fault.InnerException);
+        Assert.Equal(1, f.Observer.Gaps);
+        Assert.Single(f.Sessions.Writes);
+        f.Source.Fault = null;
+        Assert.Equal(active.SessionId, Assert.Single((await f.Refresh()).ActiveSessions).SessionId);
+    }
+
+    [Fact]
+    public async Task Pre_capture_Windows_fault_remains_unclassified_and_does_not_mark_gap()
+    {
+        var f = new Fixture();
+        f.Signatures.Fault = new Win32Exception("Revision validation failed.");
+
+        await Assert.ThrowsAsync<Win32Exception>(() => f.Refresh());
+
+        Assert.Equal(0, f.Source.Captures);
+        Assert.Equal(0, f.Observer.Gaps);
     }
 
     [Fact]
@@ -204,7 +234,12 @@ public sealed class SessionRuntimeSharedCaptureTests
     private sealed class SignatureStore : IProcessSignatureStore
     {
         internal IReadOnlyList<ProcessSignature> Values = [Fixture.Signature()];
-        public Task<IReadOnlyList<ProcessSignature>> GetAllAsync(CancellationToken ct) => Task.FromResult(Values);
+        internal Exception? Fault;
+        public Task<IReadOnlyList<ProcessSignature>> GetAllAsync(CancellationToken ct)
+        {
+            if (Fault is not null) throw Fault;
+            return Task.FromResult(Values);
+        }
         public Task<ProcessSignature?> GetAsync(Guid id, CancellationToken ct) => Task.FromResult(Values.FirstOrDefault(s => s.GameId == id));
         public Task UpsertAsync(ProcessSignature s, CancellationToken ct) => throw new NotSupportedException();
     }

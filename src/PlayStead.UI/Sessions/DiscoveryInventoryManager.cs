@@ -1,4 +1,8 @@
 using System.Collections.Immutable;
+using System.ComponentModel;
+using System.Data.Common;
+using System.IO;
+using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using PlayStead.Core.Library;
 using PlayStead.Core.Sessions.Discovery;
@@ -19,9 +23,12 @@ public sealed class DiscoveryInventoryManager
     private readonly object _gate = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly HashSet<Task> _work = [];
+    private readonly List<ExceptionDispatchInfo> _unexpectedFaults = [];
     private readonly HashSet<InstallationId> _removed = [];
+    private readonly HashSet<InstallationId> _faulted = [];
     private readonly Dictionary<InstallationId, ScopeRequest> _scopeWork = [];
     private readonly Dictionary<InstallationId, long> _scopeRevisions = [];
+    private readonly Dictionary<InstallationId, (Guid Generation, string Reason)> _loggedFailures = [];
     private ImmutableDictionary<InstallationId, DiscoveryInventoryContext> _published =
         ImmutableDictionary<InstallationId, DiscoveryInventoryContext>.Empty;
     private ImmutableDictionary<InstallationId, PreparedInstallation> _active =
@@ -66,6 +73,27 @@ public sealed class DiscoveryInventoryManager
         }
     }
 
+    public bool MarkPending(InstallationId installationId,
+        DiscoveryInventoryContext expectedContext)
+    {
+        ArgumentNullException.ThrowIfNull(expectedContext);
+        lock (_gate)
+        {
+            if (_stopped || !ReferenceEquals(_published.GetValueOrDefault(installationId),
+                    expectedContext)) return false;
+            _faulted.Add(installationId);
+            _published = _published.Remove(installationId);
+            if (_scopeWork.Remove(installationId, out var request))
+            {
+                request.Cancellation.Cancel();
+                if (request.Queued) request.Cancellation.Dispose();
+            }
+            _scopeRevisions[installationId] =
+                _scopeRevisions.GetValueOrDefault(installationId) + 1;
+            return true;
+        }
+    }
+
     public void Schedule(LibrarySnapshot snapshot, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -88,6 +116,7 @@ public sealed class DiscoveryInventoryManager
             var revision = ++_revision;
             _fullRunning = true;
             _active = prepared;
+            _faulted.Clear();
             _published = ImmutableDictionary<InstallationId, DiscoveryInventoryContext>.Empty;
             StartWork(() => InventorySnapshotAsync(prepared, revision, workCancellation.Token),
                 workCancellation);
@@ -123,9 +152,23 @@ public sealed class DiscoveryInventoryManager
         while (true)
         {
             Task[] running;
-            lock (_gate) running = _work.Where(task => !task.IsCompleted).ToArray();
-            if (running.Length == 0) return;
-            await Task.WhenAll(running).WaitAsync(cancellationToken);
+            ExceptionDispatchInfo? fault;
+            lock (_gate)
+            {
+                running = _work.ToArray();
+                fault = running.Length == 0 ? _unexpectedFaults.FirstOrDefault() : null;
+            }
+            if (running.Length == 0)
+            {
+                fault?.Throw();
+                return;
+            }
+            // Join all owners even if one faulted; its original failure is retained
+            // and thrown once the work set has drained.
+            await Task.WhenAll(running.Select(task => task.ContinueWith(
+                static _ => { }, CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default)))
+                .WaitAsync(cancellationToken);
         }
     }
 
@@ -133,7 +176,11 @@ public sealed class DiscoveryInventoryManager
     {
         lock (_gate)
         {
-            if (_joined) return;
+            if (_joined)
+            {
+                _unexpectedFaults.FirstOrDefault()?.Throw();
+                return;
+            }
             if (!_stopped)
             {
                 _stopped = true;
@@ -146,12 +193,17 @@ public sealed class DiscoveryInventoryManager
                 _published = ImmutableDictionary<InstallationId, DiscoveryInventoryContext>.Empty;
             }
         }
-        await AwaitIdleAsync(cancellationToken);
-        lock (_gate)
+        try { await AwaitIdleAsync(cancellationToken); }
+        finally
         {
-            if (_joined) return;
-            _joined = true;
-            _lifetime.Dispose();
+            lock (_gate)
+            {
+                if (!_joined && _work.Count == 0)
+                {
+                    _joined = true;
+                    _lifetime.Dispose();
+                }
+            }
         }
     }
 
@@ -212,8 +264,11 @@ public sealed class DiscoveryInventoryManager
         _work.Add(work);
         _ = work.ContinueWith(completed =>
         {
+            Exception? unexpected = completed.Exception?.InnerException;
             lock (_gate)
             {
+                if (unexpected is not null)
+                    _unexpectedFaults.Add(ExceptionDispatchInfo.Capture(unexpected));
                 _work.Remove(completed);
                 if (scopeId is { } id)
                 {
@@ -223,6 +278,10 @@ public sealed class DiscoveryInventoryManager
                 }
                 else if (ReferenceEquals(_currentWork, cancellation)) _currentWork = null;
             }
+            if (unexpected is not null)
+                _logger.LogError(unexpected,
+                    "Discovery unexpected inventory worker fault for installation {InstallationId}",
+                    scopeId);
             cancellation.Dispose();
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
@@ -247,6 +306,8 @@ public sealed class DiscoveryInventoryManager
                 if (!IsCurrentLocked(revision, cancellationToken)) return;
                 _fullRunning = false;
                 foreach (var id in _scopeWork.Keys)
+                    completed.Remove(id);
+                foreach (var id in _faulted)
                     completed.Remove(id);
                 _published = completed.ToImmutable();
                 foreach (var request in _scopeWork.Values.Where(item => item.Queued).ToArray())
@@ -275,7 +336,8 @@ public sealed class DiscoveryInventoryManager
             prepareEpisode: true, id, request.Revision);
         if (context is null) return;
         lock (_gate)
-            if (IsCurrentLocked(revision, cancellationToken, id, request.Revision))
+            if (IsCurrentLocked(revision, cancellationToken, id, request.Revision) &&
+                !_faulted.Contains(id))
                 _published = _published.SetItem(id, context);
     }
 
@@ -285,6 +347,7 @@ public sealed class DiscoveryInventoryManager
     {
         var id = installation.Installation.Id;
         if (installation.Root is null) return null;
+        var knownGeneration = Guid.Empty;
         try
         {
             var persisted = await _learningStore.LoadAsync(id, cancellationToken);
@@ -296,6 +359,7 @@ public sealed class DiscoveryInventoryManager
                 string.Equals(persisted.Inventory.Scope.RootPath, installation.Root,
                     StringComparison.OrdinalIgnoreCase)
                 ? persisted.Inventory.Scope.GenerationId : Guid.NewGuid();
+            knownGeneration = generation;
             var scope = new InstallationScope(installation.Installation.GameId, id,
                 installation.Root, generation, true);
             ExecutableInventory inventory;
@@ -307,11 +371,11 @@ public sealed class DiscoveryInventoryManager
             {
                 return null;
             }
-            catch (Exception error) when (error is not OutOfMemoryException)
+            catch (Exception error) when (IsDiscoveryBoundaryError(error))
             {
                 if (!IsCurrent(revision, cancellationToken, requestId, scopeRevision)) return null;
-                _logger.LogWarning(error,
-                    "Discovery inventory failed for installation {InstallationId}", id);
+                LogFailure(id, scope.GenerationId, "InventoryError", error,
+                    "Discovery inventory failed for installation {InstallationId} generation {GenerationId}: {Reason}");
                 inventory = new ExecutableInventory(scope, InventoryCompleteness.Incomplete, [],
                     [new InventoryIssue(scope.RootPath, InventoryIssueKind.IoFailure)]);
             }
@@ -333,6 +397,8 @@ public sealed class DiscoveryInventoryManager
                 if (!IsCurrentLocked(revision, cancellationToken, requestId, scopeRevision))
                     return null;
                 _removed.Remove(id);
+                if (state.Inventory.Completeness == InventoryCompleteness.Complete)
+                    _loggedFailures.Remove(id);
             }
             if (state.Inventory.Completeness != InventoryCompleteness.Complete)
                 return null;
@@ -342,12 +408,29 @@ public sealed class DiscoveryInventoryManager
         {
             return null;
         }
-        catch (Exception error) when (error is not OutOfMemoryException)
+        catch (Exception error) when (IsDiscoveryBoundaryError(error))
         {
-            _logger.LogWarning(error,
-                "Discovery inventory remains pending for installation {InstallationId}", id);
+            if (!IsCurrent(revision, cancellationToken, requestId, scopeRevision))
+                return null;
+            LogFailure(id, knownGeneration, "PersistenceError", error,
+                "Discovery inventory remains pending for installation {InstallationId} generation {GenerationId}: {Reason}");
             return null;
         }
+    }
+
+    private static bool IsDiscoveryBoundaryError(Exception error) =>
+        error is IOException or UnauthorizedAccessException or Win32Exception or DbException;
+
+    private void LogFailure(InstallationId id, Guid generation, string reason,
+        Exception error, string message)
+    {
+        lock (_gate)
+        {
+            if (_loggedFailures.TryGetValue(id, out var prior) &&
+                prior.Generation == generation && prior.Reason == reason) return;
+            _loggedFailures[id] = (generation, reason);
+        }
+        _logger.LogWarning(error, message, id, generation, reason);
     }
 
     private bool IsCurrent(long revision, CancellationToken cancellationToken,

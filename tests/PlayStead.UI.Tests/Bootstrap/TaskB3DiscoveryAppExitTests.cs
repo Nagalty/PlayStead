@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Reflection;
+using System.Xml.Linq;
 using System.Windows;
 using System.Windows.Threading;
 using PlayStead.Core.Library;
@@ -12,9 +14,26 @@ namespace PlayStead.UI.Tests.Bootstrap;
 
 public sealed class TaskB3DiscoveryAppExitTests
 {
+    private const string ChildProbeEnvironment = "PLAYSTEAD_B3_APP_EXIT_CHILD_PROBE";
+    private const string TargetTest =
+        "PlayStead.UI.Tests.Bootstrap.TaskB3DiscoveryAppExitTests.OnExit_pumps_started_nested_ui_apply_until_join_before_host_stop";
+
+    [Fact]
+    public async Task Child_probe_rejects_zero_matched_tests_even_when_dotnet_exits_zero()
+    {
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            RunProbeInChildProcessAsync("FullyQualifiedName~ThisB3AppExitProbeDoesNotExist"));
+    }
+
     [Fact]
     public async Task OnExit_pumps_started_nested_ui_apply_until_join_before_host_stop()
     {
+        if (Environment.GetEnvironmentVariable(ChildProbeEnvironment) != "1")
+        {
+            await RunProbeInChildProcessAsync();
+            return;
+        }
+
         var ready = new TaskCompletionSource<(Dispatcher Dispatcher, ExitProbeApp App)>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         var uiStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -111,6 +130,83 @@ public sealed class TaskB3DiscoveryAppExitTests
             }
         }
     }
+
+    private static async Task RunProbeInChildProcessAsync(string? filterOverride = null)
+    {
+        // WPF Application.Shutdown permanently changes the process-wide singleton.
+        // This probe must run in its own testhost so unrelated UI tests can still
+        // construct controls after it finishes.
+        var project = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "..", "..", "..", "PlayStead.UI.Tests.csproj"));
+        var results = Directory.CreateTempSubdirectory("playstead-b3-app-exit-");
+        try
+        {
+            var start = new ProcessStartInfo("dotnet")
+            {
+                WorkingDirectory = Path.GetDirectoryName(project)!,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            foreach (var argument in new[]
+            {
+                "test", project, "--configuration", "Release", "--no-build", "--no-restore",
+                "--filter", filterOverride ?? "FullyQualifiedName~" + TargetTest,
+                "-m:1", "/nodeReuse:false", "-p:UseSharedCompilation=false",
+                "--logger", "trx;LogFileName=app-exit-child.trx",
+                "--results-directory", results.FullName
+            }) start.ArgumentList.Add(argument);
+            start.Environment[ChildProbeEnvironment] = "1";
+            using var process = Process.Start(start)!;
+            var output = process.StandardOutput.ReadToEndAsync();
+            var error = process.StandardError.ReadToEndAsync();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try { await process.WaitForExitAsync(timeout.Token); }
+            catch (OperationCanceledException)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+                throw new TimeoutException("B3 app-exit probe child testhost did not exit.");
+            }
+            var childOutput = await output;
+            var childError = await error;
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"B3 app-exit probe child exited {process.ExitCode}.\n{childOutput}\n{childError}");
+            ValidateChildTrx(Path.Combine(results.FullName, "app-exit-child.trx"));
+        }
+        finally
+        {
+            results.Delete(recursive: true);
+        }
+    }
+
+    private static void ValidateChildTrx(string path)
+    {
+        if (!File.Exists(path))
+            throw new InvalidOperationException("B3 app-exit child produced no TRX result.");
+        var document = XDocument.Load(path);
+        var results = document.Descendants().Where(element =>
+            element.Name.LocalName == "UnitTestResult").ToArray();
+        var counters = document.Descendants().SingleOrDefault(element =>
+            element.Name.LocalName == "Counters");
+        var valid = results.Length == 1 &&
+            (string?)results[0].Attribute("testName") == TargetTest &&
+            (string?)results[0].Attribute("outcome") == "Passed" &&
+            counters is not null &&
+            Counter(counters, "total") == 1 &&
+            Counter(counters, "executed") == 1 &&
+            Counter(counters, "passed") == 1 &&
+            Counter(counters, "failed") == 0 &&
+            Counter(counters, "notExecuted") == 0;
+        if (!valid)
+            throw new InvalidOperationException(
+                "B3 app-exit child did not execute and pass exactly one target test.");
+    }
+
+    private static int? Counter(XElement counters, string name) =>
+        int.TryParse((string?)counters.Attribute(name), out var value) ? value : null;
 
     private sealed class ExitProbeApp : App
     {
