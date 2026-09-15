@@ -129,10 +129,12 @@ public sealed class Task08Fix01CorrectionRuntimeTests
 
         var arguments = constructor!
             .GetParameters()
-            .Select(parameter => CreateRuntimeDependency(
-                parameter.ParameterType,
-                sessions,
-                corrections))
+            .Select(parameter => parameter.HasDefaultValue
+                ? parameter.DefaultValue
+                : CreateRuntimeDependency(
+                    parameter.ParameterType,
+                    sessions,
+                    corrections))
             .ToArray();
 
         return Assert.IsType<SessionRuntime>(constructor.Invoke(arguments));

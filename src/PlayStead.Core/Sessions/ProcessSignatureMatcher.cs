@@ -1,10 +1,9 @@
+using PlayStead.Core.Sessions.Discovery;
+
 namespace PlayStead.Core.Sessions;
 
 public sealed class ProcessSignatureMatcher
 {
-    private static readonly StringComparer ExecutableComparer =
-        StringComparer.OrdinalIgnoreCase;
-
     public ProcessSignatureMatch Match(
         ProcessSignature signature,
         IReadOnlyCollection<ProcessSnapshot> processes)
@@ -12,16 +11,30 @@ public sealed class ProcessSignatureMatcher
         ArgumentNullException.ThrowIfNull(signature);
         ArgumentNullException.ThrowIfNull(processes);
 
-        var effectiveKinds = BuildEffectiveKinds(signature.Entries);
-
         var main = new List<ProcessSnapshot>();
         var auxiliary = new List<ProcessSnapshot>();
         var excluded = new List<ProcessSnapshot>();
 
+        if (!Enum.IsDefined(signature.Origin) ||
+            signature.Origin == ProcessSignatureOrigin.Discovered && !IsDiscoveredAdmissible(signature))
+            return new ProcessSignatureMatch(signature.GameId, main, auxiliary, excluded);
+
         foreach (var process in processes)
         {
-            if (string.IsNullOrWhiteSpace(process.ExecutableName) ||
-                !effectiveKinds.TryGetValue(process.ExecutableName, out var kind))
+            ProcessSignatureEntryKind? kind = null;
+            foreach (var entry in signature.Entries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.ExecutableName) ||
+                    !string.Equals(entry.ExecutableName, process.ExecutableName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var identityMatches = !string.IsNullOrWhiteSpace(entry.ExecutablePath)
+                    ? string.Equals(entry.ExecutablePath, process.ExecutablePath, StringComparison.OrdinalIgnoreCase)
+                    : signature.Origin is ProcessSignatureOrigin.Manual or ProcessSignatureOrigin.BuiltIn;
+                if (identityMatches && (kind is null || Priority(entry.Kind) > Priority(kind.Value)))
+                    kind = entry.Kind;
+            }
+            if (kind is null)
             {
                 continue;
             }
@@ -55,27 +68,27 @@ public sealed class ProcessSignatureMatcher
             excluded);
     }
 
-    private static Dictionary<string, ProcessSignatureEntryKind> BuildEffectiveKinds(
-        IReadOnlyList<ProcessSignatureEntry> entries)
+    internal static bool IsDiscoveredAdmissible(ProcessSignature signature)
     {
-        var result = new Dictionary<string, ProcessSignatureEntryKind>(
-            ExecutableComparer);
+        return signature.Origin == ProcessSignatureOrigin.Discovered &&
+            signature.Discovery is { ValidationState: ProcessSignatureValidationState.Valid } metadata &&
+            metadata.InstallationId is { } installation && installation.Value != Guid.Empty &&
+            metadata.GenerationId is { } generation && generation != Guid.Empty &&
+            metadata.PolicyVersion == ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion &&
+            metadata.ConcurrencyToken != Guid.Empty && signature.Entries.Count > 0 &&
+            signature.Entries.All(entry => Enum.IsDefined(entry.Kind) && entry.ValidatedRevision is not null &&
+                HasCanonicalIdentity(entry));
+    }
 
-        foreach (var entry in entries)
-        {
-            if (string.IsNullOrWhiteSpace(entry.ExecutableName))
-            {
-                continue;
-            }
-
-            if (!result.TryGetValue(entry.ExecutableName, out var existing) ||
-                Priority(entry.Kind) > Priority(existing))
-            {
-                result[entry.ExecutableName] = entry.Kind;
-            }
-        }
-
-        return result;
+    // Only inspect the supplied identity. Never resolve or normalize untrusted paths here.
+    private static bool HasCanonicalIdentity(ProcessSignatureEntry entry)
+    {
+        var path = entry.ExecutablePath;
+        if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(entry.ExecutableName)) return false;
+        var rooted = path.Length > 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '\\' ||
+            path.StartsWith(@"\\", StringComparison.Ordinal) && path.Split('\\').Length >= 5;
+        return rooted && !path.Split('\\', '/').Any(part => part is "." or "..") &&
+            string.Equals(path[(path.LastIndexOf('\\') + 1)..], entry.ExecutableName, StringComparison.OrdinalIgnoreCase);
     }
 
     private static int Priority(ProcessSignatureEntryKind kind) =>

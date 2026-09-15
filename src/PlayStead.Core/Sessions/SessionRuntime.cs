@@ -13,6 +13,8 @@ public sealed class SessionRuntime : ISessionRuntime
     private readonly ISessionCorrectionStore _correctionStore;
     private readonly SessionCorrectionPolicy _correctionPolicy;
     private readonly TimeProvider _timeProvider;
+    private readonly IDiscoveredSignatureValidator? _discoveredSignatureValidator;
+    private readonly HashSet<Guid> _unresolvedRecovered = [];
 
     private readonly Dictionary<Guid, PendingObservation>
         _pending = [];
@@ -33,7 +35,8 @@ public sealed class SessionRuntime : ISessionRuntime
         SessionTransitionPolicy transitions,
         ISessionCorrectionStore correctionStore,
         SessionCorrectionPolicy correctionPolicy,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IDiscoveredSignatureValidator? discoveredSignatureValidator = null)
     {
         ArgumentNullException.ThrowIfNull(processSource);
         ArgumentNullException.ThrowIfNull(signatureStore);
@@ -52,6 +55,7 @@ public sealed class SessionRuntime : ISessionRuntime
         _correctionStore = correctionStore;
         _correctionPolicy = correctionPolicy;
         _timeProvider = timeProvider;
+        _discoveredSignatureValidator = discoveredSignatureValidator;
     }
 
     public async Task<SessionRuntimeSnapshot> RefreshAsync(
@@ -59,25 +63,48 @@ public sealed class SessionRuntime : ISessionRuntime
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var nowUtc =
-            _timeProvider.GetUtcNow();
-
-        var recoveredThisRefresh =
-            await LoadPersistedActiveSessionsOnceAsync(
-                cancellationToken);
-
-        var processes =
-            await _processSource.CaptureAsync(
-                cancellationToken);
+        await LoadPersistedActiveSessionsOnceAsync(cancellationToken);
 
         var signatures =
             await _signatureStore.GetAllAsync(
                 cancellationToken);
 
+        var usableSignatures = new List<ProcessSignature>();
+        var pendingValidation = new HashSet<Guid>();
+        foreach (var signature in signatures)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (signature.Origin != ProcessSignatureOrigin.Discovered)
+            {
+                usableSignatures.Add(signature);
+                continue;
+            }
+
+            var validation = !ProcessSignatureMatcher.IsDiscoveredAdmissible(signature)
+                ? DiscoveredSignatureValidationResult.Invalid
+                : _discoveredSignatureValidator is null
+                    ? DiscoveredSignatureValidationResult.Pending
+                    : await _discoveredSignatureValidator.ValidateAsync(signature, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (validation == DiscoveredSignatureValidationResult.Valid)
+                usableSignatures.Add(signature);
+            else
+            {
+                _pending.Remove(signature.GameId);
+                if (validation == DiscoveredSignatureValidationResult.Pending)
+                    pendingValidation.Add(signature.GameId);
+            }
+        }
+
+        // A deferred validation must resolve before the observation it authorizes.
+        var processes = await _processSource.CaptureAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var nowUtc = _timeProvider.GetUtcNow();
+
         var matchedMainGames =
             new HashSet<Guid>();
 
-        foreach (var signature in signatures)
+        foreach (var signature in usableSignatures)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -204,7 +231,7 @@ public sealed class SessionRuntime : ISessionRuntime
                 .Where(
                     gameId =>
                         !matchedMainGames.Contains(
-                            gameId))
+                            gameId) && !pendingValidation.Contains(gameId))
                 .ToArray();
 
         foreach (var gameId in activeToEnd)
@@ -215,7 +242,7 @@ public sealed class SessionRuntime : ISessionRuntime
                 _active[gameId];
 
             var reason =
-                recoveredThisRefresh.Contains(gameId)
+                _unresolvedRecovered.Contains(gameId)
                     ? SessionEndReason.RecoveredAfterUnexpectedShutdown
                     : SessionEndReason.ProcessExited;
 
@@ -237,7 +264,10 @@ public sealed class SessionRuntime : ISessionRuntime
 
             _lastPersistedAtUtc.Remove(
                 gameId);
+            _unresolvedRecovered.Remove(gameId);
         }
+
+        _unresolvedRecovered.ExceptWith(matchedMainGames);
 
         return new SessionRuntimeSnapshot(
             nowUtc,
@@ -294,16 +324,13 @@ public sealed class SessionRuntime : ISessionRuntime
             cancellationToken);
     }
 
-    private async Task<HashSet<Guid>>
+    private async Task
         LoadPersistedActiveSessionsOnceAsync(
             CancellationToken cancellationToken)
     {
-        var recovered =
-            new HashSet<Guid>();
-
         if (_recoveryInitialized)
         {
-            return recovered;
+            return;
         }
 
         var persisted =
@@ -326,13 +353,11 @@ public sealed class SessionRuntime : ISessionRuntime
                 session.GameId] =
                 session.LastSeenAtUtc;
 
-            recovered.Add(
+            _unresolvedRecovered.Add(
                 session.GameId);
         }
 
         _recoveryInitialized = true;
-
-        return recovered;
     }
 
     private bool ShouldPersistHeartbeat(
