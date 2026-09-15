@@ -52,6 +52,7 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
             return Task.FromResult(BuildInventory(canonicalScope, candidates, issues, cancellationToken));
 
         var pending = new Stack<string>();
+        var traversedDirectories = new List<string>();
         var seenEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         pending.Push(root);
         while (pending.Count != 0)
@@ -60,6 +61,7 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
             var directory = pending.Pop();
             if (!CheckDirectoryComponents(directory, root, issues, cancellationToken))
                 continue;
+            traversedDirectories.Add(directory);
             try
             {
                 foreach (var rawEntry in _enumerateEntries(directory))
@@ -75,7 +77,70 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
             }
         }
 
+        RevalidateKnownPaths(root, traversedDirectories, candidates, issues, cancellationToken);
         return Task.FromResult(BuildInventory(canonicalScope, candidates, issues, cancellationToken));
+    }
+
+    private void RevalidateKnownPaths(string root, List<string> traversedDirectories,
+        List<ExecutableCandidate> candidates, List<InventoryIssue> issues,
+        CancellationToken cancellationToken)
+    {
+        var unsafeDirectories = new List<string>();
+        foreach (var directory in traversedDirectories)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!CheckDirectoryComponents(directory, root, issues, cancellationToken))
+                unsafeDirectories.Add(directory);
+        }
+
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (unsafeDirectories.Any(directory =>
+                    WindowsExecutablePath.IsStrictlyUnderRoot(directory, candidate.ExecutablePath)))
+                continue;
+
+            var parent = Path.GetDirectoryName(candidate.ExecutablePath)!;
+            if (!CheckDirectoryComponents(parent, root, issues, cancellationToken))
+                continue;
+
+            FileAttributes attributes;
+            try
+            {
+                attributes = _readAttributes(candidate.ExecutablePath);
+            }
+            catch (Exception error) when (IsExpectedIoError(error))
+            {
+                issues.Add(new InventoryIssue(candidate.ExecutablePath,
+                    IssueFor(error, isRootAccess: false)));
+                continue;
+            }
+
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                issues.Add(new InventoryIssue(candidate.ExecutablePath, InventoryIssueKind.ReparsePoint));
+                continue;
+            }
+            if ((attributes & FileAttributes.Directory) != 0)
+            {
+                issues.Add(new InventoryIssue(candidate.ExecutablePath, InventoryIssueKind.InvalidRoot));
+                continue;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var currentRevision = _readRevision(candidate.ExecutablePath);
+                if (currentRevision != candidate.Revision)
+                    issues.Add(new InventoryIssue(candidate.ExecutablePath,
+                        InventoryIssueKind.RevisionChanged));
+            }
+            catch (Exception error) when (IsExpectedIoError(error))
+            {
+                issues.Add(new InventoryIssue(candidate.ExecutablePath,
+                    IssueFor(error, isRootAccess: false)));
+            }
+        }
     }
 
     private bool CheckDirectoryComponents(string directory, string root, List<InventoryIssue> issues,
