@@ -255,7 +255,8 @@ public sealed class DiscoveryInventoryManager
                 if (_revision == revision && _fullRunning)
                 {
                     _fullRunning = false;
-                    CancelScopeWork();
+                    foreach (var request in _scopeWork.Values.Where(item => item.Queued).ToArray())
+                        StartScopeWork(request, revision);
                 }
             }
         }

@@ -252,6 +252,26 @@ public sealed class DiscoveryInventoryManagerTests
     }
 
     [Fact]
+    public async Task Queued_preparation_survives_cancellation_of_full_snapshot()
+    {
+        var d = new Driver();
+        var second = d.Installation(@"C:\Games\Second");
+        await d.ScheduleAsync(d.Snapshot(d.First, second));
+        d.Source.Calls.Clear();
+        d.Source.HoldNextIgnoringCancellation();
+        using var cancellation = new CancellationTokenSource();
+        d.Manager.Schedule(d.Snapshot(d.First, second), cancellation.Token);
+        await d.Source.WaitForHoldAsync();
+        var heldId = Assert.Single(d.Source.Calls);
+        var requestedId = heldId == d.First.Id ? second.Id : d.First.Id;
+        d.Manager.RequestEpisodePreparation(requestedId, CancellationToken.None);
+        cancellation.Cancel();
+        d.Source.Release();
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.NotNull(d.Manager.GetCurrent(requestedId));
+    }
+
+    [Fact]
     public async Task Fresh_unchanged_preparation_preserves_reference_and_trailing_absences()
     {
         var d = new Driver();
