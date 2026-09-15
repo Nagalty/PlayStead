@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Threading;
 using PlayStead.Core.Library;
 using PlayStead.Core.Media;
 using PlayStead.Core.Persistence;
@@ -20,6 +22,9 @@ public sealed class LibraryViewModel :
     private readonly UiPreferencesStore? _uiPreferencesStore;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly object _verifySteamGate = new();
+    private readonly Dispatcher? _uiDispatcher =
+        Application.Current?.Dispatcher
+        ?? Dispatcher.FromThread(Thread.CurrentThread);
 
     private readonly SemaphoreSlim _mediaGate =
         new(
@@ -926,6 +931,24 @@ public sealed class LibraryViewModel :
     private void SessionMonitor_OnSnapshotUpdated(
         SessionRuntimeSnapshot snapshot)
     {
+        if (_uiDispatcher is not null)
+        {
+            if (_uiDispatcher.HasShutdownStarted ||
+                _uiDispatcher.HasShutdownFinished)
+            {
+                return;
+            }
+
+            if (!_uiDispatcher.CheckAccess())
+            {
+                _uiDispatcher.BeginInvoke(
+                    () => SessionMonitor_OnSnapshotUpdated(snapshot),
+                    DispatcherPriority.Normal);
+
+                return;
+            }
+        }
+
         var activeGameIds =
             ActiveGameIds(
                 snapshot);
