@@ -202,6 +202,28 @@ public sealed class ProcessDiscoveryCaptureObserverTests
     }
 
     [Fact]
+    public async Task Additional_simultaneous_unknown_under_root_path_refreshes_once()
+    {
+        var d = new Driver();
+        await d.InitializeAsync();
+        var game = d.Process(100, 1);
+        var first = new ProcessSnapshot(500, "A.exe", d.First.InstallPath + @"\A.exe",
+            Epoch.AddSeconds(1));
+        var additional = new ProcessSnapshot(501, "B.exe", d.First.InstallPath + @"\B.exe",
+            Epoch.AddSeconds(2));
+        await d.TickAsync([game, first], 1);
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.Equal(1, d.Inventory.ExtraCalls);
+        await d.TickAsync([game, first, additional], 2);
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.Equal(2, d.Inventory.ExtraCalls);
+        await d.TickAsync([game, first, additional], 3);
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.Equal(2, d.Inventory.ExtraCalls);
+        Assert.Null(d.Store.Signature);
+    }
+
+    [Fact]
     public async Task Pending_publication_during_decision_discards_old_generation_actions()
     {
         var d = new Driver();

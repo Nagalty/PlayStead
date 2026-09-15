@@ -62,9 +62,11 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                     _coordinator.GetState(scope.InstallationId) is null)
                     continue;
                 if (_refreshTriggers.TryGetValue(scope.InstallationId, out var priorRefresh) &&
-                    !capture.Processes.Any(process => string.Equals(
-                        priorRefresh.Name ? process.ExecutableName : process.ExecutablePath,
-                        priorRefresh.Trigger, StringComparison.OrdinalIgnoreCase)))
+                    (priorRefresh.Reason == DiscoveryReason.IncompleteInventory
+                        ? UnknownUnderRootPaths(context, capture).Length == 0
+                        : !capture.Processes.Any(process => string.Equals(
+                            priorRefresh.Name ? process.ExecutableName : process.ExecutablePath,
+                            priorRefresh.Trigger, StringComparison.OrdinalIgnoreCase))))
                     _refreshTriggers.Remove(scope.InstallationId);
                 var decision = await _coordinator.ObserveAsync(scope.InstallationId, batch,
                     cancellationToken);
@@ -92,14 +94,10 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                         preparation[scope.InstallationId] = context;
                     else
                     {
+                        var unknownPaths = UnknownUnderRootPaths(context, capture);
                         var triggerProcess = capture.Processes.FirstOrDefault(process =>
-                            process.ExecutablePath is not null &&
-                            process.ExecutablePath.StartsWith(
-                                scope.RootPath.TrimEnd('\\', '/') + "\\",
-                                StringComparison.OrdinalIgnoreCase) &&
-                            !context.Inventory.Candidates.Any(candidate => string.Equals(
-                                candidate.ExecutablePath, process.ExecutablePath,
-                                StringComparison.OrdinalIgnoreCase)));
+                            unknownPaths.Contains(process.ExecutablePath,
+                                StringComparer.OrdinalIgnoreCase));
                         triggerProcess ??= capture.Processes.FirstOrDefault(process =>
                             reason != DiscoveryReason.IncompleteInventory &&
                             process.ExecutablePath is not null &&
@@ -114,6 +112,11 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                                 StringComparison.OrdinalIgnoreCase)));
                         var byName = string.IsNullOrWhiteSpace(triggerProcess?.ExecutablePath);
                         var trigger = byName ? triggerProcess?.ExecutableName : triggerProcess?.ExecutablePath;
+                        if (reason == DiscoveryReason.IncompleteInventory && unknownPaths.Length > 0)
+                        {
+                            byName = false;
+                            trigger = string.Join('|', unknownPaths);
+                        }
                         trigger ??= reason.ToString();
                         if (!_refreshTriggers.TryGetValue(scope.InstallationId, out var previous) ||
                             previous.Reason != reason || previous.Name != byName ||
@@ -135,6 +138,22 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
             }
         }
         finally { _gate.Release(); }
+    }
+
+    private static string[] UnknownUnderRootPaths(DiscoveryInventoryContext context,
+        ProcessCaptureResult capture)
+    {
+        var scope = context.Inventory.Scope;
+        var prefix = scope.RootPath.TrimEnd('\\', '/') + "\\";
+        return capture.Processes.Select(process => process.ExecutablePath)
+            .Where(path => path is not null &&
+                path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                !context.Inventory.Candidates.Any(candidate => string.Equals(
+                    candidate.ExecutablePath, path, StringComparison.OrdinalIgnoreCase)))
+            .Select(path => path!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private bool IsCurrentContext(DiscoveryInventoryContext context)
