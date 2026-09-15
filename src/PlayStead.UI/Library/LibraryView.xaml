@@ -156,7 +156,8 @@
 
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <controls:GameCard SelectionRequested="GameCard_OnSelectionRequested"/>
+                                <controls:GameCard SelectionRequested="GameCard_OnSelectionRequested"
+                                                   MediaRequested="GameCard_OnMediaRequested"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

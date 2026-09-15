@@ -1,20 +1,24 @@
 using System.IO;
+using System.Net.Http;
 using System.Diagnostics;
 using PlayStead.UI.Launching;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using PlayStead.Core.Media;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
 using PlayStead.Data.Database;
 using PlayStead.Data.Library;
+using PlayStead.Data.Media;
 using PlayStead.Data.Sessions;
 using PlayStead.Data.Steam;
 using PlayStead.Platform.Paths;
 using PlayStead.Platform.Processes;
 using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Evidence;
+using PlayStead.Providers.Steam.Media;
 using PlayStead.Providers.Steam.Remote;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
@@ -102,6 +106,28 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             WindowsSteamRootLocator>(
             _ => new WindowsSteamRootLocator());
+
+        builder.Services.AddSingleton<HttpClient>();
+
+        builder.Services.AddSingleton<
+            IGameMediaCache>(
+            _ => new FileGameMediaCache(
+                layout.MediaDirectory));
+
+        builder.Services.AddSingleton<
+            SteamLocalMediaLocator>();
+
+        builder.Services.AddSingleton<
+            ISteamMediaTransport,
+            HttpSteamMediaTransport>();
+
+        builder.Services.AddSingleton<
+            IGameMediaProvider,
+            SteamMediaProvider>();
+
+        builder.Services.AddSingleton<
+            IGameMediaResolver,
+            GameMediaResolver>();
 
         builder.Services.AddSingleton<
             SteamLibraryFoldersReader>();
@@ -198,7 +224,19 @@ public static class PlaySteadHost
             ShellViewModel>();
 
         builder.Services.AddSingleton<
-            LibraryViewModel>();
+            LibraryViewModel>(
+            services =>
+                new LibraryViewModel(
+                    services.GetRequiredService<
+                        ILibraryStore>(),
+                    services.GetRequiredService<
+                        ISteamReferenceRuntime>(),
+                    services.GetRequiredService<
+                        SessionMonitor>(),
+                    services.GetRequiredService<
+                        UiPreferencesStore>(),
+                    services.GetRequiredService<
+                        IGameMediaResolver>()));
 
         builder.Services.AddSingleton<
             SessionViewModel>();

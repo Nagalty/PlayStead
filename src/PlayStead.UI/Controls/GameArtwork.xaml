@@ -1,0 +1,89 @@
+<UserControl x:Class="PlayStead.UI.Controls.GameArtwork"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:PlayStead.UI.Controls"
+             Background="Transparent">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="CopperAccentBrush"
+                         Color="#8D623E" />
+        <SolidColorBrush x:Key="CopperAccentSoftBrush"
+                         Color="#5A402C" />
+    </UserControl.Resources>
+
+    <Grid ClipToBounds="True">
+        <Border Background="#23272C">
+            <Grid>
+                <Border Margin="12"
+                        Background="#1D2024"
+                        BorderBrush="#30343A"
+                        BorderThickness="1"
+                        CornerRadius="6" />
+
+                <Border Width="3"
+                        Margin="18,18,0,18"
+                        HorizontalAlignment="Left"
+                        Background="{StaticResource CopperAccentBrush}"
+                        CornerRadius="2" />
+
+                <StackPanel Margin="34,0,24,18"
+                            VerticalAlignment="Bottom">
+                    <TextBlock Text="{Binding Title,
+                                              RelativeSource={RelativeSource AncestorType={x:Type controls:GameArtwork}}}"
+                               Foreground="#F2F4F7"
+                               FontSize="17"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"
+                               TextWrapping="NoWrap" />
+
+                    <TextBlock Margin="0,5,0,0"
+                               Text="{Binding ProviderLabel,
+                                              RelativeSource={RelativeSource AncestorType={x:Type controls:GameArtwork}}}"
+                               Foreground="{StaticResource CopperAccentBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <Border Height="1"
+                        Margin="34,0,24,42"
+                        VerticalAlignment="Bottom"
+                        Background="{StaticResource CopperAccentSoftBrush}" />
+            </Grid>
+
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility"
+                            Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasArtwork,
+                                                       RelativeSource={RelativeSource AncestorType={x:Type controls:GameArtwork}}}"
+                                     Value="True">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+        </Border>
+
+        <Image Source="{Binding SourcePath,
+                                RelativeSource={RelativeSource AncestorType={x:Type controls:GameArtwork}}}"
+               Stretch="Uniform"
+               SnapsToDevicePixels="True">
+            <Image.Style>
+                <Style TargetType="Image">
+                    <Setter Property="Visibility"
+                            Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasArtwork,
+                                                       RelativeSource={RelativeSource AncestorType={x:Type controls:GameArtwork}}}"
+                                     Value="True">
+                            <Setter Property="Visibility"
+                                    Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Image.Style>
+        </Image>
+    </Grid>
+</UserControl>

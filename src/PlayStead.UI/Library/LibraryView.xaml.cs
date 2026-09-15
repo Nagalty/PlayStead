@@ -128,6 +128,32 @@ public partial class LibraryView :
             item);
     }
 
+    private async void GameCard_OnMediaRequested(
+        object? sender,
+        LibraryItemViewModel item)
+    {
+        if (DataContext is not
+            LibraryViewModel viewModel)
+        {
+            return;
+        }
+
+        try
+        {
+            await viewModel.EnsureCoverAsync(
+                item,
+                CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // Artwork loading is opportunistic. The fallback remains visible.
+        }
+        catch
+        {
+            // Artwork failures are non-fatal. The fallback remains visible.
+        }
+    }
+
     private void CloseQuickPanelButton_OnClick(
         object sender,
         RoutedEventArgs e)

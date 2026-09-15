@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using PlayStead.Core.Library;
+using PlayStead.Core.Media;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
@@ -15,6 +16,7 @@ public sealed class LibraryViewModel :
     INotifyPropertyChanged
 {
     private readonly ILibraryStore _libraryStore;
+    private readonly IGameMediaResolver _gameMediaResolver;
     private readonly UiPreferencesStore? _uiPreferencesStore;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly object _verifySteamGate = new();
@@ -46,6 +48,8 @@ public sealed class LibraryViewModel :
         ArgumentNullException.ThrowIfNull(libraryStore);
 
         _libraryStore = libraryStore;
+        _gameMediaResolver =
+            NullGameMediaResolver.Instance;
     }
 
     public LibraryViewModel(
@@ -85,11 +89,45 @@ public sealed class LibraryViewModel :
         ILibraryStore libraryStore,
         ISteamReferenceRuntime steamReferenceRuntime,
         SessionMonitor sessionMonitor,
+        IGameMediaResolver gameMediaResolver)
+        : this(
+            libraryStore,
+            steamReferenceRuntime,
+            sessionMonitor)
+    {
+        ArgumentNullException.ThrowIfNull(
+            gameMediaResolver);
+
+        _gameMediaResolver =
+            gameMediaResolver;
+    }
+
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        SessionMonitor sessionMonitor,
         UiPreferencesStore uiPreferencesStore)
         : this(
             libraryStore,
             steamReferenceRuntime,
             sessionMonitor)
+    {
+        ArgumentNullException.ThrowIfNull(uiPreferencesStore);
+
+        _uiPreferencesStore = uiPreferencesStore;
+    }
+
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        SessionMonitor sessionMonitor,
+        UiPreferencesStore uiPreferencesStore,
+        IGameMediaResolver gameMediaResolver)
+        : this(
+            libraryStore,
+            steamReferenceRuntime,
+            sessionMonitor,
+            gameMediaResolver)
     {
         ArgumentNullException.ThrowIfNull(uiPreferencesStore);
 
@@ -484,6 +522,49 @@ public sealed class LibraryViewModel :
     public IReadOnlyList<GameInstallation> GetLaunchInstallations(GameId gameId) =>
         _installations.Where(installation => installation.GameId == gameId).ToArray();
 
+    public async Task EnsureCoverAsync(
+        LibraryItemViewModel item,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (item.HasCover || item.Provider != ProviderKind.Steam)
+        {
+            return;
+        }
+
+        var installation = GameLaunchInstallationSelector.SelectDefault(
+            item.GameId,
+            _installations.Where(candidate =>
+                candidate.Provider == item.Provider &&
+                string.Equals(candidate.InstallPath, item.InstallPath,
+                    StringComparison.OrdinalIgnoreCase)));
+
+        if (installation is null ||
+            string.IsNullOrWhiteSpace(installation.ExternalId))
+        {
+            return;
+        }
+
+        var identity = new GameMediaIdentity(
+            installation.Provider,
+            installation.ExternalId,
+            item.Title);
+
+        var path = await _gameMediaResolver.ResolveAndCacheAsync(
+            identity,
+            GameMediaAssetType.Cover,
+            cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (path is not null)
+        {
+            item.SetCoverPath(path);
+        }
+    }
+
     public async Task RefreshAsync(
         CancellationToken cancellationToken)
     {
@@ -662,17 +743,24 @@ public sealed class LibraryViewModel :
                         }
                     }
 
-                    return new LibraryItemViewModel(
-                        game.Id,
-                        game.Title,
-                        installation.Provider,
-                        ProviderLabel(
-                            installation.Provider),
-                        installation.InstallPath,
-                        installation.InstalledSizeBytes,
-                        steamState,
-                        activeGameIds.Contains(
-                            game.Id));
+                    var item =
+                        new LibraryItemViewModel(
+                            game.Id,
+                            game.Title,
+                            installation.Provider,
+                            ProviderLabel(
+                                installation.Provider),
+                            installation.InstallPath,
+                            installation.InstalledSizeBytes,
+                            steamState,
+                            activeGameIds.Contains(
+                                game.Id));
+
+                    ApplyCachedCover(
+                        item,
+                        installation);
+
+                    return item;
                 })
             .OrderBy(
                 item =>
@@ -680,6 +768,29 @@ public sealed class LibraryViewModel :
                 StringComparer
                     .CurrentCultureIgnoreCase)
             .ToArray();
+    }
+
+    private void ApplyCachedCover(
+        LibraryItemViewModel item,
+        GameInstallation installation)
+    {
+        if (installation.Provider != ProviderKind.Steam ||
+            string.IsNullOrWhiteSpace(
+                installation.ExternalId))
+        {
+            return;
+        }
+
+        var identity =
+            new GameMediaIdentity(
+                installation.Provider,
+                installation.ExternalId,
+                item.Title);
+
+        item.SetCoverPath(
+            _gameMediaResolver.TryGetCachedPath(
+                identity,
+                GameMediaAssetType.Cover));
     }
 
     private void AttachSessionMonitor(
@@ -777,6 +888,33 @@ public sealed class LibraryViewModel :
             _ =>
                 provider.ToString()
         };
+
+    private sealed class NullGameMediaResolver :
+        IGameMediaResolver
+    {
+        public static NullGameMediaResolver Instance { get; } =
+            new();
+
+        private NullGameMediaResolver()
+        {
+        }
+
+        public string? TryGetCachedPath(
+            GameMediaIdentity identity,
+            GameMediaAssetType assetType) =>
+            null;
+
+        public Task<string?> ResolveAndCacheAsync(
+            GameMediaIdentity identity,
+            GameMediaAssetType assetType,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult<string?>(
+                null);
+        }
+    }
 
     private void OnPropertyChanged(
         [CallerMemberName]

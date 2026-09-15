@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using PlayStead.Core.Library;
 using PlayStead.Core.Steam;
@@ -13,9 +14,40 @@ public sealed record LibraryItemViewModel(
     long? InstalledSizeBytes,
     SteamUpdateState? SteamState = null,
     bool IsSessionActive = false)
+    : INotifyPropertyChanged
 {
+    private string? _coverPath;
     private static readonly CultureInfo DisplayCulture =
         CultureInfo.GetCultureInfo("fr-FR");
+
+    public string? CoverPath =>
+        _coverPath;
+
+    public bool HasCover =>
+        !string.IsNullOrWhiteSpace(_coverPath);
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void SetCoverPath(string? path)
+    {
+        if (string.Equals(
+            _coverPath,
+            path,
+            StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _coverPath = path;
+
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(CoverPath)));
+
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(HasCover)));
+    }
 
     public string InstalledSizeLabel =>
         InstalledSizeBytes is long bytes
