@@ -21,6 +21,17 @@ public sealed class LibraryViewModel :
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly object _verifySteamGate = new();
 
+    private readonly SemaphoreSlim _mediaGate =
+        new(
+            initialCount: 4,
+            maxCount: 4);
+
+    private readonly Dictionary<GameId, Task> _coverLoads =
+        new();
+
+    private readonly object _coverLoadsGate =
+        new();
+
     private SessionMonitor? _sessionMonitor;
 
     private IReadOnlyList<LibraryItemViewModel> _items =
@@ -522,49 +533,155 @@ public sealed class LibraryViewModel :
     public IReadOnlyList<GameInstallation> GetLaunchInstallations(GameId gameId) =>
         _installations.Where(installation => installation.GameId == gameId).ToArray();
 
-    public async Task EnsureCoverAsync(
+    public Task EnsureCoverAsync(
         LibraryItemViewModel item,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(item);
-        cancellationToken.ThrowIfCancellationRequested();
 
-        if (item.HasCover || item.Provider != ProviderKind.Steam)
+        if (cancellationToken.IsCancellationRequested)
         {
-            return;
+            return Task.FromCanceled(
+                cancellationToken);
         }
 
-        var installation = GameLaunchInstallationSelector.SelectDefault(
-            item.GameId,
-            _installations.Where(candidate =>
-                candidate.Provider == item.Provider &&
-                string.Equals(candidate.InstallPath, item.InstallPath,
-                    StringComparison.OrdinalIgnoreCase)));
-
-        if (installation is null ||
-            string.IsNullOrWhiteSpace(installation.ExternalId))
+        if (item.HasCover ||
+            item.Provider != ProviderKind.Steam)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        var identity = new GameMediaIdentity(
-            installation.Provider,
-            installation.ExternalId,
-            item.Title);
+        TaskCompletionSource completion;
 
-        var path = await _gameMediaResolver.ResolveAndCacheAsync(
-            identity,
-            GameMediaAssetType.Cover,
-            cancellationToken);
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (path is not null)
+        lock (_coverLoadsGate)
         {
-            item.SetCoverPath(path);
+            if (_coverLoads.TryGetValue(
+                    item.GameId,
+                    out var existingLoad))
+            {
+                return existingLoad;
+            }
+
+            completion =
+                new TaskCompletionSource(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _coverLoads[item.GameId] =
+                completion.Task;
+        }
+
+        _ = CompleteCoverLoadAsync(
+            item,
+            cancellationToken,
+            completion);
+
+        return completion.Task;
+    }
+
+    private async Task CompleteCoverLoadAsync(
+        LibraryItemViewModel item,
+        CancellationToken cancellationToken,
+        TaskCompletionSource completion)
+    {
+        try
+        {
+            await EnsureCoverCoreAsync(
+                item,
+                cancellationToken);
+
+            completion.TrySetResult();
+        }
+        catch (OperationCanceledException exception)
+        {
+            if (exception.CancellationToken.CanBeCanceled)
+            {
+                completion.TrySetCanceled(
+                    exception.CancellationToken);
+            }
+            else
+            {
+                completion.TrySetCanceled();
+            }
+        }
+        catch (Exception exception)
+        {
+            completion.TrySetException(
+                exception);
+        }
+        finally
+        {
+            lock (_coverLoadsGate)
+            {
+                if (_coverLoads.TryGetValue(
+                        item.GameId,
+                        out var currentLoad) &&
+                    ReferenceEquals(
+                        currentLoad,
+                        completion.Task))
+                {
+                    _coverLoads.Remove(
+                        item.GameId);
+                }
+            }
         }
     }
 
+    private async Task EnsureCoverCoreAsync(
+        LibraryItemViewModel item,
+        CancellationToken cancellationToken)
+    {
+        if (item.HasCover)
+        {
+            return;
+        }
+
+        var installation =
+            GameLaunchInstallationSelector.SelectDefault(
+                item.GameId,
+                _installations.Where(candidate =>
+                    candidate.Provider == item.Provider &&
+                    string.Equals(
+                        candidate.InstallPath,
+                        item.InstallPath,
+                        StringComparison.OrdinalIgnoreCase)));
+
+        if (installation is null ||
+            string.IsNullOrWhiteSpace(
+                installation.ExternalId))
+        {
+            return;
+        }
+
+        var identity =
+            new GameMediaIdentity(
+                installation.Provider,
+                installation.ExternalId,
+                item.Title);
+
+        await _mediaGate.WaitAsync(
+            cancellationToken);
+
+        try
+        {
+            var path =
+                await _gameMediaResolver.ResolveAndCacheAsync(
+                    identity,
+                    GameMediaAssetType.Cover,
+                    cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (path is not null)
+            {
+                item.SetCoverPath(
+                    path);
+            }
+        }
+        finally
+        {
+            _mediaGate.Release();
+        }
+    }
     public async Task RefreshAsync(
         CancellationToken cancellationToken)
     {
