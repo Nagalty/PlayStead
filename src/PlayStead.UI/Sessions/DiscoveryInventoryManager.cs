@@ -20,13 +20,17 @@ public sealed class DiscoveryInventoryManager
     private readonly CancellationTokenSource _lifetime = new();
     private readonly HashSet<Task> _work = [];
     private readonly HashSet<InstallationId> _removed = [];
+    private readonly Dictionary<InstallationId, ScopeRequest> _scopeWork = [];
+    private readonly Dictionary<InstallationId, long> _scopeRevisions = [];
     private ImmutableDictionary<InstallationId, DiscoveryInventoryContext> _published =
         ImmutableDictionary<InstallationId, DiscoveryInventoryContext>.Empty;
     private ImmutableDictionary<InstallationId, PreparedInstallation> _active =
         ImmutableDictionary<InstallationId, PreparedInstallation>.Empty;
     private CancellationTokenSource? _currentWork;
     private long _revision;
+    private bool _fullRunning;
     private bool _stopped;
+    private bool _joined;
 
     public DiscoveryInventoryManager(IExecutableInventorySource inventorySource,
         IProcessSignatureLearningStore learningStore,
@@ -51,6 +55,8 @@ public sealed class DiscoveryInventoryManager
             if (_stopped) return;
             _revision++;
             _currentWork?.Cancel();
+            CancelScopeWork();
+            _fullRunning = false;
             _published = ImmutableDictionary<InstallationId, DiscoveryInventoryContext>.Empty;
         }
     }
@@ -70,10 +76,12 @@ public sealed class DiscoveryInventoryManager
             foreach (var installation in prepared.Values.Where(item => item.Root is null))
                 _removed.Add(installation.Installation.Id);
             _currentWork?.Cancel();
+            CancelScopeWork();
             var workCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken, _lifetime.Token);
             _currentWork = workCancellation;
             var revision = ++_revision;
+            _fullRunning = true;
             _active = prepared;
             _published = ImmutableDictionary<InstallationId, DiscoveryInventoryContext>.Empty;
             StartWork(() => InventorySnapshotAsync(prepared, revision, workCancellation.Token),
@@ -88,14 +96,20 @@ public sealed class DiscoveryInventoryManager
         lock (_gate)
         {
             if (_stopped || !_active.TryGetValue(installationId, out var installation)) return;
-            _currentWork?.Cancel();
+            if (_scopeWork.Remove(installationId, out var prior))
+            {
+                prior.Cancellation.Cancel();
+                if (prior.Queued) prior.Cancellation.Dispose();
+            }
             var workCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken, _lifetime.Token);
-            _currentWork = workCancellation;
-            var revision = ++_revision;
+            var scopeRevision = _scopeRevisions.GetValueOrDefault(installationId) + 1;
+            _scopeRevisions[installationId] = scopeRevision;
+            var request = new ScopeRequest(installation, workCancellation, scopeRevision,
+                _fullRunning);
+            _scopeWork[installationId] = request;
             _published = _published.Remove(installationId);
-            StartWork(() => PrepareEpisodeAsync(installation, revision, workCancellation.Token),
-                workCancellation);
+            if (!_fullRunning) StartScopeWork(request, _revision);
         }
     }
 
@@ -114,16 +128,26 @@ public sealed class DiscoveryInventoryManager
     {
         lock (_gate)
         {
-            if (_stopped) return;
-            _stopped = true;
-            _revision++;
-            _lifetime.Cancel();
-            _currentWork?.Cancel();
-            _active = ImmutableDictionary<InstallationId, PreparedInstallation>.Empty;
-            _published = ImmutableDictionary<InstallationId, DiscoveryInventoryContext>.Empty;
+            if (_joined) return;
+            if (!_stopped)
+            {
+                _stopped = true;
+                _revision++;
+                _lifetime.Cancel();
+                _currentWork?.Cancel();
+                CancelScopeWork();
+                _fullRunning = false;
+                _active = ImmutableDictionary<InstallationId, PreparedInstallation>.Empty;
+                _published = ImmutableDictionary<InstallationId, DiscoveryInventoryContext>.Empty;
+            }
         }
         await AwaitIdleAsync(cancellationToken);
-        _lifetime.Dispose();
+        lock (_gate)
+        {
+            if (_joined) return;
+            _joined = true;
+            _lifetime.Dispose();
+        }
     }
 
     private ImmutableDictionary<InstallationId, PreparedInstallation> PrepareSnapshot(
@@ -157,7 +181,25 @@ public sealed class DiscoveryInventoryManager
         return result;
     }
 
-    private void StartWork(Func<Task> operation, CancellationTokenSource cancellation)
+    private void CancelScopeWork()
+    {
+        foreach (var request in _scopeWork.Values)
+        {
+            request.Cancellation.Cancel();
+            if (request.Queued) request.Cancellation.Dispose();
+        }
+        _scopeWork.Clear();
+    }
+
+    private void StartScopeWork(ScopeRequest request, long snapshotRevision)
+    {
+        request.Queued = false;
+        StartWork(() => PrepareEpisodeAsync(request, snapshotRevision),
+            request.Cancellation, request.Installation.Installation.Id);
+    }
+
+    private void StartWork(Func<Task> operation, CancellationTokenSource cancellation,
+        InstallationId? scopeId = null)
     {
         // Task.Run is required: the Platform inventory performs its recursive walk
         // synchronously before returning Task.FromResult.
@@ -168,7 +210,13 @@ public sealed class DiscoveryInventoryManager
             lock (_gate)
             {
                 _work.Remove(completed);
-                if (ReferenceEquals(_currentWork, cancellation)) _currentWork = null;
+                if (scopeId is { } id)
+                {
+                    if (_scopeWork.TryGetValue(id, out var request) &&
+                        ReferenceEquals(request.Cancellation, cancellation))
+                        _scopeWork.Remove(id);
+                }
+                else if (ReferenceEquals(_currentWork, cancellation)) _currentWork = null;
             }
             cancellation.Dispose();
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously,
@@ -179,40 +227,62 @@ public sealed class DiscoveryInventoryManager
         ImmutableDictionary<InstallationId, PreparedInstallation> installations,
         long revision, CancellationToken cancellationToken)
     {
-        var completed = ImmutableDictionary.CreateBuilder<InstallationId, DiscoveryInventoryContext>();
-        foreach (var installation in installations.Values)
+        try
         {
-            if (!IsCurrent(revision, cancellationToken)) return;
-            var context = await InventoryOneAsync(installation, revision, cancellationToken,
-                prepareEpisode: false);
-            if (context is not null) completed[installation.Installation.Id] = context;
-        }
-        lock (_gate)
-            if (IsCurrentLocked(revision, cancellationToken))
+            var completed = ImmutableDictionary.CreateBuilder<InstallationId, DiscoveryInventoryContext>();
+            foreach (var installation in installations.Values)
+            {
+                if (!IsCurrent(revision, cancellationToken)) return;
+                var context = await InventoryOneAsync(installation, revision, cancellationToken,
+                    prepareEpisode: false);
+                if (context is not null) completed[installation.Installation.Id] = context;
+            }
+            lock (_gate)
+            {
+                if (!IsCurrentLocked(revision, cancellationToken)) return;
+                _fullRunning = false;
+                foreach (var id in _scopeWork.Keys)
+                    completed.Remove(id);
                 _published = completed.ToImmutable();
+                foreach (var request in _scopeWork.Values.Where(item => item.Queued).ToArray())
+                    StartScopeWork(request, revision);
+            }
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                if (_revision == revision && _fullRunning)
+                {
+                    _fullRunning = false;
+                    CancelScopeWork();
+                }
+            }
+        }
     }
 
-    private async Task PrepareEpisodeAsync(PreparedInstallation installation,
-        long revision, CancellationToken cancellationToken)
+    private async Task PrepareEpisodeAsync(ScopeRequest request, long revision)
     {
-        var context = await InventoryOneAsync(installation, revision, cancellationToken,
-            prepareEpisode: true);
+        var id = request.Installation.Installation.Id;
+        var cancellationToken = request.Cancellation.Token;
+        var context = await InventoryOneAsync(request.Installation, revision, cancellationToken,
+            prepareEpisode: true, id, request.Revision);
         if (context is null) return;
         lock (_gate)
-            if (IsCurrentLocked(revision, cancellationToken))
-                _published = _published.SetItem(installation.Installation.Id, context);
+            if (IsCurrentLocked(revision, cancellationToken, id, request.Revision))
+                _published = _published.SetItem(id, context);
     }
 
     private async Task<DiscoveryInventoryContext?> InventoryOneAsync(
         PreparedInstallation installation, long revision, CancellationToken cancellationToken,
-        bool prepareEpisode)
+        bool prepareEpisode, InstallationId? requestId = null, long scopeRevision = 0)
     {
         var id = installation.Installation.Id;
         if (installation.Root is null) return null;
         try
         {
             var persisted = await _learningStore.LoadAsync(id, cancellationToken);
-            if (!IsCurrent(revision, cancellationToken)) return null;
+            if (!IsCurrent(revision, cancellationToken, requestId, scopeRevision)) return null;
             bool reappeared;
             lock (_gate) reappeared = _removed.Contains(id);
             var generation = !reappeared && persisted is not null &&
@@ -233,13 +303,13 @@ public sealed class DiscoveryInventoryManager
             }
             catch (Exception error) when (error is not OutOfMemoryException)
             {
-                if (!IsCurrent(revision, cancellationToken)) return null;
+                if (!IsCurrent(revision, cancellationToken, requestId, scopeRevision)) return null;
                 _logger.LogWarning(error,
                     "Discovery inventory failed for installation {InstallationId}", id);
                 inventory = new ExecutableInventory(scope, InventoryCompleteness.Incomplete, [],
                     [new InventoryIssue(scope.RootPath, InventoryIssueKind.IoFailure)]);
             }
-            if (!IsCurrent(revision, cancellationToken)) return null;
+            if (!IsCurrent(revision, cancellationToken, requestId, scopeRevision)) return null;
             var incoming = new DiscoveryInventoryContext(inventory, installation.Ambiguous);
             ProcessSignatureLearningState state;
             if (prepareEpisode)
@@ -254,7 +324,8 @@ public sealed class DiscoveryInventoryManager
             else state = await _coordinator.InitializeAsync(incoming, cancellationToken);
             lock (_gate)
             {
-                if (!IsCurrentLocked(revision, cancellationToken)) return null;
+                if (!IsCurrentLocked(revision, cancellationToken, requestId, scopeRevision))
+                    return null;
                 _removed.Remove(id);
             }
             if (state.Inventory.Completeness != InventoryCompleteness.Complete)
@@ -273,14 +344,27 @@ public sealed class DiscoveryInventoryManager
         }
     }
 
-    private bool IsCurrent(long revision, CancellationToken cancellationToken)
+    private bool IsCurrent(long revision, CancellationToken cancellationToken,
+        InstallationId? requestId = null, long scopeRevision = 0)
     {
-        lock (_gate) return IsCurrentLocked(revision, cancellationToken);
+        lock (_gate) return IsCurrentLocked(revision, cancellationToken, requestId, scopeRevision);
     }
 
-    private bool IsCurrentLocked(long revision, CancellationToken cancellationToken) =>
-        !_stopped && !cancellationToken.IsCancellationRequested && _revision == revision;
+    private bool IsCurrentLocked(long revision, CancellationToken cancellationToken,
+        InstallationId? requestId = null, long scopeRevision = 0) =>
+        !_stopped && !cancellationToken.IsCancellationRequested && _revision == revision &&
+        (requestId is null || _scopeRevisions.GetValueOrDefault(requestId.Value) == scopeRevision &&
+            _scopeWork.ContainsKey(requestId.Value));
 
     private sealed record PreparedInstallation(GameInstallation Installation,
         string? Root, bool Ambiguous);
+
+    private sealed class ScopeRequest(PreparedInstallation installation,
+        CancellationTokenSource cancellation, long revision, bool queued)
+    {
+        public PreparedInstallation Installation { get; } = installation;
+        public CancellationTokenSource Cancellation { get; } = cancellation;
+        public long Revision { get; } = revision;
+        public bool Queued { get; set; } = queued;
+    }
 }

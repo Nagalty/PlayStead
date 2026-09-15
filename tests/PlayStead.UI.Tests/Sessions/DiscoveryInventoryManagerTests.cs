@@ -200,6 +200,58 @@ public sealed class DiscoveryInventoryManagerTests
     }
 
     [Fact]
+    public async Task Preparation_during_full_snapshot_preserves_unrelated_publication()
+    {
+        var d = new Driver();
+        var second = d.Installation(@"C:\Games\Second");
+        d.Source.HoldNext();
+        d.Manager.Schedule(d.Snapshot(d.First, second), CancellationToken.None);
+        await d.Source.WaitForHoldAsync();
+        var heldId = Assert.Single(d.Source.Calls);
+        var requestedId = heldId == d.First.Id ? second.Id : d.First.Id;
+        d.Manager.RequestEpisodePreparation(requestedId, CancellationToken.None);
+        d.Source.Release();
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.NotNull(d.Manager.GetCurrent(heldId));
+        Assert.NotNull(d.Manager.GetCurrent(requestedId));
+    }
+
+    [Fact]
+    public async Task Overlapping_preparations_for_different_installations_both_publish()
+    {
+        var d = new Driver();
+        var second = d.Installation(@"C:\Games\Second");
+        await d.ScheduleAsync(d.Snapshot(d.First, second));
+        d.Source.HoldNext();
+        d.Manager.RequestEpisodePreparation(d.First.Id, CancellationToken.None);
+        await d.Source.WaitForHoldAsync();
+        d.Manager.RequestEpisodePreparation(second.Id, CancellationToken.None);
+        d.Source.Release();
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.NotNull(d.Manager.GetCurrent(d.First.Id));
+        Assert.NotNull(d.Manager.GetCurrent(second.Id));
+    }
+
+    [Fact]
+    public async Task Cancelled_full_snapshot_does_not_leave_later_preparation_queued()
+    {
+        var d = new Driver();
+        var second = d.Installation(@"C:\Games\Second");
+        await d.ScheduleAsync(d.Snapshot(d.First, second));
+        d.Source.HoldNextIgnoringCancellation();
+        using var cancellation = new CancellationTokenSource();
+        d.Manager.Schedule(d.Snapshot(d.First, second), cancellation.Token);
+        await d.Source.WaitForHoldAsync();
+        d.Manager.RequestEpisodePreparation(second.Id, CancellationToken.None);
+        cancellation.Cancel();
+        d.Source.Release();
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        d.Manager.RequestEpisodePreparation(d.First.Id, CancellationToken.None);
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.NotNull(d.Manager.GetCurrent(d.First.Id));
+    }
+
+    [Fact]
     public async Task Fresh_unchanged_preparation_preserves_reference_and_trailing_absences()
     {
         var d = new Driver();
@@ -230,6 +282,24 @@ public sealed class DiscoveryInventoryManagerTests
         cancellation.Cancel();
         d.Source.Release();
         await d.Manager.AwaitIdleAsync(CancellationToken.None);
+        Assert.Null(d.Manager.GetCurrent(d.First.Id));
+    }
+
+    [Fact]
+    public async Task Cancelled_stop_can_be_retried_and_joins_owned_inventory()
+    {
+        var d = new Driver();
+        d.Source.HoldNextIgnoringCancellation();
+        d.Manager.Schedule(d.Snapshot(), CancellationToken.None);
+        await d.Source.WaitForHoldAsync();
+        using var shutdown = new CancellationTokenSource();
+        shutdown.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            d.Manager.StopAsync(shutdown.Token));
+        var retry = d.Manager.StopAsync(CancellationToken.None);
+        Assert.False(retry.IsCompleted);
+        d.Source.Release();
+        await retry.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Null(d.Manager.GetCurrent(d.First.Id));
     }
 
@@ -313,7 +383,7 @@ public sealed class DiscoveryInventoryManagerTests
         public async Task<ExecutableInventory> InventoryAsync(InstallationScope scope,
             CancellationToken cancellationToken)
         {
-            Calls.Add(scope.InstallationId);
+            lock (Calls) Calls.Add(scope.InstallationId);
             var held = Interlocked.Exchange(ref _held, null);
             if (held is not null)
             {
