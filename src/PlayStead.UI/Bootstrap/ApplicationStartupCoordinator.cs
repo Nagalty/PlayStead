@@ -110,17 +110,42 @@ public sealed class ApplicationStartupCoordinator
             return;
         }
 
-        await _operations.StopPipeAsync(
-            cancellationToken);
-
-        if (_hostBuilt)
+        try
         {
-            await _operations.StopHostAsync(
-                cancellationToken);
-        }
+            await _operations.StopPipeAsync(cancellationToken);
 
-        await _operations.ReleaseSingleInstanceAsync(
-            cancellationToken);
+            if (BackgroundRefreshTask is { } refresh)
+            {
+                try
+                {
+                    await refresh.WaitAsync(cancellationToken);
+                }
+                catch (OperationCanceledException) when (refresh.IsCanceled)
+                {
+                    // Application cancellation leaves no durable refresh to publish.
+                }
+            }
+        }
+        finally
+        {
+            try
+            {
+                if (_hostBuilt && _operations.StopDiscoveryAsync is { } stopDiscovery)
+                    await stopDiscovery(cancellationToken);
+            }
+            finally
+            {
+                try
+                {
+                    if (_hostBuilt)
+                        await _operations.StopHostAsync(cancellationToken);
+                }
+                finally
+                {
+                    await _operations.ReleaseSingleInstanceAsync(cancellationToken);
+                }
+            }
+        }
     }
 
     private Task HandleInvocationAsync(
@@ -217,5 +242,6 @@ public sealed class ApplicationStartupCoordinator
         Func<
             CancellationToken,
             Task>
-            ReleaseSingleInstanceAsync);
+            ReleaseSingleInstanceAsync,
+        Func<CancellationToken, Task>? StopDiscoveryAsync = null);
 }

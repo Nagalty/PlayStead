@@ -3,6 +3,7 @@ using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Data.Database;
 using PlayStead.UI.Steam;
+using PlayStead.UI.Sessions;
 
 namespace PlayStead.UI.Bootstrap;
 
@@ -17,6 +18,7 @@ public sealed class LocalStartupPipeline
     private readonly ILibraryStore _libraryStore;
     private readonly LocalScanCoordinator _scanCoordinator;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
+    private readonly DiscoveryInventoryManager? _discoveryInventory;
 
     public LocalStartupPipeline(
         DatabaseInitializer databaseInitializer,
@@ -53,6 +55,20 @@ public sealed class LocalStartupPipeline
             steamReferenceRuntime;
     }
 
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        DiscoveryInventoryManager discoveryInventory)
+        : this(databaseInitializer, databaseHealthChecker, libraryStore,
+            scanCoordinator, steamReferenceRuntime)
+    {
+        _discoveryInventory = discoveryInventory
+            ?? throw new ArgumentNullException(nameof(discoveryInventory));
+    }
+
     public async Task<LocalStartupState> InitializeAsync(
         CancellationToken cancellationToken)
     {
@@ -66,6 +82,9 @@ public sealed class LocalStartupPipeline
         var snapshot =
             await _libraryStore.LoadSnapshotAsync(
                 cancellationToken);
+
+        if (health.IsHealthy)
+            _discoveryInventory?.Schedule(snapshot, cancellationToken);
 
         if (_steamReferenceRuntime is not null)
         {
@@ -81,6 +100,8 @@ public sealed class LocalStartupPipeline
     public async Task<LibrarySnapshot> RefreshAsync(
         CancellationToken cancellationToken)
     {
+        _discoveryInventory?.MarkRefreshing();
+
         var results =
             await _scanCoordinator.ScanAllAsync(
                 cancellationToken);
@@ -100,7 +121,9 @@ public sealed class LocalStartupPipeline
                 cancellationToken);
         }
 
-        return await _libraryStore.LoadSnapshotAsync(
+        var snapshot = await _libraryStore.LoadSnapshotAsync(
             cancellationToken);
+        _discoveryInventory?.Schedule(snapshot, cancellationToken);
+        return snapshot;
     }
 }

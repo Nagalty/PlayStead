@@ -8,6 +8,7 @@ using PlayStead.Core.Media;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.Sessions;
+using PlayStead.Core.Sessions.Discovery;
 using PlayStead.Core.Steam;
 using PlayStead.Data.Database;
 using PlayStead.Data.Library;
@@ -16,6 +17,7 @@ using PlayStead.Data.Sessions;
 using PlayStead.Data.Steam;
 using PlayStead.Platform.Paths;
 using PlayStead.Platform.Processes;
+using PlayStead.Platform.Processes.Discovery;
 using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Evidence;
 using PlayStead.Providers.Steam.Media;
@@ -63,9 +65,39 @@ public static class PlaySteadHost
             ISteamEvidenceStore,
             SqliteSteamEvidenceStore>();
 
-        builder.Services.AddSingleton<
-            IProcessSignatureStore,
-            SqliteProcessSignatureStore>();
+        builder.Services.AddSingleton<SqliteProcessSignatureStore>();
+        builder.Services.AddSingleton<IProcessSignatureStore>(services =>
+            services.GetRequiredService<SqliteProcessSignatureStore>());
+        builder.Services.AddSingleton<IProcessSignatureDiscoveryStore>(services =>
+            services.GetRequiredService<SqliteProcessSignatureStore>());
+        builder.Services.AddSingleton<IProcessSignatureLearningStore,
+            SqliteProcessSignatureLearningStore>();
+        builder.Services.AddSingleton<IExecutableInventorySource,
+            WindowsExecutableInventorySource>();
+        builder.Services.AddSingleton<IExecutableRevisionSource,
+            WindowsExecutableRevisionSource>();
+        builder.Services.AddSingleton<ProcessSignatureDiscoveryPolicy>();
+        builder.Services.AddSingleton<ProcessSignatureLearningCoordinator>();
+        builder.Services.AddSingleton<DiscoveryInventoryManager>();
+        builder.Services.AddSingleton<ProcessSignatureAcceptanceService>(services =>
+            new ProcessSignatureAcceptanceService(
+                services.GetRequiredService<IProcessSignatureLearningStore>(),
+                services.GetRequiredService<IProcessSignatureStore>(),
+                services.GetRequiredService<IProcessSignatureDiscoveryStore>(),
+                services.GetRequiredService<IExecutableRevisionSource>(),
+                services.GetRequiredService<ProcessSignatureDiscoveryPolicy>(),
+                services.GetRequiredService<DiscoveryInventoryManager>().GetCurrent,
+                services.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton<ProcessDiscoveryCaptureObserver>();
+        builder.Services.AddSingleton<IProcessCaptureObserver>(services =>
+            services.GetRequiredService<ProcessDiscoveryCaptureObserver>());
+        builder.Services.AddSingleton<IDiscoveredSignatureValidator>(services =>
+            new DiscoveredSignatureValidator(
+                services.GetRequiredService<IProcessSignatureStore>(),
+                services.GetRequiredService<IProcessSignatureLearningStore>(),
+                services.GetRequiredService<IProcessSignatureDiscoveryStore>(),
+                services.GetRequiredService<IExecutableRevisionSource>(),
+                services.GetRequiredService<DiscoveryInventoryManager>().GetCurrent));
 
         builder.Services.AddSingleton<
             ISessionStore,
@@ -88,9 +120,18 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             SessionCorrectionPolicy>();
 
-        builder.Services.AddSingleton<
-            ISessionRuntime,
-            SessionRuntime>();
+        builder.Services.AddSingleton<ISessionRuntime>(services =>
+            SessionRuntime.CreateWithObserver(
+                services.GetRequiredService<IProcessSnapshotSource>(),
+                services.GetRequiredService<IProcessSignatureStore>(),
+                services.GetRequiredService<ISessionStore>(),
+                services.GetRequiredService<ProcessSignatureMatcher>(),
+                services.GetRequiredService<SessionTransitionPolicy>(),
+                services.GetRequiredService<ISessionCorrectionStore>(),
+                services.GetRequiredService<SessionCorrectionPolicy>(),
+                services.GetRequiredService<TimeProvider>(),
+                services.GetRequiredService<IProcessCaptureObserver>(),
+                services.GetRequiredService<IDiscoveredSignatureValidator>()));
 
         builder.Services.AddSingleton(
             SessionMonitorOptions.Default);

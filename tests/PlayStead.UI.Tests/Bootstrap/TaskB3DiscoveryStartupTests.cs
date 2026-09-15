@@ -1,0 +1,249 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using PlayStead.Core.Library;
+using PlayStead.Core.Persistence;
+using PlayStead.Core.Scanning;
+using PlayStead.Core.Sessions.Discovery;
+using PlayStead.Data.Database;
+using PlayStead.Platform.Paths;
+using PlayStead.Platform.SingleInstance;
+using PlayStead.UI.Bootstrap;
+using PlayStead.UI.Sessions;
+using PlayStead.UI.Steam;
+
+namespace PlayStead.UI.Tests.Bootstrap;
+
+public sealed class TaskB3DiscoveryStartupTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "PlayStead.Tests", Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public async Task Initial_inventory_is_scheduled_from_durable_library_snapshot()
+    {
+        Directory.CreateDirectory(_root);
+        var install = Path.Combine(_root, "InstalledGame");
+        Directory.CreateDirectory(install);
+        await File.WriteAllTextAsync(Path.Combine(install, "Game.exe"), "binary");
+        var layout = UserDataLayout.FromRoot(_root);
+        layout.EnsureDirectoriesExist();
+        using var host = PlaySteadHost.Build(layout);
+        var services = host.Services;
+        var store = services.GetRequiredService<ILibraryStore>();
+        await services.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        var observed = new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+        await store.ApplySourceScanAsync(SourceScanResult.Success(ProviderKind.Steam, observed,
+            [DiscoveredInstallation.Create(ProviderKind.Steam, "b3-test-" + Guid.NewGuid().ToString("N"),
+                "Installed Game", install, 6, observed)]), CancellationToken.None);
+        var durable = await store.LoadSnapshotAsync(CancellationToken.None);
+        var installation = Assert.Single(durable.Installations);
+        var manager = services.GetRequiredService<DiscoveryInventoryManager>();
+
+        var state = await services.GetRequiredService<LocalStartupPipeline>().InitializeAsync(CancellationToken.None);
+        Assert.True(state.Health.IsHealthy);
+        Assert.Equal(installation.Id, Assert.Single(state.Snapshot.Installations).Id);
+        await manager.AwaitIdleAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        var context = manager.GetCurrent(installation.Id);
+        Assert.NotNull(context);
+        Assert.Contains(context.Inventory.Candidates, candidate =>
+            candidate.ExecutablePath.EndsWith("Game.exe", StringComparison.OrdinalIgnoreCase));
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Stop_joins_background_refresh_before_disposing_host()
+    {
+        var refreshEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRefresh = new TaskCompletionSource<LibrarySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var hostDisposed = false;
+        var snapshot = new LibrarySnapshot([], []);
+        var layout = UserDataLayout.FromRoot(_root);
+        var operations = new ApplicationStartupCoordinator.Operations(
+            _ => new AppInvocation(true, null),
+            (_, _) => Task.FromResult(SingleInstanceResult.Primary),
+            () => layout,
+            _ => { },
+            (_, _) => Task.CompletedTask,
+            _ => Task.FromResult(new LocalStartupState(new DatabaseHealthResult(true, "ok"), snapshot)),
+            _ => Task.CompletedTask,
+            (_, _) => Task.CompletedTask,
+            (_, _) => Task.CompletedTask,
+            _ => { },
+            _ => { },
+            (_, _) => Task.CompletedTask,
+            async _ => { refreshEntered.SetResult(); return await releaseRefresh.Task; },
+            (_, _) => Task.CompletedTask,
+            _ => Task.CompletedTask,
+            _ => { hostDisposed = true; return Task.CompletedTask; },
+            _ => Task.CompletedTask);
+        var coordinator = new ApplicationStartupCoordinator(operations);
+        Assert.Equal(ApplicationStartupCoordinator.StartResult.Started,
+            await coordinator.StartAsync([], CancellationToken.None));
+        await refreshEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var stop = coordinator.StopAsync(CancellationToken.None);
+        Assert.False(hostDisposed);
+        Assert.False(stop.IsCompleted);
+        releaseRefresh.SetResult(snapshot);
+        await stop.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(hostDisposed);
+        Assert.True(coordinator.BackgroundRefreshTask!.IsCompleted);
+    }
+
+    [Fact]
+    public async Task Rescan_hides_old_inventory_before_scan_and_publishes_durable_removal()
+    {
+        Directory.CreateDirectory(_root);
+        var install = Path.Combine(_root, "InstalledGame");
+        Directory.CreateDirectory(install);
+        await File.WriteAllTextAsync(Path.Combine(install, "Game.exe"), "binary");
+        var layout = UserDataLayout.FromRoot(_root);
+        layout.EnsureDirectoriesExist();
+        using var host = PlaySteadHost.Build(layout);
+        var services = host.Services;
+        var store = services.GetRequiredService<ILibraryStore>();
+        var observed = new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+        await services.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        await store.ApplySourceScanAsync(SourceScanResult.Success(ProviderKind.Steam, observed,
+            [DiscoveredInstallation.Create(ProviderKind.Steam, "b3-rescan", "Installed Game",
+                install, 6, observed)]), CancellationToken.None);
+        var installation = Assert.Single((await store.LoadSnapshotAsync(CancellationToken.None)).Installations);
+        var manager = services.GetRequiredService<DiscoveryInventoryManager>();
+        var scan = new PausedSource(observed.AddMinutes(1));
+        var pipeline = new LocalStartupPipeline(
+            services.GetRequiredService<DatabaseInitializer>(),
+            services.GetRequiredService<DatabaseHealthChecker>(), store,
+            new LocalScanCoordinator([scan]), new EmptySteamReferenceRuntime(), manager);
+        await pipeline.InitializeAsync(CancellationToken.None);
+        await manager.AwaitIdleAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.NotNull(manager.GetCurrent(installation.Id));
+
+        var refresh = pipeline.RefreshAsync(CancellationToken.None);
+        await scan.Entered.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Null(manager.GetCurrent(installation.Id));
+        Assert.True(installation.IsPresent);
+        scan.Release();
+        var snapshot = await refresh.WaitAsync(TimeSpan.FromSeconds(5));
+        await manager.AwaitIdleAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(Assert.Single(snapshot.Installations).IsPresent);
+        Assert.Null(manager.GetCurrent(installation.Id));
+        Assert.False(Assert.Single((await store.LoadSnapshotAsync(CancellationToken.None)).Installations).IsPresent);
+        await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Faulted_refresh_still_stops_inventory_before_host_and_propagates_failure()
+    {
+        var order = new List<string>();
+        var failed = new TaskCompletionSource<LibrarySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var snapshot = new LibrarySnapshot([], []);
+        var layout = UserDataLayout.FromRoot(_root);
+        var operations = new ApplicationStartupCoordinator.Operations(
+            _ => new AppInvocation(true, null),
+            (_, _) => Task.FromResult(SingleInstanceResult.Primary),
+            () => layout, _ => { }, (_, _) => Task.CompletedTask,
+            _ => Task.FromResult(new LocalStartupState(new DatabaseHealthResult(true, "ok"), snapshot)),
+            _ => Task.CompletedTask, (_, _) => Task.CompletedTask,
+            (_, _) => Task.CompletedTask, _ => { }, _ => { },
+            (_, _) => Task.CompletedTask,
+            _ => failed.Task,
+            (_, _) => Task.CompletedTask,
+            _ => Task.CompletedTask,
+            _ => { order.Add("host"); return Task.CompletedTask; },
+            _ => Task.CompletedTask,
+            _ => { order.Add("inventory"); return Task.CompletedTask; });
+        var coordinator = new ApplicationStartupCoordinator(operations);
+        await coordinator.StartAsync([], CancellationToken.None);
+        failed.SetException(new InvalidOperationException("scan failed"));
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => coordinator.StopAsync(CancellationToken.None));
+        Assert.Equal("scan failed", error.Message);
+        Assert.Equal(["inventory", "host"], order);
+    }
+
+    [Fact]
+    public async Task Cached_snapshot_returns_while_inventory_source_is_blocked()
+    {
+        Directory.CreateDirectory(_root);
+        var install = Path.Combine(_root, "InstalledGame");
+        Directory.CreateDirectory(install);
+        var layout = UserDataLayout.FromRoot(_root);
+        layout.EnsureDirectoriesExist();
+        using var host = PlaySteadHost.Build(layout);
+        var services = host.Services;
+        var store = services.GetRequiredService<ILibraryStore>();
+        var observed = new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+        await services.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        await store.ApplySourceScanAsync(SourceScanResult.Success(ProviderKind.Steam, observed,
+            [DiscoveredInstallation.Create(ProviderKind.Steam, "b3-cache", "Installed Game",
+                install, null, observed)]), CancellationToken.None);
+        var source = new BlockedInventorySource();
+        var manager = new DiscoveryInventoryManager(source,
+            services.GetRequiredService<IProcessSignatureLearningStore>(),
+            services.GetRequiredService<ProcessSignatureLearningCoordinator>(),
+            services.GetRequiredService<ILogger<DiscoveryInventoryManager>>());
+        var pipeline = new LocalStartupPipeline(
+            services.GetRequiredService<DatabaseInitializer>(),
+            services.GetRequiredService<DatabaseHealthChecker>(), store,
+            new LocalScanCoordinator([]), new EmptySteamReferenceRuntime(), manager);
+        try
+        {
+            var state = await pipeline.InitializeAsync(CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.True(state.Health.IsHealthy);
+            Assert.Single(state.Snapshot.Games);
+            await source.Entered.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.Null(manager.GetCurrent(Assert.Single(state.Snapshot.Installations).Id));
+        }
+        finally
+        {
+            source.Release();
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    private sealed class BlockedInventorySource : IExecutableInventorySource
+    {
+        private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task Entered => _entered.Task;
+        public void Release() => _release.TrySetResult();
+        public async Task<ExecutableInventory> InventoryAsync(InstallationScope scope,
+            CancellationToken cancellationToken)
+        {
+            _entered.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+            return new ExecutableInventory(scope, InventoryCompleteness.Complete, [], []);
+        }
+    }
+
+    private sealed class PausedSource(DateTimeOffset observed) : ILocalLibrarySource
+    {
+        private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public ProviderKind Provider => ProviderKind.Steam;
+        public Task Entered => _entered.Task;
+        public void Release() => _release.SetResult();
+        public async Task<SourceScanResult> ScanAsync(CancellationToken cancellationToken)
+        {
+            _entered.SetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+            return SourceScanResult.Success(ProviderKind.Steam, observed, []);
+        }
+    }
+
+    private sealed class EmptySteamReferenceRuntime : ISteamReferenceRuntime
+    {
+        public SteamReferenceSnapshot Current { get; } = new([]);
+        public Task<SteamReferenceSnapshot> LoadCachedAsync(CancellationToken token) => Task.FromResult(Current);
+        public Task<SteamReferenceSnapshot> RefreshStaleAsync(CancellationToken token) => Task.FromResult(Current);
+        public Task<SteamReferenceSnapshot> RefreshAllAsync(CancellationToken token) => Task.FromResult(Current);
+    }
+
+    public void Dispose()
+    {
+        SqliteConnection.ClearAllPools();
+        if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
+    }
+}

@@ -251,7 +251,11 @@ public partial class App : Application
                     _singleInstanceGate = null;
 
                     return Task.CompletedTask;
-                });
+                },
+            StopDiscoveryAsync:
+                cancellationToken =>
+                    GetRequiredService<DiscoveryInventoryManager>()
+                        .StopAsync(cancellationToken));
     }
 
     private Task BuildHostAsync(
