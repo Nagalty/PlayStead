@@ -12,19 +12,33 @@ public sealed class SteamLocalMediaLocator
         ArgumentException.ThrowIfNullOrWhiteSpace(steamRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(appId);
 
-        if (assetType != GameMediaAssetType.Cover)
+        string[] filenames = assetType switch
         {
-            return null;
+            GameMediaAssetType.Cover => [$"{appId}_library_600x900.jpg"],
+            GameMediaAssetType.Header =>
+            [
+                $"{appId}_library_header.jpg",
+                $"{appId}_header.jpg"
+            ],
+            GameMediaAssetType.Hero => [$"{appId}_library_hero.jpg"],
+            GameMediaAssetType.Logo => [$"{appId}_logo.png"],
+            _ => []
+        };
+
+        foreach (var filename in filenames)
+        {
+            var candidate = Path.Combine(
+                steamRoot,
+                "appcache",
+                "librarycache",
+                filename);
+
+            if (File.Exists(candidate))
+            {
+                return Path.GetFullPath(candidate);
+            }
         }
 
-        var candidate = Path.Combine(
-            steamRoot,
-            "appcache",
-            "librarycache",
-            $"{appId}_library_600x900.jpg");
-
-        return File.Exists(candidate)
-            ? Path.GetFullPath(candidate)
-            : null;
+        return null;
     }
 }

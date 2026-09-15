@@ -9,6 +9,12 @@ public sealed class SteamMediaUriFactoryTests
     [InlineData(
         GameMediaAssetType.Cover,
         "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900.jpg")]
+    [InlineData(
+        GameMediaAssetType.Hero,
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_hero.jpg")]
+    [InlineData(
+        GameMediaAssetType.Logo,
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/logo.png")]
     public void CreateCandidates_uses_exact_AppId_asset_URL(
         GameMediaAssetType type,
         string expected)
@@ -23,17 +29,21 @@ public sealed class SteamMediaUriFactoryTests
             uri.AbsoluteUri);
     }
 
-    [Theory]
-    [InlineData(GameMediaAssetType.Header)]
-    [InlineData(GameMediaAssetType.Hero)]
-    [InlineData(GameMediaAssetType.Logo)]
-    public void CreateCandidates_throws_for_asset_types_not_supported_in_Task3(
-        GameMediaAssetType type)
+    [Fact]
+    public void CreateCandidates_Header_returns_exact_candidates_in_priority_order()
     {
-        Assert.Throws<NotSupportedException>(() =>
-            SteamMediaUriFactory.CreateCandidates(
-                "1874880",
-                type));
+        var candidates = SteamMediaUriFactory.CreateCandidates(
+            "1874880",
+            GameMediaAssetType.Header);
+
+        Assert.Collection(
+            candidates,
+            uri => Assert.Equal(
+                "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_header.jpg",
+                uri.AbsoluteUri),
+            uri => Assert.Equal(
+                "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/header.jpg",
+                uri.AbsoluteUri));
     }
 
     [Theory]

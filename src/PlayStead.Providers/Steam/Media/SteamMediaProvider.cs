@@ -37,7 +37,10 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         ArgumentNullException.ThrowIfNull(identity);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (assetType != GameMediaAssetType.Cover ||
+        if (assetType is not (GameMediaAssetType.Cover or
+            GameMediaAssetType.Header or
+            GameMediaAssetType.Hero or
+            GameMediaAssetType.Logo) ||
             identity.Provider != ProviderKind.Steam)
         {
             return null;
@@ -64,7 +67,9 @@ public sealed class SteamMediaProvider : IGameMediaProvider
                     "steam-local",
                     identity.ProviderGameId,
                     localBytes,
-                    "image/jpeg",
+                    assetType == GameMediaAssetType.Logo
+                        ? "image/png"
+                        : "image/jpeg",
                     new Uri(
                         Path.GetFullPath(localCoverPath),
                         UriKind.Absolute));
