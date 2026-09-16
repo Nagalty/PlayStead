@@ -7,6 +7,7 @@ using PlayStead.Core.Sessions;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
+using PlayStead.UI.Notifications;
 using PlayStead.UI.Launching;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
@@ -38,6 +39,7 @@ public partial class MainWindow : Window
     private readonly ISessionStore? _sessionStore;
     private readonly ISessionCorrectionStore? _sessionCorrectionStore;
     private readonly SessionCorrectionPolicy? _sessionCorrectionPolicy;
+    private readonly NotificationCenterViewModel? _notificationCenterViewModel;
 
     public MainWindow()
         : this(
@@ -296,7 +298,8 @@ public partial class MainWindow : Window
         AttentionViewModel attentionViewModel,
         ISessionStore sessionStore,
         ISessionCorrectionStore sessionCorrectionStore,
-        SessionCorrectionPolicy sessionCorrectionPolicy)
+        SessionCorrectionPolicy sessionCorrectionPolicy,
+        NotificationCenterViewModel notificationCenterViewModel)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
             settingsViewModel, uiMotionController, homeViewModel, gameLaunchService)
@@ -305,11 +308,15 @@ public partial class MainWindow : Window
         ArgumentNullException.ThrowIfNull(sessionStore);
         ArgumentNullException.ThrowIfNull(sessionCorrectionStore);
         ArgumentNullException.ThrowIfNull(sessionCorrectionPolicy);
+        ArgumentNullException.ThrowIfNull(notificationCenterViewModel);
 
         _attentionViewModel = attentionViewModel;
         _sessionStore = sessionStore;
         _sessionCorrectionStore = sessionCorrectionStore;
         _sessionCorrectionPolicy = sessionCorrectionPolicy;
+        _notificationCenterViewModel = notificationCenterViewModel;
+        NotificationBellButton.DataContext = notificationCenterViewModel;
+        NotificationPanelHost.DataContext = notificationCenterViewModel;
 
         UpdateQuickPanel();
         ApplyCurrentRoute();

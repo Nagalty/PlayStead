@@ -31,6 +31,7 @@ using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
+using PlayStead.UI.Notifications;
 using PlayStead.UI.Sessions;
 using PlayStead.UI.Settings;
 using PlayStead.UI.Shell;
@@ -327,6 +328,9 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<
             AttentionViewModel>();
+
+        builder.Services.AddSingleton<
+            NotificationCenterViewModel>();
 
         builder.Services.AddSingleton<
             MainWindow>();

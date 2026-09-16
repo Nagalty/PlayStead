@@ -1,0 +1,34 @@
+<UserControl x:Class="PlayStead.UI.Notifications.NotificationPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </UserControl.Resources>
+    <Border Padding="16" Background="{DynamicResource PlayStead.Brush.Surface}" BorderBrush="{DynamicResource PlayStead.Brush.Border}" BorderThickness="1">
+        <StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="ActiveNotificationsFilterButton" Content="Actives" Command="{Binding SelectFilterCommand}" CommandParameter="Active" Margin="0,0,8,0" />
+                <Button x:Name="ResolvedNotificationsFilterButton" Content="Résolues" Command="{Binding SelectFilterCommand}" CommandParameter="Resolved" />
+            </StackPanel>
+            <ItemsControl ItemsSource="{Binding Items}" Margin="0,12,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Command="{Binding DataContext.SelectAsync, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding NotificationId}" HorizontalContentAlignment="Left" Margin="0,2">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <StackPanel DataContext="{Binding SelectedItem}" Margin="0,16,0,0">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Priority}" />
+                <TextBlock Text="{Binding State}" />
+                <TextBlock Text="{Binding UpdatedUtc}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>
