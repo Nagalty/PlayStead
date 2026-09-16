@@ -35,7 +35,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            8,
+            9,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
@@ -89,7 +89,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            8,
+            9,
             Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
