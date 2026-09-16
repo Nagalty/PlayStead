@@ -1,3 +1,5 @@
+using PlayStead.Core.Catalog;
+
 namespace PlayStead.Core.Library;
 
 public sealed record LogicalGame(
@@ -5,4 +7,5 @@ public sealed record LogicalGame(
     string Title,
     bool IsHidden,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    CatalogContentId? CanonicalContentId = null);

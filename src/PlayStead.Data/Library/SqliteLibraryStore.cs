@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using PlayStead.Core.Catalog;
 using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
@@ -376,7 +377,8 @@ public sealed class SqliteLibraryStore : ILibraryStore
                 title,
                 is_hidden,
                 created_utc,
-                updated_utc
+                updated_utc,
+                canonical_content_id
             FROM games
             ORDER BY title COLLATE NOCASE, game_id;
             """;
@@ -394,7 +396,11 @@ public sealed class SqliteLibraryStore : ILibraryStore
                     reader.GetString(1),
                     reader.GetInt64(2) != 0,
                     ParseUtc(reader.GetString(3)),
-                    ParseUtc(reader.GetString(4))));
+                    ParseUtc(reader.GetString(4)),
+                    reader.IsDBNull(5)
+                        ? null
+                        : new CatalogContentId(
+                            Guid.Parse(reader.GetString(5)))));
         }
 
         return result;

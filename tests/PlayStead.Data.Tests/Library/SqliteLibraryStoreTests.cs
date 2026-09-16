@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using PlayStead.Core.Catalog;
 using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
@@ -33,6 +34,7 @@ public sealed class SqliteLibraryStoreTests : IDisposable
         var installation = Assert.Single(snapshot.Installations);
 
         Assert.Equal("Counter-Strike 2", game.Title);
+        Assert.Null(game.CanonicalContentId);
         Assert.Equal(game.Id, installation.GameId);
         Assert.Equal(ProviderKind.Steam, installation.Provider);
         Assert.Equal("730", installation.ExternalId);
@@ -76,10 +78,61 @@ public sealed class SqliteLibraryStoreTests : IDisposable
 
         Assert.Equal(firstGameId, Assert.Single(second.Games).Id);
 
+        Assert.Null(
+            Assert.Single(second.Games)
+                .CanonicalContentId);
+
         var installation = Assert.Single(second.Installations);
         Assert.Equal(firstInstallationId, installation.Id);
         Assert.True(installation.IsPresent);
         Assert.Equal(secondObserved, installation.LastSeenUtc);
+    }
+
+    [Fact]
+    public async Task LoadSnapshot_reads_canonical_content_id_when_present()
+    {
+        var (store, databasePath) = await CreateStoreAsync();
+
+        var observed = Utc(8, 0);
+        await store.ApplySourceScanAsync(
+            SourceScanResult.Success(
+                ProviderKind.Steam,
+                observed,
+                [SteamGame(observed)]),
+            CancellationToken.None);
+
+        var canonicalId =
+            new CatalogContentId(
+                Guid.Parse(
+                    "22222222-2222-2222-2222-222222222222"));
+
+        await using (var connection = new SqliteConnection(
+            $"Data Source={databasePath};Pooling=False"))
+        {
+            await connection.OpenAsync();
+
+            var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE games
+                SET canonical_content_id = $canonicalContentId;
+                """;
+
+            command.Parameters.AddWithValue(
+                "$canonicalContentId",
+                canonicalId.Value.ToString("D"));
+
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var snapshot =
+            await store.LoadSnapshotAsync(
+                CancellationToken.None);
+
+        var game = Assert.Single(snapshot.Games);
+
+        Assert.Equal(
+            canonicalId,
+            game.CanonicalContentId);
     }
 
     [Fact]
