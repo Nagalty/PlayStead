@@ -66,6 +66,12 @@ public sealed class FileGameMediaCache : IGameMediaCache
         ValidatePayload(identity, payload);
 
         var extension = DetectImageExtension(payload.Content);
+        var contentToStore =
+            payload.AssetType == GameMediaAssetType.Logo &&
+            string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase)
+                ? PngLogoNormalizer.Normalize(payload.Content)
+                : payload.Content;
+
         var directory = GetGameDirectory(identity);
         var gate = DirectoryLocks.GetOrAdd(directory, static _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -78,7 +84,7 @@ public sealed class FileGameMediaCache : IGameMediaCache
             var assetName = GetAssetName(payload.AssetType);
             var fileName = assetName + extension;
             var finalPath = Path.Combine(directory, fileName);
-            await WriteAtomicallyAsync(finalPath, payload.Content, cancellationToken)
+            await WriteAtomicallyAsync(finalPath, contentToStore, cancellationToken)
                 .ConfigureAwait(false);
 
             var manifest = ReadManifest(directory) ?? ReconstructManifest(directory);

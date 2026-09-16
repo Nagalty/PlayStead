@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using PlayStead.Core.Library;
@@ -212,6 +214,78 @@ public sealed class FileGameMediaCacheTests : IDisposable
         Assert.NotNull(cache.TryGetPath(Identity(), GameMediaAssetType.Logo));
     }
 
+    [Fact]
+    public async Task StoreAsync_crops_transparent_padding_from_PNG_logo()
+    {
+        var cache =
+            new FileGameMediaCache(
+                _root);
+
+        var source =
+            CreateRgbaPng(
+                width: 40,
+                height: 30,
+                visibleLeft: 13,
+                visibleTop: 11,
+                visibleWidth: 14,
+                visibleHeight: 8);
+
+        var path =
+            await cache.StoreAsync(
+                Identity(),
+                new GameMediaPayload(
+                    GameMediaAssetType.Logo,
+                    "steam-remote",
+                    "1874880",
+                    source,
+                    "image/png",
+                    null),
+                CancellationToken.None);
+
+        var stored =
+            await File.ReadAllBytesAsync(
+                path);
+
+        Assert.Equal(
+            (22, 16),
+            ReadPngDimensions(
+                stored));
+    }
+
+    [Fact]
+    public async Task StoreAsync_does_not_crop_transparent_padding_from_non_logo_PNG()
+    {
+        var cache =
+            new FileGameMediaCache(
+                _root);
+
+        var source =
+            CreateRgbaPng(
+                width: 40,
+                height: 30,
+                visibleLeft: 13,
+                visibleTop: 11,
+                visibleWidth: 14,
+                visibleHeight: 8);
+
+        var path =
+            await cache.StoreAsync(
+                Identity(),
+                new GameMediaPayload(
+                    GameMediaAssetType.Cover,
+                    "steam-remote",
+                    "1874880",
+                    source,
+                    "image/png",
+                    null),
+                CancellationToken.None);
+
+        Assert.Equal(
+            source,
+            await File.ReadAllBytesAsync(
+                path));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))
@@ -242,4 +316,220 @@ public sealed class FileGameMediaCacheTests : IDisposable
     private static byte[] ValidPngBytes() =>
         Convert.FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+
+
+    private static byte[] CreateRgbaPng(
+        int width,
+        int height,
+        int visibleLeft,
+        int visibleTop,
+        int visibleWidth,
+        int visibleHeight)
+    {
+        var rowByteCount =
+            width * 4;
+
+        using var filtered =
+            new MemoryStream(
+                (rowByteCount + 1) *
+                height);
+
+        for (var y = 0; y < height; y++)
+        {
+            filtered.WriteByte(0);
+
+            for (var x = 0; x < width; x++)
+            {
+                var visible =
+                    x >= visibleLeft &&
+                    x < visibleLeft + visibleWidth &&
+                    y >= visibleTop &&
+                    y < visibleTop + visibleHeight;
+
+                filtered.WriteByte(255);
+                filtered.WriteByte(255);
+                filtered.WriteByte(255);
+                filtered.WriteByte(
+                    visible
+                        ? (byte)255
+                        : (byte)0);
+            }
+        }
+
+        byte[] compressedBytes;
+
+        using (var compressed =
+               new MemoryStream())
+        {
+            using (var deflater =
+                   new ZLibStream(
+                       compressed,
+                       CompressionLevel.Optimal,
+                       leaveOpen: true))
+            {
+                var filteredBytes =
+                    filtered.ToArray();
+
+                deflater.Write(
+                    filteredBytes,
+                    0,
+                    filteredBytes.Length);
+            }
+
+            compressedBytes =
+                compressed.ToArray();
+        }
+
+        using var output =
+            new MemoryStream();
+
+        output.Write(
+            new byte[]
+            {
+                137, 80, 78, 71,
+                13, 10, 26, 10
+            });
+
+        Span<byte> header =
+            stackalloc byte[13];
+
+        BinaryPrimitives.WriteUInt32BigEndian(
+            header[..4],
+            (uint)width);
+
+        BinaryPrimitives.WriteUInt32BigEndian(
+            header.Slice(4, 4),
+            (uint)height);
+
+        header[8] = 8;
+        header[9] = 6;
+        header[10] = 0;
+        header[11] = 0;
+        header[12] = 0;
+
+        WritePngChunk(
+            output,
+            "IHDR"u8,
+            header);
+
+        WritePngChunk(
+            output,
+            "IDAT"u8,
+            compressedBytes);
+
+        WritePngChunk(
+            output,
+            "IEND"u8,
+            ReadOnlySpan<byte>.Empty);
+
+        return output.ToArray();
+    }
+
+    private static (int Width, int Height)
+        ReadPngDimensions(
+            byte[] content)
+    {
+        Assert.True(
+            content.Length >= 24);
+
+        Assert.Equal(
+            new byte[]
+            {
+                137, 80, 78, 71,
+                13, 10, 26, 10
+            },
+            content[..8]);
+
+        return (
+            checked(
+                (int)
+                BinaryPrimitives.ReadUInt32BigEndian(
+                    content.AsSpan(
+                        16,
+                        4))),
+            checked(
+                (int)
+                BinaryPrimitives.ReadUInt32BigEndian(
+                    content.AsSpan(
+                        20,
+                        4))));
+    }
+
+    private static void WritePngChunk(
+        Stream stream,
+        ReadOnlySpan<byte> type,
+        ReadOnlySpan<byte> data)
+    {
+        Span<byte> length =
+            stackalloc byte[4];
+
+        BinaryPrimitives.WriteUInt32BigEndian(
+            length,
+            (uint)data.Length);
+
+        stream.Write(
+            length);
+
+        stream.Write(
+            type);
+
+        stream.Write(
+            data);
+
+        Span<byte> crcBytes =
+            stackalloc byte[4];
+
+        BinaryPrimitives.WriteUInt32BigEndian(
+            crcBytes,
+            ComputePngCrc(
+                type,
+                data));
+
+        stream.Write(
+            crcBytes);
+    }
+
+    private static uint ComputePngCrc(
+        ReadOnlySpan<byte> type,
+        ReadOnlySpan<byte> data)
+    {
+        var crc =
+            uint.MaxValue;
+
+        foreach (var value in type)
+        {
+            crc =
+                UpdatePngCrc(
+                    crc,
+                    value);
+        }
+
+        foreach (var value in data)
+        {
+            crc =
+                UpdatePngCrc(
+                    crc,
+                    value);
+        }
+
+        return ~crc;
+    }
+
+    private static uint UpdatePngCrc(
+        uint crc,
+        byte value)
+    {
+        crc ^= value;
+
+        for (var bit = 0; bit < 8; bit++)
+        {
+            crc =
+                (crc & 1) == 0
+                    ? crc >> 1
+                    : (crc >> 1) ^
+                      0xEDB88320u;
+        }
+
+        return crc;
+    }
 }
