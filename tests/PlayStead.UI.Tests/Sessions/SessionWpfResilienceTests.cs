@@ -524,6 +524,14 @@ public sealed class SessionWpfResilienceTests
                 IReadOnlyList<GameSession>>(
                     Array.Empty<GameSession>());
         }
+
+        public Task<IReadOnlyList<GameSession>>
+            GetByGameAsync(
+                Guid gameId,
+                CancellationToken cancellationToken) =>
+            Task.FromResult<
+                IReadOnlyList<GameSession>>(
+                    Array.Empty<GameSession>());
     }
 
     private sealed class EmptyCorrectionStore :

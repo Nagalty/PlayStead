@@ -392,6 +392,20 @@ public sealed class Task08Fix01CorrectionRuntimeTests
                     .Take(limit)
                     .ToArray());
         }
+
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(
+            Guid gameId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult<IReadOnlyList<GameSession>>(
+                _sessions.Values
+                    .Where(session => session.GameId == gameId)
+                    .OrderByDescending(session => session.ObservedStartedAtUtc)
+                    .ThenByDescending(session => session.SessionId)
+                    .ToArray());
+        }
     }
 
     private sealed class FakeSessionCorrectionStore : ISessionCorrectionStore

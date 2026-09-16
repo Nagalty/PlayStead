@@ -520,6 +520,13 @@ public sealed class ProcessDiscoveryLifecycleTests
             Task.FromResult<IReadOnlyList<GameSession>>([]);
         public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken token) =>
             Task.FromResult<IReadOnlyList<GameSession>>([]);
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(Guid gameId, CancellationToken token) =>
+            Task.FromResult<IReadOnlyList<GameSession>>(
+                Writes
+                    .Where(session => session.GameId == gameId)
+                    .OrderByDescending(session => session.ObservedStartedAtUtc)
+                    .ThenByDescending(session => session.SessionId)
+                    .ToArray());
         public Task<GameSession?> GetAsync(Guid id, CancellationToken token) =>
             Task.FromResult<GameSession?>(null);
         public Task UpsertAsync(GameSession session, CancellationToken token)

@@ -150,6 +150,51 @@ public sealed class SqliteSessionStoreTests : IDisposable
             recent.Select(x => x.SessionId).ToArray());
     }
 
+    [Fact]
+    public async Task GetByGame_returns_only_requested_game_newest_first()
+    {
+        var context = await CreateStoreAsync(
+            GameA,
+            GameB);
+
+        var olderA = ActiveSession(
+            Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"),
+            GameA,
+            T0);
+
+        var gameB = ActiveSession(
+            Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2"),
+            GameB,
+            T0.AddMinutes(5));
+
+        var newerA = ActiveSession(
+            Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb3"),
+            GameA,
+            T0.AddMinutes(10));
+
+        await context.Store.UpsertAsync(
+            olderA,
+            CancellationToken.None);
+
+        await context.Store.UpsertAsync(
+            gameB,
+            CancellationToken.None);
+
+        await context.Store.UpsertAsync(
+            newerA,
+            CancellationToken.None);
+
+        var sessions =
+            await context.Store.GetByGameAsync(
+                GameA,
+                CancellationToken.None);
+
+        Assert.Equal(
+            [newerA.SessionId, olderA.SessionId],
+            sessions.Select(
+                session => session.SessionId).ToArray());
+    }
+
     private async Task<StoreContext> CreateStoreAsync(
         params Guid[] gameIds)
     {

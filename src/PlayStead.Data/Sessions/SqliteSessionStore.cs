@@ -227,6 +227,40 @@ public sealed class SqliteSessionStore : ISessionStore
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<GameSession>> GetByGameAsync(
+        Guid gameId,
+        CancellationToken cancellationToken)
+    {
+        await using var connection =
+            await OpenConnectionAsync(cancellationToken);
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                session_id,
+                game_id,
+                observed_started_at_utc,
+                last_seen_at_utc,
+                observed_ended_at_utc,
+                state,
+                end_reason,
+                detection_source,
+                created_at_utc,
+                updated_at_utc
+            FROM game_sessions
+            WHERE game_id = $gameId
+            ORDER BY observed_started_at_utc DESC, session_id DESC;
+            """;
+
+        command.Parameters.AddWithValue(
+            "$gameId",
+            gameId.ToString());
+
+        return await ReadManyAsync(
+            command,
+            cancellationToken);
+    }
+
     private async Task<SqliteConnection> OpenConnectionAsync(
         CancellationToken cancellationToken)
     {

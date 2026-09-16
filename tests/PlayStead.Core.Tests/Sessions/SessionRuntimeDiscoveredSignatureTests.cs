@@ -247,6 +247,14 @@ public sealed class SessionRuntimeDiscoveredSignatureTests
         internal int Loads;
         public Task<IReadOnlyList<GameSession>> GetActiveAsync(CancellationToken ct) { Loads++; return Task.FromResult(Persisted); }
         public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<GameSession>>([]);
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(Guid gameId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<GameSession>>(
+                Persisted
+                    .Concat(Writes)
+                    .Where(session => session.GameId == gameId)
+                    .OrderByDescending(session => session.ObservedStartedAtUtc)
+                    .ThenByDescending(session => session.SessionId)
+                    .ToArray());
         public Task<GameSession?> GetAsync(Guid id, CancellationToken ct) => Task.FromResult<GameSession?>(null);
         public Task UpsertAsync(GameSession s, CancellationToken ct) { ct.ThrowIfCancellationRequested(); Writes.Add(s); return Task.CompletedTask; }
     }

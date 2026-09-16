@@ -314,6 +314,20 @@ public sealed class SessionRuntimeHeartbeatPersistenceTests
             CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<GameSession>>(
                 []);
+
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(
+            Guid gameId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult<IReadOnlyList<GameSession>>(
+                _active
+                    .Where(session => session.GameId == gameId)
+                    .OrderByDescending(session => session.ObservedStartedAtUtc)
+                    .ThenByDescending(session => session.SessionId)
+                    .ToArray());
+        }
     }
 
 

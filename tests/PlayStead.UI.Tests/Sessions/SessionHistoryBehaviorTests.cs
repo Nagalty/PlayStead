@@ -554,6 +554,30 @@ public sealed class SessionHistoryBehaviorTests
             return Task.FromResult(
                 Recent);
         }
+
+        public Task<IReadOnlyList<GameSession>>
+            GetByGameAsync(
+                Guid gameId,
+                CancellationToken cancellationToken)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+
+            return Task.FromResult<
+                IReadOnlyList<GameSession>>(
+                    _sessions.Values
+                        .Where(
+                            session =>
+                                session.GameId ==
+                                gameId)
+                        .OrderByDescending(
+                            session =>
+                                session.ObservedStartedAtUtc)
+                        .ThenByDescending(
+                            session =>
+                                session.SessionId)
+                        .ToArray());
+        }
     }
 
     private sealed class RecordingCorrectionStore :

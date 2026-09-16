@@ -249,6 +249,13 @@ public sealed class SessionRuntimeSharedCaptureTests
         internal readonly List<GameSession> Writes = [];
         public Task<IReadOnlyList<GameSession>> GetActiveAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<GameSession>>([]);
         public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken ct) => Task.FromResult<IReadOnlyList<GameSession>>([]);
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(Guid gameId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<GameSession>>(
+                Writes
+                    .Where(session => session.GameId == gameId)
+                    .OrderByDescending(session => session.ObservedStartedAtUtc)
+                    .ThenByDescending(session => session.SessionId)
+                    .ToArray());
         public Task<GameSession?> GetAsync(Guid id, CancellationToken ct) => Task.FromResult<GameSession?>(null);
         public Task UpsertAsync(GameSession s, CancellationToken ct) { Writes.Add(s); return Task.CompletedTask; }
     }

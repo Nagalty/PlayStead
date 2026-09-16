@@ -16,4 +16,8 @@ public interface ISessionStore
     Task<IReadOnlyList<GameSession>> GetRecentAsync(
         int limit,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<GameSession>> GetByGameAsync(
+        Guid gameId,
+        CancellationToken cancellationToken);
 }

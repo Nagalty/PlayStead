@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using PlayStead.Core.Library;
+using PlayStead.Core.Sessions;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
@@ -34,6 +35,9 @@ public partial class MainWindow : Window
     private readonly GameLaunchService? _gameLaunchService;
     private readonly AttentionViewModel? _attentionViewModel;
     private AttentionView? _attentionView;
+    private readonly ISessionStore? _sessionStore;
+    private readonly ISessionCorrectionStore? _sessionCorrectionStore;
+    private readonly SessionCorrectionPolicy? _sessionCorrectionPolicy;
 
     public MainWindow()
         : this(
@@ -289,13 +293,25 @@ public partial class MainWindow : Window
         UiMotionController uiMotionController,
         HomeViewModel homeViewModel,
         GameLaunchService gameLaunchService,
-        AttentionViewModel attentionViewModel)
+        AttentionViewModel attentionViewModel,
+        ISessionStore sessionStore,
+        ISessionCorrectionStore sessionCorrectionStore,
+        SessionCorrectionPolicy sessionCorrectionPolicy)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
             settingsViewModel, uiMotionController, homeViewModel, gameLaunchService)
     {
         ArgumentNullException.ThrowIfNull(attentionViewModel);
+        ArgumentNullException.ThrowIfNull(sessionStore);
+        ArgumentNullException.ThrowIfNull(sessionCorrectionStore);
+        ArgumentNullException.ThrowIfNull(sessionCorrectionPolicy);
+
         _attentionViewModel = attentionViewModel;
+        _sessionStore = sessionStore;
+        _sessionCorrectionStore = sessionCorrectionStore;
+        _sessionCorrectionPolicy = sessionCorrectionPolicy;
+
+        UpdateQuickPanel();
         ApplyCurrentRoute();
     }
 
@@ -316,11 +332,41 @@ public partial class MainWindow : Window
 
     private void UpdateQuickPanel()
     {
+        if (DataContext is not LibraryViewModel viewModel ||
+            viewModel.SelectedItem is not { } game)
+        {
+            _libraryView.QuickPanelViewModel =
+                null;
+
+            return;
+        }
+
+        var quickPanel =
+            _sessionStore is not null &&
+            _sessionCorrectionStore is not null &&
+            _sessionCorrectionPolicy is not null
+                ? new GameQuickPanelViewModel(
+                    game,
+                    _navigationService,
+                    CreateLaunchModel(
+                        viewModel,
+                        game.GameId),
+                    _sessionStore,
+                    _sessionCorrectionStore,
+                    _sessionCorrectionPolicy)
+                : new GameQuickPanelViewModel(
+                    game,
+                    _navigationService,
+                    CreateLaunchModel(
+                        viewModel,
+                        game.GameId));
+
         _libraryView.QuickPanelViewModel =
-            DataContext is LibraryViewModel viewModel && viewModel.SelectedItem is { } game
-                ? new GameQuickPanelViewModel(game, _navigationService,
-                    CreateLaunchModel(viewModel, game.GameId))
-                : null;
+            quickPanel;
+
+        _ =
+            quickPanel.LoadSessionSummaryAsync(
+                CancellationToken.None);
     }
 
     private async void MainWindow_OnMotionFirstLoaded(

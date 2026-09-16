@@ -387,6 +387,16 @@ public sealed class SessionRuntimeTests
             CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<GameSession>>(
                 []);
+
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(
+            Guid gameId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult<IReadOnlyList<GameSession>>(
+                []);
+        }
     }
 
 
