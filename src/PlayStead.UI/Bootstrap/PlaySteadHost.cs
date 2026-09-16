@@ -11,6 +11,7 @@ using PlayStead.Core.Sessions;
 using PlayStead.Core.Sessions.Discovery;
 using PlayStead.Core.Steam;
 using PlayStead.Data.Database;
+using PlayStead.Data.Catalog;
 using PlayStead.Data.Library;
 using PlayStead.Data.Media;
 using PlayStead.Data.Sessions;
@@ -56,6 +57,16 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<
             DatabaseHealthChecker>();
+
+        var dataRoot = Path.GetDirectoryName(layout.DatabasePath)
+            ?? throw new InvalidOperationException("PlayStead database path has no parent directory.");
+        builder.Services.AddSingleton(new CatalogDatabaseOptions(
+            Path.Combine(dataRoot, "catalog.db"),
+            Path.Combine(layout.BackupsDirectory, "Catalog")));
+        builder.Services.AddSingleton<CatalogDatabaseInitializer>();
+        builder.Services.AddSingleton<SqliteCanonicalCatalogStore>();
+        builder.Services.AddSingleton<PlayStead.Core.Persistence.ICanonicalCatalogStore>(
+            services => services.GetRequiredService<SqliteCanonicalCatalogStore>());
 
         builder.Services.AddSingleton<
             ILibraryStore,

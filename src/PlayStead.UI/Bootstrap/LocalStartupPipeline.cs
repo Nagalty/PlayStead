@@ -2,6 +2,7 @@ using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Data.Database;
+using PlayStead.Data.Catalog;
 using PlayStead.UI.Steam;
 using PlayStead.UI.Sessions;
 
@@ -19,6 +20,7 @@ public sealed class LocalStartupPipeline
     private readonly LocalScanCoordinator _scanCoordinator;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly DiscoveryInventoryManager? _discoveryInventory;
+    private readonly CatalogDatabaseInitializer? _catalogDatabaseInitializer;
     private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
     private readonly object _refreshRequestGate = new();
     private long _latestRefreshRequest;
@@ -72,11 +74,29 @@ public sealed class LocalStartupPipeline
             ?? throw new ArgumentNullException(nameof(discoveryInventory));
     }
 
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        DiscoveryInventoryManager discoveryInventory,
+        CatalogDatabaseInitializer catalogDatabaseInitializer)
+        : this(databaseInitializer, databaseHealthChecker, libraryStore, scanCoordinator,
+            steamReferenceRuntime, discoveryInventory)
+    {
+        _catalogDatabaseInitializer = catalogDatabaseInitializer
+            ?? throw new ArgumentNullException(nameof(catalogDatabaseInitializer));
+    }
+
     public async Task<LocalStartupState> InitializeAsync(
         CancellationToken cancellationToken)
     {
         await _databaseInitializer.InitializeAsync(
             cancellationToken);
+
+        if (_catalogDatabaseInitializer is not null)
+            await _catalogDatabaseInitializer.InitializeAsync(cancellationToken);
 
         var health =
             await _databaseHealthChecker.QuickCheckAsync(
