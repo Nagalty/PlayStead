@@ -1,4 +1,5 @@
 using PlayStead.Core.Identity;
+using PlayStead.Core.Notifications;
 using PlayStead.Core.Persistence;
 
 namespace PlayStead.Core.Scanning;
@@ -10,12 +11,28 @@ public sealed class LocalIdentityResolutionCoordinator
     private readonly IGameIdentityResolver _identityResolver;
     private readonly IIdentityResolutionStore _identityResolutionStore;
     private readonly ILocalIdentityReconciler _identityReconciler;
+    private readonly IIdentityNotificationProducer? _notificationProducer;
 
     public LocalIdentityResolutionCoordinator(
         ILibraryGameLookup libraryGameLookup,
         IGameIdentityResolver identityResolver,
         IIdentityResolutionStore identityResolutionStore,
         ILocalIdentityReconciler identityReconciler)
+        : this(
+            libraryGameLookup,
+            identityResolver,
+            identityResolutionStore,
+            identityReconciler,
+            notificationProducer: null)
+    {
+    }
+
+    public LocalIdentityResolutionCoordinator(
+        ILibraryGameLookup libraryGameLookup,
+        IGameIdentityResolver identityResolver,
+        IIdentityResolutionStore identityResolutionStore,
+        ILocalIdentityReconciler identityReconciler,
+        IIdentityNotificationProducer? notificationProducer)
     {
         ArgumentNullException.ThrowIfNull(libraryGameLookup);
         ArgumentNullException.ThrowIfNull(identityResolver);
@@ -26,6 +43,7 @@ public sealed class LocalIdentityResolutionCoordinator
         _identityResolver = identityResolver;
         _identityResolutionStore = identityResolutionStore;
         _identityReconciler = identityReconciler;
+        _notificationProducer = notificationProducer;
     }
 
     public async Task ResolveAfterScanAsync(
@@ -112,6 +130,26 @@ public sealed class LocalIdentityResolutionCoordinator
                         nameof(resolution),
                         resolution.State,
                         "Unsupported identity resolution state.");
+            }
+
+            if (_notificationProducer is not null)
+            {
+                try
+                {
+                    await _notificationProducer.PublishForResolutionAsync(
+                        gameId.Value,
+                        resolution,
+                        cancellationToken);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // Notifications are a non-critical identity side effect.
+                }
             }
         }
     }

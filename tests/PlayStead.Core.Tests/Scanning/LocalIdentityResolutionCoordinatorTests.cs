@@ -1,6 +1,7 @@
 using PlayStead.Core.Catalog;
 using PlayStead.Core.Identity;
 using PlayStead.Core.Library;
+using PlayStead.Core.Notifications;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 
@@ -202,6 +203,44 @@ public sealed class LocalIdentityResolutionCoordinatorTests
         Assert.Equal(ObservedAt, observation.ObservedAtUtc);
     }
 
+    [Fact]
+    public async Task Notification_failure_does_not_break_new_identity_persistence()
+    {
+        var store = new RecordingResolutionStore();
+        var sut = new LocalIdentityResolutionCoordinator(
+            new RecordingLookup(Game(1)),
+            new RecordingResolver(NewResult()),
+            store,
+            new RecordingReconciler(),
+            new ThrowingNotificationProducer(new IOException("notification failure")));
+
+        await sut.ResolveAfterScanAsync(SteamScan(), CancellationToken.None);
+
+        Assert.Equal(1, store.GetOrCreateCount);
+    }
+
+    [Fact]
+    public async Task Notification_cancellation_is_propagated_after_confirmed_reconciliation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var reconciler = new RecordingReconciler();
+        var contentId = CatalogContentId.New();
+        var sut = new LocalIdentityResolutionCoordinator(
+            new RecordingLookup(Game(1)),
+            new RecordingResolver(new IdentityResolutionResult(
+                IdentityResolutionState.MatchConfirmed,
+                contentId,
+                ExactMatch(contentId))),
+            new RecordingResolutionStore(),
+            reconciler,
+            new CancellingNotificationProducer(cancellation));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            sut.ResolveAfterScanAsync(SteamScan(), cancellation.Token));
+
+        Assert.Single(reconciler.Calls);
+    }
+
     private static LocalIdentityResolutionCoordinator CreateCoordinator(
         GameId gameId,
         IdentityResolutionResult result,
@@ -356,6 +395,29 @@ public sealed class LocalIdentityResolutionCoordinatorTests
                     evidence,
                     observedAtUtc));
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingNotificationProducer(Exception exception)
+        : IIdentityNotificationProducer
+    {
+        public Task PublishForResolutionAsync(
+            GameId gameId,
+            IdentityResolutionResult result,
+            CancellationToken cancellationToken) =>
+            Task.FromException(exception);
+    }
+
+    private sealed class CancellingNotificationProducer(CancellationTokenSource cancellation)
+        : IIdentityNotificationProducer
+    {
+        public Task PublishForResolutionAsync(
+            GameId gameId,
+            IdentityResolutionResult result,
+            CancellationToken cancellationToken)
+        {
+            cancellation.Cancel();
+            return Task.FromCanceled(cancellationToken);
         }
     }
 
