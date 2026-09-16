@@ -19,7 +19,7 @@ public sealed class NotificationCenterViewModel : INotifyPropertyChanged
         ArgumentNullException.ThrowIfNull(service);
         _service = service;
         TogglePanelCommand = new AsyncRelayCommand(TogglePanelAsync);
-        SelectFilterCommand = new AsyncRelayCommand<NotificationListFilter>(SelectFilterAsync);
+        SelectFilterCommand = new AsyncRelayCommand<object?>(SelectFilterAsync);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -68,8 +68,11 @@ public sealed class NotificationCenterViewModel : INotifyPropertyChanged
         if (IsPanelOpen) await RefreshAsync(CancellationToken.None);
     }
 
-    private async Task SelectFilterAsync(NotificationListFilter filter)
+    private async Task SelectFilterAsync(object? parameter)
     {
+        if (parameter is not NotificationListFilter filter &&
+            !(parameter is string text && Enum.TryParse(text, ignoreCase: true, out filter)))
+            return;
         Filter = filter;
         await RefreshAsync(CancellationToken.None);
     }
