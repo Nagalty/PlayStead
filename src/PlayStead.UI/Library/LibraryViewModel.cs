@@ -37,6 +37,12 @@ public sealed class LibraryViewModel :
     private readonly object _coverLoadsGate =
         new();
 
+    private readonly Dictionary<GameId, Task> _logoLoads =
+        new();
+
+    private readonly object _logoLoadsGate =
+        new();
+
     private SessionMonitor? _sessionMonitor;
 
     private IReadOnlyList<LibraryItemViewModel> _items =
@@ -440,6 +446,9 @@ public sealed class LibraryViewModel :
 
         SetSelectedItem(
             item);
+
+        _ = EnsureSelectedLogoAsync(
+            item);
     }
 
     public void ClearSelection()
@@ -687,6 +696,171 @@ public sealed class LibraryViewModel :
             _mediaGate.Release();
         }
     }
+    public Task EnsureLogoAsync(
+        LibraryItemViewModel item,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled(
+                cancellationToken);
+        }
+
+        if (item.HasLogo ||
+            item.Provider != ProviderKind.Steam)
+        {
+            return Task.CompletedTask;
+        }
+
+        TaskCompletionSource completion;
+
+        lock (_logoLoadsGate)
+        {
+            if (_logoLoads.TryGetValue(
+                    item.GameId,
+                    out var existingLoad))
+            {
+                return existingLoad;
+            }
+
+            completion =
+                new TaskCompletionSource(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _logoLoads[item.GameId] =
+                completion.Task;
+        }
+
+        _ = CompleteLogoLoadAsync(
+            item,
+            cancellationToken,
+            completion);
+
+        return completion.Task;
+    }
+
+    private async Task CompleteLogoLoadAsync(
+        LibraryItemViewModel item,
+        CancellationToken cancellationToken,
+        TaskCompletionSource completion)
+    {
+        try
+        {
+            await EnsureLogoCoreAsync(
+                item,
+                cancellationToken);
+
+            completion.TrySetResult();
+        }
+        catch (OperationCanceledException exception)
+        {
+            if (exception.CancellationToken.CanBeCanceled)
+            {
+                completion.TrySetCanceled(
+                    exception.CancellationToken);
+            }
+            else
+            {
+                completion.TrySetCanceled();
+            }
+        }
+        catch (Exception exception)
+        {
+            completion.TrySetException(
+                exception);
+        }
+        finally
+        {
+            lock (_logoLoadsGate)
+            {
+                if (_logoLoads.TryGetValue(
+                        item.GameId,
+                        out var currentLoad) &&
+                    ReferenceEquals(
+                        currentLoad,
+                        completion.Task))
+                {
+                    _logoLoads.Remove(
+                        item.GameId);
+                }
+            }
+        }
+    }
+
+    private async Task EnsureLogoCoreAsync(
+        LibraryItemViewModel item,
+        CancellationToken cancellationToken)
+    {
+        if (item.HasLogo)
+        {
+            return;
+        }
+
+        var installation =
+            GameLaunchInstallationSelector.SelectDefault(
+                item.GameId,
+                _installations.Where(candidate =>
+                    candidate.Provider == item.Provider &&
+                    string.Equals(
+                        candidate.InstallPath,
+                        item.InstallPath,
+                        StringComparison.OrdinalIgnoreCase)));
+
+        if (installation is null ||
+            string.IsNullOrWhiteSpace(
+                installation.ExternalId))
+        {
+            return;
+        }
+
+        var identity =
+            new GameMediaIdentity(
+                installation.Provider,
+                installation.ExternalId,
+                item.Title);
+
+        await _mediaGate.WaitAsync(
+            cancellationToken);
+
+        try
+        {
+            var path =
+                await _gameMediaResolver.ResolveAndCacheAsync(
+                    identity,
+                    GameMediaAssetType.Logo,
+                    cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (path is not null)
+            {
+                item.SetLogoPath(
+                    path);
+            }
+        }
+        finally
+        {
+            _mediaGate.Release();
+        }
+    }
+
+    private async Task EnsureSelectedLogoAsync(
+        LibraryItemViewModel item)
+    {
+        try
+        {
+            await EnsureLogoAsync(
+                item,
+                CancellationToken.None);
+        }
+        catch
+        {
+            // Logo media is cosmetic. Selection and launch behavior must remain available.
+        }
+    }
+
     public async Task RefreshAsync(
         CancellationToken cancellationToken)
     {
@@ -882,6 +1056,10 @@ public sealed class LibraryViewModel :
                         item,
                         installation);
 
+                    ApplyCachedLogo(
+                        item,
+                        installation);
+
                     return item;
                 })
             .OrderBy(
@@ -913,6 +1091,29 @@ public sealed class LibraryViewModel :
             _gameMediaResolver.TryGetCachedPath(
                 identity,
                 GameMediaAssetType.Cover));
+    }
+
+    private void ApplyCachedLogo(
+        LibraryItemViewModel item,
+        GameInstallation installation)
+    {
+        if (installation.Provider != ProviderKind.Steam ||
+            string.IsNullOrWhiteSpace(
+                installation.ExternalId))
+        {
+            return;
+        }
+
+        var identity =
+            new GameMediaIdentity(
+                installation.Provider,
+                installation.ExternalId,
+                item.Title);
+
+        item.SetLogoPath(
+            _gameMediaResolver.TryGetCachedPath(
+                identity,
+                GameMediaAssetType.Logo));
     }
 
     private void AttachSessionMonitor(

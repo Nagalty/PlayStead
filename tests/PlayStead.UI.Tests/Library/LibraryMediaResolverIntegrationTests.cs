@@ -63,7 +63,7 @@ public sealed class LibraryMediaResolverIntegrationTests
             @"C:\Media\steam\1874880\cover.jpg",
             item.CoverPath);
 
-        Assert.Equal(1, resolver.TryGetCachedPathCalls);
+        Assert.Equal(2, resolver.TryGetCachedPathCalls);
         Assert.Equal(0, resolver.ResolveAndCacheCalls);
 
         Assert.NotNull(resolver.LastIdentity);
@@ -77,8 +77,14 @@ public sealed class LibraryMediaResolverIntegrationTests
             "Arma Reforger",
             resolver.LastIdentity.CanonicalTitle);
         Assert.Equal(
+            2,
+            resolver.CachedAssetTypes.Count);
+        Assert.Contains(
             GameMediaAssetType.Cover,
-            resolver.LastAssetType);
+            resolver.CachedAssetTypes);
+        Assert.Contains(
+            GameMediaAssetType.Logo,
+            resolver.CachedAssetTypes);
     }
 
     [Fact]
@@ -226,6 +232,8 @@ public sealed class LibraryMediaResolverIntegrationTests
         public int TryGetCachedPathCalls { get; private set; }
         public int ResolveAndCacheCalls { get; private set; }
 
+        public List<GameMediaAssetType> CachedAssetTypes { get; } = [];
+
         public GameMediaIdentity? LastIdentity { get; private set; }
         public GameMediaAssetType? LastAssetType { get; private set; }
         public GameMediaIdentity? LastResolvedIdentity { get; private set; }
@@ -239,10 +247,13 @@ public sealed class LibraryMediaResolverIntegrationTests
             GameMediaAssetType assetType)
         {
             TryGetCachedPathCalls++;
+            CachedAssetTypes.Add(assetType);
             LastIdentity = identity;
             LastAssetType = assetType;
 
-            return cachedPath;
+            return assetType == GameMediaAssetType.Cover
+                ? cachedPath
+                : null;
         }
 
         public Task<string?> ResolveAndCacheAsync(

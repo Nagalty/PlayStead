@@ -17,6 +17,7 @@ public sealed record LibraryItemViewModel(
     : INotifyPropertyChanged
 {
     private string? _coverPath;
+    private string? _logoPath;
     private static readonly CultureInfo DisplayCulture =
         CultureInfo.GetCultureInfo("fr-FR");
 
@@ -25,6 +26,12 @@ public sealed record LibraryItemViewModel(
 
     public bool HasCover =>
         !string.IsNullOrWhiteSpace(_coverPath);
+
+    public string? LogoPath =>
+        _logoPath;
+
+    public bool HasLogo =>
+        !string.IsNullOrWhiteSpace(_logoPath);
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -47,6 +54,27 @@ public sealed record LibraryItemViewModel(
         PropertyChanged?.Invoke(
             this,
             new PropertyChangedEventArgs(nameof(HasCover)));
+    }
+
+    public void SetLogoPath(string? path)
+    {
+        if (string.Equals(
+            _logoPath,
+            path,
+            StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _logoPath = path;
+
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(LogoPath)));
+
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(HasLogo)));
     }
 
     public string InstalledSizeLabel =>

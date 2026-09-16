@@ -8,6 +8,104 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+
+        <Style x:Key="PremiumSearchChromeStyle"
+               TargetType="Border">
+            <Setter Property="Height"
+                    Value="40"/>
+            <Setter Property="Background"
+                    Value="{DynamicResource PlayStead.Brush.SurfaceRaised}"/>
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+            <Setter Property="CornerRadius"
+                    Value="8"/>
+            <Style.Triggers>
+                <Trigger Property="IsKeyboardFocusWithin"
+                         Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource PlayStead.Brush.SurfaceHover}"/>
+                    <Setter Property="BorderBrush"
+                            Value="{DynamicResource PlayStead.Brush.Copper}"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver"
+                         Value="True">
+                    <Setter Property="BorderBrush"
+                            Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PremiumToolbarButtonStyle"
+               TargetType="Button">
+            <Setter Property="Height"
+                    Value="40"/>
+            <Setter Property="Padding"
+                    Value="14,0"/>
+            <Setter Property="Background"
+                    Value="{DynamicResource PlayStead.Brush.SurfaceRaised}"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+            <Setter Property="FontWeight"
+                    Value="SemiBold"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="VerticalContentAlignment"
+                    Value="Center"/>
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Background"
+                                        Value="{DynamicResource PlayStead.Brush.SurfaceHover}"/>
+                                <Setter TargetName="Chrome"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource PlayStead.Brush.Copper}"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter TargetName="Chrome"
+                                        Property="Background"
+                                        Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+                                <Setter TargetName="Chrome"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource PlayStead.Brush.CopperPressed}"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter TargetName="Chrome"
+                                        Property="Opacity"
+                                        Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Grid Margin="28">
@@ -40,75 +138,128 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBox x:Name="LibrarySearchBox"
-                         Grid.Column="0"
-                         Height="36"
-                         Padding="10,6"
-                         VerticalContentAlignment="Center"
-                         Background="#202429"
-                         Foreground="#F2F4F7"
-                         BorderBrush="#3A3F46"
-                         BorderThickness="1"
-                         TextChanged="LibrarySearchBox_OnTextChanged"
-                         GotKeyboardFocus="LibrarySearchBox_OnGotKeyboardFocus"
-                         LostKeyboardFocus="LibrarySearchBox_OnLostKeyboardFocus"
-                         ToolTip="Rechercher dans la bibliothèque (Ctrl+K)"/>
+                <Border Grid.Column="0"
+                        Style="{StaticResource PremiumSearchChromeStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="38"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                <TextBlock x:Name="LibrarySearchPlaceholder"
-                           Grid.Column="0"
-                           Margin="11,0,0,0"
-                           VerticalAlignment="Center"
-                           Text="Rechercher un jeu"
-                           Foreground="#7F8791"
-                           IsHitTestVisible="False"/>
+                        <TextBlock Grid.Column="0"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="15"
+                                   Foreground="{DynamicResource PlayStead.Brush.IconAccent}"
+                                   Text="&#xE721;"
+                                   IsHitTestVisible="False"/>
+
+                        <Grid Grid.Column="1">
+                            <TextBox x:Name="LibrarySearchBox"
+                                     Height="38"
+                                     Padding="0,0,10,0"
+                                     VerticalContentAlignment="Center"
+                                     Background="Transparent"
+                                     Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                     BorderThickness="0"
+                                     FontSize="13"
+                                     TextChanged="LibrarySearchBox_OnTextChanged"
+                                     GotKeyboardFocus="LibrarySearchBox_OnGotKeyboardFocus"
+                                     LostKeyboardFocus="LibrarySearchBox_OnLostKeyboardFocus"
+                                     ToolTip="Rechercher dans la bibliothèque (Ctrl+K)"/>
+
+                            <TextBlock x:Name="LibrarySearchPlaceholder"
+                                       Margin="1,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Text="Rechercher un jeu"
+                                       Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                       FontSize="13"
+                                       IsHitTestVisible="False"/>
+                        </Grid>
+                    </Grid>
+                </Border>
 
                 <Button x:Name="ClearSearchButton"
                         Grid.Column="1"
                         Margin="8,0,0,0"
-                        Padding="10,6"
-                        Content="Effacer"
+                        Width="40"
+                        Height="40"
                         Click="ClearSearchButton_OnClick"
                         Visibility="{Binding IsSearchActive, Converter={StaticResource BooleanToVisibilityConverter}}"
-                        Background="#262A2F"
-                        Foreground="#E9EAEC"
-                        BorderBrush="#555B63"
-                        BorderThickness="1"/>
+                        Style="{StaticResource PremiumToolbarButtonStyle}"
+                        ToolTip="Effacer la recherche">
+                    <TextBlock FontFamily="Segoe MDL2 Assets"
+                               FontSize="13"
+                               Foreground="{DynamicResource PlayStead.Brush.IconMuted}"
+                               Text="&#xE711;"
+                               VerticalAlignment="Center"/>
+                </Button>
             </Grid>
 
             <StackPanel Grid.Column="2"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
+
                 <Button x:Name="GridModeButton"
                         Tag="Grid"
-                        Content="Grille"
                         Click="GridModeButton_OnClick"
-                        Padding="12,8"
-                        Background="#262A2F"
-                        Foreground="#E9EAEC"
-                        BorderBrush="#555B63"
-                        BorderThickness="1"/>
+                        Style="{StaticResource PremiumToolbarButtonStyle}"
+                        ToolTip="Afficher la bibliothèque en grille">
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource PlayStead.Brush.IconMuted}"
+                                   Text="&#xE8A9;"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Margin="8,0,0,0"
+                                   Text="Grille"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
 
                 <Button x:Name="ListModeButton"
                         Tag="List"
-                        Content="Liste"
                         Click="ListModeButton_OnClick"
                         Margin="8,0,0,0"
-                        Padding="12,8"
-                        Background="#262A2F"
-                        Foreground="#E9EAEC"
-                        BorderBrush="#555B63"
-                        BorderThickness="1"/>
+                        Style="{StaticResource PremiumToolbarButtonStyle}"
+                        ToolTip="Afficher la bibliothèque en liste">
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource PlayStead.Brush.IconMuted}"
+                                   Text="&#xE8FD;"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Margin="8,0,0,0"
+                                   Text="Liste"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
 
                 <Button x:Name="VerifySteamButton"
-                        Content="Vérifier Steam"
                         IsEnabled="{Binding CanVerifySteam}"
                         Click="VerifySteamButton_OnClick"
-                        Padding="14,8"
                         Margin="16,0,0,0"
-                        Background="#262A2F"
-                        Foreground="#E9EAEC"
-                        BorderBrush="#8D623E"
-                        BorderThickness="1"/>
+                        Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                        BorderBrush="{DynamicResource PlayStead.Brush.Copper}"
+                        Style="{StaticResource PremiumToolbarButtonStyle}"
+                        ToolTip="Vérifier les installations Steam">
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource PlayStead.Brush.Copper}"
+                                   Text="&#xE73E;"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Margin="8,0,0,0"
+                                   Text="Vérifier Steam"
+                                   Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
             </StackPanel>
         </Grid>
 
@@ -123,6 +274,7 @@
 
         <ItemsControl x:Name="GameGridRows"
                       Grid.Row="2"
+                      Margin="0,16,0,0"
                       ItemsSource="{Binding GridRows}"
                       Visibility="{Binding IsGridMode, Converter={StaticResource BooleanToVisibilityConverter}}"
                       VirtualizingPanel.IsVirtualizing="True"
@@ -134,7 +286,9 @@
                                   CanContentScroll="True"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
-                        <ItemsPresenter/>
+                        <Border Padding="0,12,0,0">
+                            <ItemsPresenter/>
+                        </Border>
                     </ScrollViewer>
                 </ControlTemplate>
             </ItemsControl.Template>
@@ -167,6 +321,7 @@
 
         <ItemsControl x:Name="GameList"
                       Grid.Row="2"
+                      Margin="0,16,0,0"
                       ItemsSource="{Binding VisibleItems}"
                       Visibility="{Binding IsListMode, Converter={StaticResource BooleanToVisibilityConverter}}"
                       VirtualizingPanel.IsVirtualizing="True"
@@ -263,104 +418,421 @@
         <ContentControl x:Name="GameQuickPanel"
                         Grid.Row="2"
                         HorizontalAlignment="Right"
-                        VerticalAlignment="Stretch"
-                        Width="340"
-                        Margin="20,0,0,0"
+                        VerticalAlignment="Top"
+                        Width="360"
+                        Margin="20,16,0,0"
                         Panel.ZIndex="10"
                         Content="{Binding SelectedItem}"
                         Visibility="{Binding HasSelectedItem, Converter={StaticResource BooleanToVisibilityConverter}}">
             <ContentControl.ContentTemplate>
                 <DataTemplate>
-                    <Border Padding="20"
-                            Background="#202429"
-                            BorderBrush="#3A3F46"
+                    <Border Padding="18"
+                            Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
+                            BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
                             BorderThickness="1"
-                            CornerRadius="10">
+                            CornerRadius="12">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="18"
+                                              ShadowDepth="0"
+                                              Opacity="0.18"
+                                              Color="Black"/>
+                        </Border.Effect>
+
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
+                            <!-- Identité / logo -->
                             <Grid Grid.Row="0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding Title}"
-                                           Foreground="#F2F4F7"
-                                           FontSize="20"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis"/>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
                                 <Button x:Name="CloseQuickPanelButton"
-                                        Grid.Column="1"
-                                        Content="✕"
+                                        Grid.Row="0"
+                                        Width="32"
+                                        Height="32"
+                                        HorizontalAlignment="Right"
                                         Click="CloseQuickPanelButton_OnClick"
-                                        Margin="12,0,0,0"
-                                        Padding="8,4"
-                                        Background="Transparent"
-                                        Foreground="#A9AFB7"
-                                        BorderBrush="#3A3F46"
+                                        Background="{DynamicResource PlayStead.Brush.Surface}"
+                                        Foreground="{DynamicResource PlayStead.Brush.IconMuted}"
+                                        BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
                                         BorderThickness="1"
                                         ToolTip="Fermer le panneau rapide"
-                                        AutomationProperties.Name="Fermer le panneau rapide"/>
+                                        AutomationProperties.Name="Fermer le panneau rapide">
+                                    <TextBlock FontFamily="Segoe MDL2 Assets"
+                                               FontSize="11"
+                                               Text="&#xE711;"
+                                               VerticalAlignment="Center"/>
+                                </Button>
+
+                                <Grid Grid.Row="1"
+                                      Height="122"
+                                      Margin="0,4,0,0">
+                                    <Image Source="{Binding LogoPath}"
+                                           Stretch="Uniform"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           MaxWidth="315"
+                                           MaxHeight="108">
+                                        <Image.Style>
+                                            <Style TargetType="Image">
+                                                <Setter Property="Visibility"
+                                                        Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasLogo}"
+                                                                 Value="False">
+                                                        <Setter Property="Visibility"
+                                                                Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Image.Style>
+                                    </Image>
+
+                                    <TextBlock Text="{Binding Title}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               MaxWidth="315"
+                                               Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                               FontSize="20"
+                                               FontWeight="SemiBold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility"
+                                                        Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasLogo}"
+                                                                 Value="False">
+                                                        <Setter Property="Visibility"
+                                                                Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+
+                                <!-- Barre visuelle type Shelf -->
+                                <Grid Grid.Row="2"
+                                      Height="5"
+                                      Margin="0,8,0,0">
+                                    <Border Height="1"
+                                            VerticalAlignment="Center"
+                                            Background="{DynamicResource PlayStead.Brush.BorderStrong}"/>
+                                    <Border Width="72"
+                                            Height="3"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Background="{DynamicResource PlayStead.Brush.Copper}"
+                                            CornerRadius="2"/>
+                                </Grid>
+
+                                <Grid Grid.Row="3"
+                                      Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0"
+                                                Orientation="Horizontal">
+                                        <TextBlock Text="{Binding ProviderLabel}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                                   FontSize="12"/>
+                                        <TextBlock Margin="7,0"
+                                                   Text="·"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                                   FontSize="12"/>
+                                        <TextBlock Text="{Binding InstalledSizeLabel, Mode=OneWay}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                                   FontSize="12"/>
+                                    </StackPanel>
+
+                                    <Border Grid.Column="1"
+                                            Margin="10,0,0,0"
+                                            Padding="8,3"
+                                            Background="{DynamicResource PlayStead.Brush.Surface}"
+                                            BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Visibility="{Binding HasSteamStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="{Binding SteamStatusLabel}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.Copper}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"/>
+                                    </Border>
+                                </Grid>
                             </Grid>
 
-                            <TextBlock Grid.Row="1"
-                                       Margin="0,14,0,0"
-                                       Foreground="#A9AFB7"
-                                       FontSize="13">
-                                <Run Text="{Binding ProviderLabel}"/>
-                                <Run Text="  ·  "/>
-                                <Run Text="{Binding InstalledSizeLabel, Mode=OneWay}"/>
-                            </TextBlock>
+                            <!-- Jeu -->
+                            <Border Grid.Row="1"
+                                    Margin="0,16,0,0"
+                                    Padding="12"
+                                    Background="{DynamicResource PlayStead.Brush.Surface}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="2"
-                                       Margin="0,10,0,0"
-                                       Text="{Binding InstallPath}"
-                                       Foreground="#7F8791"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"/>
+                                    <StackPanel Grid.Row="0"
+                                                Orientation="Horizontal">
+                                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="13"
+                                                   Foreground="{DynamicResource PlayStead.Brush.IconAccent}"
+                                                   Text="&#xE7FC;"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Margin="8,0,0,0"
+                                                   Text="Jeu"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"/>
+                                    </StackPanel>
 
-                            <StackPanel Grid.Row="3"
-                                        Margin="0,16,0,0"
-                                        Orientation="Horizontal">
-                                <controls:StatusBadge Text="{Binding SessionStatusLabel}"
-                                                      Visibility="{Binding IsSessionActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                    <Grid Grid.Row="1"
+                                          Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
 
-                                <Border Margin="8,0,0,0"
-                                        Padding="8,3"
-                                        Background="#25292E"
-                                        BorderBrush="#3A3F46"
-                                        BorderThickness="1"
-                                        CornerRadius="5"
-                                        Visibility="{Binding HasSteamStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <TextBlock Text="{Binding SteamStatusLabel}"
-                                               Foreground="#D7B08C"
-                                               FontSize="12"
-                                               FontWeight="SemiBold"/>
-                                </Border>
-                            </StackPanel>
+                                        <TextBlock Text="Bibliothèque"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                                   FontSize="12"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding ProviderLabel}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextSoft}"
+                                                   FontSize="12"/>
+                                    </Grid>
 
-                            <StackPanel Grid.Row="4">
-                                <controls:PlaySplitButton Margin="0,20,0,0"
-                                    DataContext="{Binding QuickPanelViewModel.Launch, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}"/>
+                                    <Grid Grid.Row="2"
+                                          Margin="0,7,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Text="Session"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                                   FontSize="12"/>
+
+                                        <TextBlock Grid.Column="1"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text"
+                                                            Value="Aucune session active"/>
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource PlayStead.Brush.TextSecondary}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSessionActive}"
+                                                                     Value="True">
+                                                            <Setter Property="Text"
+                                                                    Value="En cours"/>
+                                                            <Setter Property="Foreground"
+                                                                    Value="{DynamicResource PlayStead.Brush.Success}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <!-- Activité PlayStead -->
+                            <Border Grid.Row="2"
+                                    Margin="0,10,0,0"
+                                    Padding="12"
+                                    Background="{DynamicResource PlayStead.Brush.Surface}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0"
+                                                Orientation="Horizontal">
+                                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="13"
+                                                   Foreground="{DynamicResource PlayStead.Brush.IconAccent}"
+                                                   Text="&#xE823;"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Margin="8,0,0,0"
+                                                   Text="Activité PlayStead"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"/>
+                                    </StackPanel>
+
+                                    <Grid Grid.Row="1"
+                                          Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Dernière activité"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                                   FontSize="12"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding QuickPanelViewModel.LastActivityLabel, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextSoft}"
+                                                   FontSize="12"/>
+                                    </Grid>
+
+                                    <Grid Grid.Row="2"
+                                          Margin="0,7,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Dernière session"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                                   FontSize="12"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding QuickPanelViewModel.LastSessionDurationLabel, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextSoft}"
+                                                   FontSize="12"/>
+                                    </Grid>
+
+                                    <Grid Grid.Row="3"
+                                          Margin="0,7,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Temps total"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                                   FontSize="12"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding QuickPanelViewModel.TotalPlayTimeLabel, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.Copper}"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"/>
+                                    </Grid>
+
+                                    <Grid Grid.Row="4"
+                                          Margin="0,7,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Historique"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                                   FontSize="12"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding QuickPanelViewModel.SessionCountLabel, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextSoft}"
+                                                   FontSize="12"/>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <!-- Installation -->
+                            <Border Grid.Row="3"
+                                    Margin="0,10,0,0"
+                                    Padding="12"
+                                    Background="{DynamicResource PlayStead.Brush.Surface}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0"
+                                                Orientation="Horizontal">
+                                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="13"
+                                                   Foreground="{DynamicResource PlayStead.Brush.IconAccent}"
+                                                   Text="&#xEDA2;"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Margin="8,0,0,0"
+                                                   Text="Installation"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"/>
+                                    </StackPanel>
+
+                                    <Grid Grid.Row="1"
+                                          Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Text="Taille"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                                   FontSize="12"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding InstalledSizeLabel, Mode=OneWay}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextSoft}"
+                                                   FontSize="12"/>
+                                    </Grid>
+
+                                    <StackPanel Grid.Row="2"
+                                                Margin="0,8,0,0">
+                                        <TextBlock Text="Emplacement"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                                   FontSize="12"/>
+                                        <TextBlock Margin="0,4,0,0"
+                                                   Text="{Binding InstallPath}"
+                                                   Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap"
+                                                   MaxHeight="34"
+                                                   ToolTip="{Binding InstallPath}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Actions -->
+                            <controls:PlaySplitButton Grid.Row="4"
+                                                      Height="42"
+                                                      MaxHeight="42"
+                                                      Margin="0,16,0,0"
+                                                      HorizontalAlignment="Stretch"
+                                                      VerticalAlignment="Top"
+                                                      DataContext="{Binding QuickPanelViewModel.Launch, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}"/>
+
                             <Button x:Name="OpenGameDetailButton"
+                                    Grid.Row="5"
+                                    Height="42"
                                     Content="Voir la fiche"
                                     Click="OpenGameDetailButton_OnClick"
-                                    Margin="0,20,0,0"
-                                    Padding="14,10"
+                                    Margin="0,10,0,0"
                                     HorizontalAlignment="Stretch"
-                                    Background="#8D623E"
-                                    Foreground="#F7F7F8"
-                                    BorderThickness="0"/>
-                            </StackPanel>
+                                    Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                                    Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.Copper}"
+                                    BorderThickness="1"
+                                    FontWeight="SemiBold"/>
                         </Grid>
                     </Border>
                 </DataTemplate>
@@ -369,6 +841,7 @@
 
         <StackPanel x:Name="EmptyStatePanel"
                     Grid.Row="2"
+                    Margin="0,16,0,0"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
             <StackPanel.Style>

@@ -9,6 +9,160 @@
                 <ResourceDictionary Source="Themes/PlaySteadTokens.xaml"/>
                 <ResourceDictionary Source="Themes/PlaySteadControls.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="PlayStead.VerticalScrollThumbStyle"
+                   TargetType="{x:Type Thumb}">
+                <Setter Property="Height"
+                        Value="56"/>
+                <Setter Property="MinHeight"
+                        Value="56"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Thumb}">
+                            <Border x:Name="ThumbChrome"
+                                    Width="6"
+                                    Margin="1,2"
+                                    HorizontalAlignment="Center"
+                                    Background="{DynamicResource PlayStead.Brush.ScrollThumb}"
+                                    CornerRadius="3"/>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver"
+                                         Value="True">
+                                    <Setter TargetName="ThumbChrome"
+                                            Property="Background"
+                                            Value="{DynamicResource PlayStead.Brush.ScrollThumbHover}"/>
+                                </Trigger>
+                                <Trigger Property="IsDragging"
+                                         Value="True">
+                                    <Setter TargetName="ThumbChrome"
+                                            Property="Background"
+                                            Value="{DynamicResource PlayStead.Brush.CopperPressed}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="PlayStead.HorizontalScrollThumbStyle"
+                   TargetType="{x:Type Thumb}">
+                <Setter Property="Width"
+                        Value="56"/>
+                <Setter Property="MinWidth"
+                        Value="56"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Thumb}">
+                            <Border x:Name="ThumbChrome"
+                                    Height="6"
+                                    Margin="2,1"
+                                    VerticalAlignment="Center"
+                                    Background="{DynamicResource PlayStead.Brush.ScrollThumb}"
+                                    CornerRadius="3"/>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver"
+                                         Value="True">
+                                    <Setter TargetName="ThumbChrome"
+                                            Property="Background"
+                                            Value="{DynamicResource PlayStead.Brush.ScrollThumbHover}"/>
+                                </Trigger>
+                                <Trigger Property="IsDragging"
+                                         Value="True">
+                                    <Setter TargetName="ThumbChrome"
+                                            Property="Background"
+                                            Value="{DynamicResource PlayStead.Brush.CopperPressed}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <ControlTemplate x:Key="PlayStead.VerticalScrollBarTemplate"
+                             TargetType="{x:Type ScrollBar}">
+                <Grid Width="8"
+                      Background="{DynamicResource PlayStead.Brush.ScrollTrack}">
+                    <Track x:Name="PART_Track"
+                           Orientation="Vertical"
+                           IsDirectionReversed="True"
+                           Minimum="{TemplateBinding Minimum}"
+                           Maximum="{TemplateBinding Maximum}"
+                           Value="{TemplateBinding Value}"
+                           ViewportSize="NaN">
+                        <Track.DecreaseRepeatButton>
+                            <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                          Focusable="False"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Opacity="0"/>
+                        </Track.DecreaseRepeatButton>
+                        <Track.Thumb>
+                            <Thumb Style="{StaticResource PlayStead.VerticalScrollThumbStyle}"/>
+                        </Track.Thumb>
+                        <Track.IncreaseRepeatButton>
+                            <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                          Focusable="False"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Opacity="0"/>
+                        </Track.IncreaseRepeatButton>
+                    </Track>
+                </Grid>
+            </ControlTemplate>
+
+            <ControlTemplate x:Key="PlayStead.HorizontalScrollBarTemplate"
+                             TargetType="{x:Type ScrollBar}">
+                <Grid Height="8"
+                      Background="{DynamicResource PlayStead.Brush.ScrollTrack}">
+                    <Track x:Name="PART_Track"
+                           Orientation="Horizontal"
+                           IsDirectionReversed="False"
+                           Minimum="{TemplateBinding Minimum}"
+                           Maximum="{TemplateBinding Maximum}"
+                           Value="{TemplateBinding Value}"
+                           ViewportSize="NaN">
+                        <Track.DecreaseRepeatButton>
+                            <RepeatButton Command="{x:Static ScrollBar.PageLeftCommand}"
+                                          Focusable="False"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Opacity="0"/>
+                        </Track.DecreaseRepeatButton>
+                        <Track.Thumb>
+                            <Thumb Style="{StaticResource PlayStead.HorizontalScrollThumbStyle}"/>
+                        </Track.Thumb>
+                        <Track.IncreaseRepeatButton>
+                            <RepeatButton Command="{x:Static ScrollBar.PageRightCommand}"
+                                          Focusable="False"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Opacity="0"/>
+                        </Track.IncreaseRepeatButton>
+                    </Track>
+                </Grid>
+            </ControlTemplate>
+
+            <Style TargetType="{x:Type ScrollBar}">
+                <Setter Property="Background"
+                        Value="{DynamicResource PlayStead.Brush.ScrollTrack}"/>
+                <Style.Triggers>
+                    <Trigger Property="Orientation"
+                             Value="Vertical">
+                        <Setter Property="Width"
+                                Value="8"/>
+                        <Setter Property="Template"
+                                Value="{StaticResource PlayStead.VerticalScrollBarTemplate}"/>
+                    </Trigger>
+                    <Trigger Property="Orientation"
+                             Value="Horizontal">
+                        <Setter Property="Height"
+                                Value="8"/>
+                        <Setter Property="Template"
+                                Value="{StaticResource PlayStead.HorizontalScrollBarTemplate}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>

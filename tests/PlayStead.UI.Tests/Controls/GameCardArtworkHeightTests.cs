@@ -6,7 +6,7 @@ namespace PlayStead.UI.Tests.Controls;
 public sealed class GameCardArtworkHeightTests
 {
     [Fact]
-    public void GameCard_reserves_exactly_144_pixels_for_artwork()
+    public void GameCard_reserves_exactly_300_pixels_for_artwork()
     {
         var document =
             XDocument.Load(
@@ -44,7 +44,7 @@ public sealed class GameCardArtworkHeightTests
             $"Expected a numeric artwork row height, got '{height}'.");
 
         Assert.Equal(
-            144d,
+            300d,
             pixels);
     }
 

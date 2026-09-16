@@ -39,11 +39,11 @@ public sealed class GameArtworkFallbackContractTests
         Assert.Contains(
             document.Descendants(),
             element =>
-                element.Name.LocalName == "SolidColorBrush" &&
+                element.Name.LocalName == "Border" &&
                 element.Attributes().Any(
                     attribute =>
-                        attribute.Name.LocalName == "Key" &&
-                        attribute.Value == "CopperAccentBrush"));
+                        attribute.Name.LocalName == "Background" &&
+                        attribute.Value.Contains("PlayStead.Brush.SurfaceSubtle", StringComparison.Ordinal)));
 
         Assert.Contains(
             document.Descendants(),
@@ -53,7 +53,7 @@ public sealed class GameArtworkFallbackContractTests
                     attribute =>
                         attribute.Name.LocalName == "Background" &&
                         attribute.Value.Contains(
-                            "CopperAccentBrush",
+                            "PlayStead.Brush.Copper",
                             StringComparison.Ordinal)));
     }
 

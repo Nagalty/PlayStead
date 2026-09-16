@@ -3,33 +3,27 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:PlayStead.UI.Controls"
              Background="Transparent">
-    <UserControl.Resources>
-        <SolidColorBrush x:Key="CopperAccentBrush"
-                         Color="#8D623E" />
-        <SolidColorBrush x:Key="CopperAccentSoftBrush"
-                         Color="#5A402C" />
-    </UserControl.Resources>
 
     <Grid ClipToBounds="True">
-        <Border Background="#23272C">
+        <Border Background="{DynamicResource PlayStead.Brush.SurfaceSubtle}">
             <Grid>
                 <Border Margin="12"
-                        Background="#1D2024"
-                        BorderBrush="#30343A"
+                        Background="{DynamicResource PlayStead.Brush.Surface}"
+                        BorderBrush="{DynamicResource PlayStead.Brush.Border}"
                         BorderThickness="1"
                         CornerRadius="6" />
 
                 <Border Width="3"
                         Margin="18,18,0,18"
                         HorizontalAlignment="Left"
-                        Background="{StaticResource CopperAccentBrush}"
+                        Background="{DynamicResource PlayStead.Brush.Copper}"
                         CornerRadius="2" />
 
                 <StackPanel Margin="34,0,24,18"
                             VerticalAlignment="Bottom">
                     <TextBlock Text="{Binding Title,
                                               RelativeSource={RelativeSource AncestorType={x:Type controls:GameArtwork}}}"
-                               Foreground="#F2F4F7"
+                               Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
                                FontSize="17"
                                FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis"
@@ -38,7 +32,7 @@
                     <TextBlock Margin="0,5,0,0"
                                Text="{Binding ProviderLabel,
                                               RelativeSource={RelativeSource AncestorType={x:Type controls:GameArtwork}}}"
-                               Foreground="{StaticResource CopperAccentBrush}"
+                               Foreground="{DynamicResource PlayStead.Brush.Copper}"
                                FontSize="11"
                                FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis" />
@@ -47,7 +41,7 @@
                 <Border Height="1"
                         Margin="34,0,24,42"
                         VerticalAlignment="Bottom"
-                        Background="{StaticResource CopperAccentSoftBrush}" />
+                        Background="{DynamicResource PlayStead.Brush.BorderStrong}" />
             </Grid>
 
             <Border.Style>
@@ -69,6 +63,9 @@
         <Image Source="{Binding SourcePath,
                                 RelativeSource={RelativeSource AncestorType={x:Type controls:GameArtwork}}}"
                Stretch="Uniform"
+               StretchDirection="Both"
+               HorizontalAlignment="Stretch"
+               VerticalAlignment="Stretch"
                SnapsToDevicePixels="True">
             <Image.Style>
                 <Style TargetType="Image">
