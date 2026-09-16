@@ -21,6 +21,8 @@ public sealed class LocalStartupPipeline
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly DiscoveryInventoryManager? _discoveryInventory;
     private readonly CatalogDatabaseInitializer? _catalogDatabaseInitializer;
+    private readonly ILocalIdentityResolutionCoordinator?
+        _identityResolutionCoordinator;
     private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
     private readonly object _refreshRequestGate = new();
     private long _latestRefreshRequest;
@@ -40,6 +42,23 @@ public sealed class LocalStartupPipeline
         _databaseHealthChecker = databaseHealthChecker;
         _libraryStore = libraryStore;
         _scanCoordinator = scanCoordinator;
+    }
+
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
+        ILocalIdentityResolutionCoordinator identityResolutionCoordinator)
+        : this(
+            databaseInitializer,
+            databaseHealthChecker,
+            libraryStore,
+            scanCoordinator)
+    {
+        _identityResolutionCoordinator = identityResolutionCoordinator
+            ?? throw new ArgumentNullException(
+                nameof(identityResolutionCoordinator));
     }
 
     public LocalStartupPipeline(
@@ -87,6 +106,29 @@ public sealed class LocalStartupPipeline
     {
         _catalogDatabaseInitializer = catalogDatabaseInitializer
             ?? throw new ArgumentNullException(nameof(catalogDatabaseInitializer));
+    }
+
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        DiscoveryInventoryManager discoveryInventory,
+        CatalogDatabaseInitializer catalogDatabaseInitializer,
+        ILocalIdentityResolutionCoordinator identityResolutionCoordinator)
+        : this(
+            databaseInitializer,
+            databaseHealthChecker,
+            libraryStore,
+            scanCoordinator,
+            steamReferenceRuntime,
+            discoveryInventory,
+            catalogDatabaseInitializer)
+    {
+        _identityResolutionCoordinator = identityResolutionCoordinator
+            ?? throw new ArgumentNullException(
+                nameof(identityResolutionCoordinator));
     }
 
     public async Task<LocalStartupState> InitializeAsync(
@@ -145,6 +187,26 @@ public sealed class LocalStartupPipeline
                 await _libraryStore.ApplySourceScanAsync(
                     result,
                     cancellationToken);
+
+                if (_identityResolutionCoordinator is not null)
+                {
+                    try
+                    {
+                        await _identityResolutionCoordinator
+                            .ResolveAfterScanAsync(
+                                result,
+                                cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                        when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch
+                    {
+                        // Identity resolution is a best-effort sidecar.
+                    }
+                }
             }
 
             if (_steamReferenceRuntime is not null)

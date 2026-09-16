@@ -5,6 +5,7 @@ using PlayStead.UI.Launching;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PlayStead.Core.Media;
+using PlayStead.Core.Identity;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.Sessions;
@@ -13,6 +14,7 @@ using PlayStead.Core.Steam;
 using PlayStead.Data.Database;
 using PlayStead.Data.Catalog;
 using PlayStead.Data.Library;
+using PlayStead.Data.Identity;
 using PlayStead.Data.Media;
 using PlayStead.Data.Sessions;
 using PlayStead.Data.Steam;
@@ -71,6 +73,26 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             ILibraryStore,
             SqliteLibraryStore>();
+
+        builder.Services.AddSingleton<
+            IGameIdentityResolver,
+            GameIdentityResolver>();
+
+        builder.Services.AddSingleton<
+            IIdentityResolutionStore,
+            SqliteIdentityResolutionStore>();
+
+        builder.Services.AddSingleton<
+            ILocalIdentityReconciler,
+            SqliteLocalIdentityReconciler>();
+
+        builder.Services.AddSingleton<
+            ILibraryGameLookup,
+            SqliteLibraryGameLookup>();
+
+        builder.Services.AddSingleton<
+            ILocalIdentityResolutionCoordinator,
+            LocalIdentityResolutionCoordinator>();
 
         builder.Services.AddSingleton<
             ISteamEvidenceStore,
