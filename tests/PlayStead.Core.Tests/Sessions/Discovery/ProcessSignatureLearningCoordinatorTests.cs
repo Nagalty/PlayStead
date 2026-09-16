@@ -543,18 +543,44 @@ public sealed class ProcessSignatureLearningCoordinatorTests
     }
 
     [Fact]
-    public async Task Unknown_name_and_path_during_episode_breaks_qualification()
+    public async Task Unrelated_unknown_name_and_path_during_episode_does_not_break_qualification()
     {
         var d = await Driver.CreateAsync();
+        var unrelated =
+            new ProcessSnapshot(
+                300,
+                "Unknown.exe",
+                null,
+                null);
+
         await d.CaptureAsync(1, []);
         await d.CaptureAsync(2, []);
         await d.CaptureAsync(3, [d.Process(100)]);
-        var result = await d.CaptureAsync(4, [d.Process(100),
-            new ProcessSnapshot(300, "Unknown.exe", null, null)]);
-        Assert.Equal([DiscoveryReason.UnknownProcessIdentity], result!.Reasons);
-        await d.CaptureAsync(5, []);
-        await d.CaptureAsync(6, []);
-        Assert.Null(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+
+        var result =
+            await d.CaptureAsync(
+                4,
+                [d.Process(100), unrelated]);
+
+        Assert.DoesNotContain(
+            DiscoveryReason.UnknownProcessIdentity,
+            result?.Reasons
+            ?? Array.Empty<DiscoveryReason>());
+
+        await d.CaptureAsync(5, [unrelated]);
+
+        var completion =
+            await d.CaptureAsync(
+                6,
+                [unrelated]);
+
+        Assert.NotNull(
+            d.Coordinator.GetState(
+                d.Scope.InstallationId)!.Reference);
+
+        Assert.Equal(
+            [DiscoveryReason.AwaitingIndependentEpisode],
+            completion!.Reasons);
     }
 
     [Fact]

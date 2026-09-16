@@ -150,6 +150,24 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
             }
         }
         catch (Exception error) when (processingId is not null && processingContext is not null &&
+            ProcessSignatureLearningCoordinator.IsLearningAuthorityConflict(error))
+        {
+            var id = processingId.Value;
+            preparation.Remove(id);
+            // The conditional Data write refused this episode. Fresh inventory
+            // and durable state are prepared off the capture tick; explicit
+            // signatures still consume the already captured process snapshot.
+            Interlocked.Exchange(ref _captureGap, 1);
+            if (IsCurrentContext(processingContext))
+                _inventory.RequestEpisodePreparation(id, cancellationToken);
+            _logger.LogInformation(error,
+                "Discovery learning authority advanced for installation {InstallationId} generation {GenerationId}",
+                id, processingGeneration);
+            foreach (var (preparedId, context) in preparation)
+                if (IsCurrentContext(context))
+                    _inventory.RequestEpisodePreparation(preparedId, cancellationToken);
+        }
+        catch (Exception error) when (processingId is not null && processingContext is not null &&
             error is (IOException or UnauthorizedAccessException or DbException))
         {
             var id = processingId.Value;

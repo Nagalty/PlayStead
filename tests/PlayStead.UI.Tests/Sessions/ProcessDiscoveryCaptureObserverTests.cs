@@ -127,17 +127,39 @@ public sealed class ProcessDiscoveryCaptureObserverTests
     }
 
     [Fact]
-    public async Task New_unknown_identity_during_episode_blocks_promotion()
+    public async Task New_unrelated_unknown_identity_during_episode_does_not_block_promotion()
     {
         var d = new Driver();
         await d.InitializeAsync();
         await d.CompleteEpisodeAsync(100, 1);
+
         await d.TickAsync([d.Process(200, 20)], 20);
-        await d.TickAsync([d.Process(200, 20), new(900, "Other.exe", null, null)], 21);
+        await d.TickAsync(
+            [
+                d.Process(200, 20),
+                new ProcessSnapshot(
+                    900,
+                    "Other.exe",
+                    null,
+                    null)
+            ],
+            21);
+
         await d.TickAsync([], 22);
         await d.TickAsync([], 23);
-        Assert.Null(d.Store.Signature);
-        Assert.Null(d.Store.State(d.First.Id)!.Reference);
+
+        Assert.NotNull(d.Store.Signature);
+        Assert.Equal(
+            ProcessSignatureOrigin.Discovered,
+            d.Store.Signature!.Origin);
+        Assert.Equal(
+            "Game.exe",
+            Assert.Single(
+                d.Store.Signature.Entries)
+                .ExecutableName);
+        Assert.Equal(
+            1,
+            d.Store.AcceptedWrites);
     }
 
     [Fact]

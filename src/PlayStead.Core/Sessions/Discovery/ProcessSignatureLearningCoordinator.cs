@@ -5,6 +5,11 @@ namespace PlayStead.Core.Sessions.Discovery;
 
 public sealed class ProcessSignatureLearningCoordinator
 {
+    private const string AuthorityConflictMarker = "PlayStead.Discovery.LearningAuthorityConflict";
+
+    public static bool IsLearningAuthorityConflict(Exception error) =>
+        error is InvalidOperationException && error.Data[AuthorityConflictMarker] is true;
+
     private readonly IProcessSignatureLearningStore _learningStore;
     private readonly IProcessSignatureStore _signatureStore;
     private readonly IExecutableRevisionSource _revisionSource;
@@ -111,6 +116,22 @@ public sealed class ProcessSignatureLearningCoordinator
                 throw new ArgumentException("An installation cannot change game identity.", nameof(context));
             if (installation.State.ConcurrencyToken != expectedLearningToken)
                 return false;
+            // Episode preparation runs outside the capture tick. A conditional
+            // acceptance or explicit Upsert can consume proof and advance the
+            // durable token while this coordinator still holds the older state.
+            var durable = await _learningStore.LoadAsync(id, cancellationToken);
+            if (durable is null) return false;
+            if (durable.ConcurrencyToken != installation.State.ConcurrencyToken)
+            {
+                // Only an externally advanced token can signal a stale
+                // publication. A deliberate next generation with the same
+                // durable token is the normal B2 preparation contract.
+                if (durable.Inventory.Scope.GenerationId !=
+                    context.Inventory.Scope.GenerationId) return false;
+                installation.State = durable;
+                installation.PendingInvalidation = null;
+                installation.ResetCapture();
+            }
             var inventory = AuthoritativeInventory(context.Inventory, installation.State.Inventory);
             var changed = !SameInventory(installation.State.Inventory, inventory) ||
                 installation.State.HasAmbiguousInstallation != context.HasAmbiguousInstallation ||
@@ -192,13 +213,6 @@ public sealed class ProcessSignatureLearningCoordinator
                          installation.Current?.Identities.Values.Any(identity =>
                              identity.ProcessId == process.ProcessId) == true))
                         return await InvalidateAsync(installation, DiscoveryReason.UnreliablePath, cancellationToken);
-                    if ((installation.Current is not null || startsEpisode) &&
-                        (string.IsNullOrWhiteSpace(process.ExecutablePath) || process.ProcessId <= 0 ||
-                         process.StartedAtUtc is null) &&
-                        (process.ProcessId <= 0 ||
-                         !installation.BaselineUnknown.Contains(UnknownIdentity(process))))
-                        return await InvalidateAsync(installation, DiscoveryReason.UnknownProcessIdentity,
-                            cancellationToken);
                     continue;
                 }
                 if (process.ProcessId <= 0 || process.StartedAtUtc is null)
@@ -413,8 +427,15 @@ public sealed class ProcessSignatureLearningCoordinator
         }
         if (!saved)
         {
+            var durable = await _learningStore.LoadAsync(
+                installation.State.Inventory.Scope.InstallationId, cancellationToken);
+            var authorityChanged = durable is not null &&
+                durable.ConcurrencyToken != installation.State.ConcurrencyToken;
             DropInstallation(installation);
-            throw new InvalidOperationException("Learning state changed during observation.");
+            var error = new InvalidOperationException(
+                "Learning state changed during observation.");
+            if (authorityChanged) error.Data[AuthorityConflictMarker] = true;
+            throw error;
         }
         lock (_installations)
         {

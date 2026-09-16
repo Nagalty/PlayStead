@@ -26,20 +26,80 @@ public sealed class ProcessSignatureLearningCoordinatorQualityTests
     }
 
     [Fact]
-    public async Task Preexisting_null_path_pid_with_changed_start_invalidates_candidate_episode()
+    public async Task New_unrelated_unknown_identity_appearing_during_episode_does_not_invalidate()
+    {
+        var d = new Driver();
+        await d.PrepareAsync();
+
+        var game = d.Game(100);
+        var unrelated = new ProcessSnapshot(
+            900,
+            "Other.exe",
+            null,
+            null);
+
+        await d.ObserveAsync(1, []);
+        await d.ObserveAsync(2, []);
+        await d.ObserveAsync(3, [game]);
+
+        var noiseDecision =
+            await d.ObserveAsync(
+                4,
+                [game, unrelated]);
+
+        Assert.DoesNotContain(
+            DiscoveryReason.UnknownProcessIdentity,
+            noiseDecision?.Reasons
+            ?? Array.Empty<DiscoveryReason>());
+
+        await d.ObserveAsync(5, [unrelated]);
+
+        var completion =
+            await d.ObserveAsync(
+                6,
+                [unrelated]);
+
+        Assert.NotNull(d.Store.State!.Reference);
+        Assert.Null(d.Store.State.Confirmation);
+        Assert.Equal(
+            [DiscoveryReason.AwaitingIndependentEpisode],
+            completion!.Reasons);
+    }
+
+    [Fact]
+    public async Task Preexisting_unrelated_null_path_pid_with_changed_start_does_not_invalidate()
     {
         var d = new Driver();
         await d.PrepareAsync();
         var original = new ProcessSnapshot(900, "Other.exe", null, Epoch.AddSeconds(1));
         var reusedPid = new ProcessSnapshot(900, "Other.exe", null, Epoch.AddSeconds(4));
         var game = d.Game(100);
+
         await d.ObserveAsync(1, [original]);
         await d.ObserveAsync(2, [original]);
         await d.ObserveAsync(3, [original, game]);
-        var decision = await d.ObserveAsync(4, [reusedPid, game]);
-        Assert.NotNull(decision);
-        Assert.Equal([DiscoveryReason.UnknownProcessIdentity], decision.Reasons);
-        Assert.Null(d.Store.State!.Reference);
+
+        var decision =
+            await d.ObserveAsync(
+                4,
+                [reusedPid, game]);
+
+        Assert.DoesNotContain(
+            DiscoveryReason.UnknownProcessIdentity,
+            decision?.Reasons
+            ?? Array.Empty<DiscoveryReason>());
+
+        await d.ObserveAsync(5, [reusedPid]);
+
+        var completion =
+            await d.ObserveAsync(
+                6,
+                [reusedPid]);
+
+        Assert.NotNull(d.Store.State!.Reference);
+        Assert.Equal(
+            [DiscoveryReason.AwaitingIndependentEpisode],
+            completion!.Reasons);
     }
 
     [Fact]
@@ -60,20 +120,37 @@ public sealed class ProcessSignatureLearningCoordinatorQualityTests
     }
 
     [Fact]
-    public async Task Preexisting_unknown_identity_that_disappears_cannot_reappear_during_episode()
+    public async Task Preexisting_unrelated_unknown_identity_may_disappear_and_reappear()
     {
         var d = new Driver();
         await d.PrepareAsync();
         var unrelated = new ProcessSnapshot(900, "Other.exe", null, null);
         var game = d.Game(100);
+
         await d.ObserveAsync(1, [unrelated]);
         await d.ObserveAsync(2, [unrelated]);
         await d.ObserveAsync(3, [unrelated, game]);
         await d.ObserveAsync(4, [game]);
-        var decision = await d.ObserveAsync(5, [unrelated]);
-        Assert.NotNull(decision);
-        Assert.Equal([DiscoveryReason.UnknownProcessIdentity], decision.Reasons);
-        Assert.Null(d.Store.State!.Reference);
+
+        var decision =
+            await d.ObserveAsync(
+                5,
+                [unrelated]);
+
+        Assert.DoesNotContain(
+            DiscoveryReason.UnknownProcessIdentity,
+            decision?.Reasons
+            ?? Array.Empty<DiscoveryReason>());
+
+        var completion =
+            await d.ObserveAsync(
+                6,
+                [unrelated]);
+
+        Assert.NotNull(d.Store.State!.Reference);
+        Assert.Equal(
+            [DiscoveryReason.AwaitingIndependentEpisode],
+            completion!.Reasons);
     }
 
     private sealed class Driver

@@ -384,12 +384,15 @@ public sealed class DiscoveryInventoryManager
             ProcessSignatureLearningState state;
             if (prepareEpisode)
             {
-                var token = _coordinator.GetState(id)?.ConcurrencyToken ??
-                    persisted?.ConcurrencyToken;
-                if (token is null) return null;
-                if (!await _coordinator.PrepareEpisodeAsync(incoming, token.Value,
-                    cancellationToken)) return null;
-                state = _coordinator.GetState(id)!;
+                var current = _coordinator.GetState(id);
+                if (current is null)
+                    state = await _coordinator.InitializeAsync(incoming, cancellationToken);
+                else
+                {
+                    if (!await _coordinator.PrepareEpisodeAsync(incoming,
+                        current.ConcurrencyToken, cancellationToken)) return null;
+                    state = _coordinator.GetState(id)!;
+                }
             }
             else state = await _coordinator.InitializeAsync(incoming, cancellationToken);
             lock (_gate)
