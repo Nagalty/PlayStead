@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PlayStead.Core.Media;
 using PlayStead.Core.Identity;
+using PlayStead.Core.Notifications;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.Sessions;
@@ -15,6 +16,7 @@ using PlayStead.Data.Database;
 using PlayStead.Data.Catalog;
 using PlayStead.Data.Library;
 using PlayStead.Data.Identity;
+using PlayStead.Data.Notifications;
 using PlayStead.Data.Media;
 using PlayStead.Data.Sessions;
 using PlayStead.Data.Steam;
@@ -93,6 +95,11 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             ILocalIdentityResolutionCoordinator,
             LocalIdentityResolutionCoordinator>();
+
+        builder.Services.AddSingleton<INotificationStore, SqliteNotificationStore>();
+        builder.Services.AddSingleton<INotificationCenterService, NotificationCenterService>();
+        builder.Services.AddSingleton<IIdentityNotificationProducer, IdentityNotificationProducer>();
+        builder.Services.AddSingleton<NotificationRetentionStartup>();
 
         builder.Services.AddSingleton<
             ISteamEvidenceStore,

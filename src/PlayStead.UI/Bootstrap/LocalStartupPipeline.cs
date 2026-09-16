@@ -23,6 +23,8 @@ public sealed class LocalStartupPipeline
     private readonly CatalogDatabaseInitializer? _catalogDatabaseInitializer;
     private readonly ILocalIdentityResolutionCoordinator?
         _identityResolutionCoordinator;
+    private readonly NotificationRetentionStartup?
+        _notificationRetentionStartup;
     private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
     private readonly object _refreshRequestGate = new();
     private long _latestRefreshRequest;
@@ -49,6 +51,18 @@ public sealed class LocalStartupPipeline
         DatabaseHealthChecker databaseHealthChecker,
         ILibraryStore libraryStore,
         LocalScanCoordinator scanCoordinator,
+        NotificationRetentionStartup notificationRetentionStartup)
+        : this(databaseInitializer, databaseHealthChecker, libraryStore, scanCoordinator)
+    {
+        _notificationRetentionStartup = notificationRetentionStartup
+            ?? throw new ArgumentNullException(nameof(notificationRetentionStartup));
+    }
+
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
         ILocalIdentityResolutionCoordinator identityResolutionCoordinator)
         : this(
             databaseInitializer,
@@ -59,6 +73,30 @@ public sealed class LocalStartupPipeline
         _identityResolutionCoordinator = identityResolutionCoordinator
             ?? throw new ArgumentNullException(
                 nameof(identityResolutionCoordinator));
+    }
+
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        DiscoveryInventoryManager discoveryInventory,
+        CatalogDatabaseInitializer catalogDatabaseInitializer,
+        ILocalIdentityResolutionCoordinator identityResolutionCoordinator,
+        NotificationRetentionStartup notificationRetentionStartup)
+        : this(
+            databaseInitializer,
+            databaseHealthChecker,
+            libraryStore,
+            scanCoordinator,
+            steamReferenceRuntime,
+            discoveryInventory,
+            catalogDatabaseInitializer,
+            identityResolutionCoordinator)
+    {
+        _notificationRetentionStartup = notificationRetentionStartup
+            ?? throw new ArgumentNullException(nameof(notificationRetentionStartup));
     }
 
     public LocalStartupPipeline(
@@ -139,6 +177,9 @@ public sealed class LocalStartupPipeline
 
         if (_catalogDatabaseInitializer is not null)
             await _catalogDatabaseInitializer.InitializeAsync(cancellationToken);
+
+        if (_notificationRetentionStartup is not null)
+            await _notificationRetentionStartup.InitializeAsync(cancellationToken);
 
         var health =
             await _databaseHealthChecker.QuickCheckAsync(
