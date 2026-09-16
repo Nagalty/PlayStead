@@ -346,6 +346,11 @@ public sealed class HomeMediaIntegrationTests
         public Task ApplySourceScanAsync(SourceScanResult result, CancellationToken token) => throw new NotSupportedException();
         public Task UpsertAsync(GameSession session, CancellationToken token) => throw new NotSupportedException();
         public Task<GameSession?> GetAsync(Guid id, CancellationToken token) => Task.FromResult<GameSession?>(null);
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(Guid gameId, CancellationToken token) =>
+            Task.FromResult<IReadOnlyList<GameSession>>(
+                Recent
+                    .Where(session => session.GameId == gameId)
+                    .ToArray());
         public Task<IReadOnlyList<GameSession>> GetActiveAsync(CancellationToken token) => Task.FromResult(Active);
         public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken token) => Task.FromResult(Recent);
     }
