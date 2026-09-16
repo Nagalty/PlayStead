@@ -29,7 +29,8 @@ internal sealed class DiscoveryDatabaseFixture : IDisposable
         await connection.OpenAsync(cancellationToken);
         var assembly = typeof(DatabaseInitializer).Assembly;
         var names = assembly.GetManifestResourceNames()
-            .Where(name => name.EndsWith(".sql", StringComparison.Ordinal))
+            .Where(name => name.StartsWith("PlayStead.Data.Database.Migrations.", StringComparison.Ordinal)
+                && name.EndsWith(".sql", StringComparison.Ordinal))
             .OrderBy(name => name, StringComparer.Ordinal)
             .Take(version).ToArray();
         Assert.Equal(version, names.Length);

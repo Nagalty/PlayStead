@@ -43,7 +43,7 @@ public sealed class DatabaseInitializerTests : IDisposable
         var version = Convert.ToInt32(
             await command.ExecuteScalarAsync());
 
-        Assert.Equal(6, version);
+        Assert.Equal(7, version);
     }
 
     public void Dispose()
