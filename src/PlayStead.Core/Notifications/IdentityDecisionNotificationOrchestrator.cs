@@ -37,6 +37,12 @@ public sealed class IdentityDecisionNotificationOrchestrator : IIdentityDecision
         catch { }
     }
 
+    public Task<GameIdentityDecision?> GetActiveConfirmedAsync(GameId gameId, CancellationToken cancellationToken) =>
+        _decisions.GetActiveConfirmedAsync(gameId, cancellationToken);
+
+    public Task RevokeConfirmedAsync(GameId gameId, CancellationToken cancellationToken) =>
+        _decisions.RevokeConfirmedAsync(gameId, DateTimeOffset.UtcNow, cancellationToken);
+
     private async Task<IdentityDecisionContext> RequireCandidateAsync(GameId gameId, CatalogContentId candidate, CancellationToken token)
     {
         var context = await _contexts.GetAsync(gameId, token) ?? throw new InvalidOperationException("No identity decision context is available.");

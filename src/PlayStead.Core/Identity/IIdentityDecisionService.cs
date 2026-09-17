@@ -10,4 +10,6 @@ public interface IIdentityDecisionService
     Task<GameIdentityDecision> RejectAsync(GameId gameId, CatalogContentId catalogContentId, DateTimeOffset decidedUtc, CancellationToken cancellationToken);
 
     Task<GameIdentityDecision?> RevokeConfirmedAsync(GameId gameId, DateTimeOffset revokedUtc, CancellationToken cancellationToken);
+
+    Task<GameIdentityDecision?> GetActiveConfirmedAsync(GameId gameId, CancellationToken cancellationToken);
 }

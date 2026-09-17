@@ -27,4 +27,10 @@ public sealed class IdentityDecisionApplicationService : IIdentityDecisionApplic
 
     public Task RejectAsync(GameId gameId, CatalogContentId catalogContentId, CancellationToken cancellationToken) =>
         _orchestrator.RejectAsync(gameId, catalogContentId, cancellationToken);
+
+    public Task<GameIdentityDecision?> GetActiveConfirmedAsync(GameId gameId, CancellationToken cancellationToken) =>
+        _orchestrator.GetActiveConfirmedAsync(gameId, cancellationToken);
+
+    public Task RevokeConfirmedAsync(GameId gameId, CancellationToken cancellationToken) =>
+        _orchestrator.RevokeConfirmedAsync(gameId, cancellationToken);
 }

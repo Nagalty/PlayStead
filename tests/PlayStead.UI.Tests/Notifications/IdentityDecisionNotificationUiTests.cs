@@ -140,6 +140,8 @@ public sealed class IdentityDecisionNotificationUiTests
         public Task<IdentityDecisionContext?> GetContextAsync(GameId gameId, CancellationToken cancellationToken) { LastToken = cancellationToken; cancellationToken.ThrowIfCancellationRequested(); RequestedGame = gameId; if (ThrowCancellation) throw new OperationCanceledException(cancellationToken); return Task.FromResult(Context); }
         public async Task ConfirmAsync(GameId gameId, CatalogContentId catalogContentId, CancellationToken cancellationToken) { ConfirmCallCount++; Confirmed = (gameId, catalogContentId); if (BlockActions) { ActionStarted.SetResult(true); await ReleaseActions.Task.WaitAsync(cancellationToken); } }
         public Task RejectAsync(GameId gameId, CatalogContentId catalogContentId, CancellationToken cancellationToken) { RejectCallCount++; Rejected = (gameId, catalogContentId); return Task.CompletedTask; }
+        public Task<GameIdentityDecision?> GetActiveConfirmedAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult<GameIdentityDecision?>(null);
+        public Task RevokeConfirmedAsync(GameId gameId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class RecordingNotifications(NotificationRecord item) : INotificationCenterService

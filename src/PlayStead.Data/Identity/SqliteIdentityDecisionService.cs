@@ -32,6 +32,19 @@ public sealed class SqliteIdentityDecisionService : IIdentityDecisionService
         return existing with { UpdatedUtc = revokedUtc, RevokedUtc = revokedUtc };
     }
 
+    public async Task<GameIdentityDecision?> GetActiveConfirmedAsync(GameId gameId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await using var connection = new SqliteConnection($"Data Source={_options.DatabasePath};Mode=ReadOnly;Pooling=False");
+        await connection.OpenAsync(cancellationToken);
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT decision_id,game_id,catalog_content_id,decision_type,created_utc,updated_utc,revoked_utc FROM game_identity_decisions WHERE game_id=$game AND decision_type=1 AND revoked_utc IS NULL LIMIT 1;";
+        command.Parameters.AddWithValue("$game", gameId.ToString());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+        return new GameIdentityDecision(new IdentityDecisionId(Guid.Parse(reader.GetString(0))), new GameId(Guid.Parse(reader.GetString(1))), new CatalogContentId(Guid.Parse(reader.GetString(2))), (IdentityDecisionType)reader.GetInt32(3), DateTimeOffset.Parse(reader.GetString(4)), DateTimeOffset.Parse(reader.GetString(5)), reader.IsDBNull(6) ? null : DateTimeOffset.Parse(reader.GetString(6)));
+    }
+
     private async Task<GameIdentityDecision> ExecuteAsync(GameId gameId, CatalogContentId contentId, IdentityDecisionType type, DateTimeOffset at, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

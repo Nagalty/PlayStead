@@ -43,6 +43,7 @@
                     <Button Content="Confirmer" Command="{Binding DataContext.ConfirmDecisionCommand, ElementName=Root}" Margin="0,8,8,0" />
                     <Button Content="Rejeter" Command="{Binding DataContext.RejectSingleCandidateCommand, ElementName=Root}" Margin="0,8,0,0" />
                 </StackPanel>
+                <Button Content="Annuler le choix" Command="{Binding DataContext.RevokeConfirmedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="0,8,0,0" Visibility="{Binding DataContext.IsRevokeConfirmedVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StackPanel>
         </StackPanel>
     </Border>

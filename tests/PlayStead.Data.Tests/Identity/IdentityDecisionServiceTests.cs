@@ -42,6 +42,40 @@ public sealed class IdentityDecisionServiceTests : IDisposable
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ConfirmAsync(_game, CatalogContentId.New(), DateTimeOffset.UtcNow, source.Token));
     }
 
+    [Fact]
+    public async Task Get_active_confirmation_returns_only_the_unrevoked_confirmation()
+    {
+        await SetupAsync(); var service = new SqliteIdentityDecisionService(_options); var candidate = CatalogContentId.New(); var at = DateTimeOffset.UtcNow;
+        Assert.Null(await service.GetActiveConfirmedAsync(_game, CancellationToken.None));
+        var confirmed = await service.ConfirmAsync(_game, candidate, at, CancellationToken.None);
+        Assert.Equal(confirmed, await service.GetActiveConfirmedAsync(_game, CancellationToken.None));
+        await service.RevokeConfirmedAsync(_game, at.AddMinutes(1), CancellationToken.None);
+        Assert.Null(await service.GetActiveConfirmedAsync(_game, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Revoke_preserves_history_rejections_and_clears_only_the_exact_games_canonical()
+    {
+        await SetupAsync(); var service = new SqliteIdentityDecisionService(_options); var confirmedCandidate = CatalogContentId.New(); var rejectedCandidate = CatalogContentId.New(); var at = DateTimeOffset.UtcNow;
+        await service.ConfirmAsync(_game, confirmedCandidate, at, CancellationToken.None);
+        await service.RejectAsync(_game, rejectedCandidate, at.AddMinutes(1), CancellationToken.None);
+        var revoked = await service.RevokeConfirmedAsync(_game, at.AddMinutes(2), CancellationToken.None);
+        await using var c = await OpenAsync();
+        Assert.NotNull(revoked); Assert.Equal(_game, revoked!.GameId); Assert.Equal(at.AddMinutes(2), revoked.RevokedUtc); Assert.Equal(at.AddMinutes(2), revoked.UpdatedUtc);
+        Assert.True(await ScalarAsync(c, "SELECT canonical_content_id FROM games WHERE game_id=$g;", ("$g", _game.ToString())) is DBNull);
+        Assert.Equal(1L, await ScalarAsync(c, "SELECT COUNT(*) FROM game_identity_decisions WHERE game_id=$g AND decision_type=2 AND revoked_utc IS NULL;", ("$g", _game.ToString())));
+        Assert.Equal(at.AddMinutes(2).ToString("O"), await ScalarAsync(c, "SELECT revoked_utc FROM game_identity_decisions WHERE decision_id=$d;", ("$d", revoked.DecisionId.ToString())));
+        Assert.Null(await service.RevokeConfirmedAsync(_game, at.AddMinutes(3), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Cancelled_revocation_leaves_active_confirmation_unchanged()
+    {
+        await SetupAsync(); var service = new SqliteIdentityDecisionService(_options); await service.ConfirmAsync(_game, CatalogContentId.New(), DateTimeOffset.UtcNow, CancellationToken.None); using var cts = new CancellationTokenSource(); cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.RevokeConfirmedAsync(_game, DateTimeOffset.UtcNow, cts.Token));
+        Assert.NotNull(await service.GetActiveConfirmedAsync(_game, CancellationToken.None));
+    }
+
     private async Task SetupAsync() { await new DatabaseInitializer(_options).InitializeAsync(CancellationToken.None); await using var c = await OpenAsync(); using var cmd = c.CreateCommand(); cmd.CommandText = "INSERT INTO games(game_id,title,is_hidden,created_utc,updated_utc) VALUES($g,'G',0,$u,$u);"; cmd.Parameters.AddWithValue("$g", _game.ToString()); cmd.Parameters.AddWithValue("$u", DateTimeOffset.UtcNow.ToString("O")); await cmd.ExecuteNonQueryAsync(); }
     private async Task<SqliteConnection> OpenAsync() { var c = new SqliteConnection($"Data Source={_options.DatabasePath};Pooling=False;Foreign Keys=True"); await c.OpenAsync(); return c; }
     private static async Task<object?> ScalarAsync(SqliteConnection c, string sql, (string, object) parameter) { using var cmd = c.CreateCommand(); cmd.CommandText = sql; cmd.Parameters.AddWithValue(parameter.Item1, parameter.Item2); return await cmd.ExecuteScalarAsync(); }

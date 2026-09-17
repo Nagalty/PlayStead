@@ -36,6 +36,7 @@ public sealed class NotificationCenterViewModel : INotifyPropertyChanged
         RejectDecisionCommand = new AsyncRelayCommand<object?>(RejectParameterAsync, _ => !IsDecisionActionInProgress);
         RejectSingleCandidateCommand = new AsyncRelayCommand(RejectSingleAsync, () => !IsDecisionActionInProgress);
         ChooseDecisionCommand = new AsyncRelayCommand<object?>(ChooseParameterAsync, _ => !IsDecisionActionInProgress);
+        RevokeConfirmedCommand = new AsyncRelayCommand(RevokeConfirmedAsync, () => !IsDecisionActionInProgress);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -60,12 +61,15 @@ public sealed class NotificationCenterViewModel : INotifyPropertyChanged
     public IAsyncRelayCommand<object?> RejectDecisionCommand { get; }
     public IAsyncRelayCommand RejectSingleCandidateCommand { get; }
     public IAsyncRelayCommand<object?> ChooseDecisionCommand { get; }
+    public IAsyncRelayCommand RevokeConfirmedCommand { get; }
     public IReadOnlyList<CatalogContentId> DecisionCandidates { get; private set; } = [];
     public bool IsDecisionActionVisible => _decisionApplication is not null && SelectedItem is { Producer: NotificationProducer.IdentityResolution, Priority: NotificationPriority.ActionRequired } && DecisionContext is not null && (DecisionContext.State is IdentityResolutionState.MatchProbable or IdentityResolutionState.Ambiguous);
     public bool IsSingleCandidateDecisionVisible => IsDecisionActionVisible && DecisionContext!.State == IdentityResolutionState.MatchProbable;
     public bool IsAmbiguousDecisionVisible => IsDecisionActionVisible && DecisionContext!.State == IdentityResolutionState.Ambiguous;
     public bool IsDecisionActionInProgress => _isDecisionActionInProgress;
     public IdentityDecisionContext? DecisionContext { get; private set; }
+    public GameIdentityDecision? ActiveConfirmedDecision { get; private set; }
+    public bool IsRevokeConfirmedVisible => Filter == NotificationListFilter.Resolved && _decisionApplication is not null && SelectedItem is { Producer: NotificationProducer.IdentityResolution, Priority: NotificationPriority.ActionRequired, State: NotificationState.Resolved } selected && ActiveConfirmedDecision is { DecisionType: IdentityDecisionType.UserConfirmed, RevokedUtc: null } decision && Guid.TryParse(selected.SubjectId, out var gameValue) && decision.GameId == new GameId(gameValue);
 
     public async Task RefreshAsync(CancellationToken cancellationToken)
     {
@@ -93,6 +97,7 @@ public sealed class NotificationCenterViewModel : INotifyPropertyChanged
     public async Task LoadDecisionContextAsync(CancellationToken cancellationToken)
     {
         DecisionContext = null;
+        ActiveConfirmedDecision = null;
         DecisionCandidates = [];
         var selected = SelectedItem;
         if (_decisionApplication is null || selected is null || selected.Producer != NotificationProducer.IdentityResolution || selected.Priority != NotificationPriority.ActionRequired || !Guid.TryParse(selected.SubjectId, out var gameValue))
@@ -101,18 +106,27 @@ public sealed class NotificationCenterViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(DecisionCandidates));
             OnPropertyChanged(nameof(IsDecisionActionVisible));
             OnPropertyChanged(nameof(IsSingleCandidateDecisionVisible)); OnPropertyChanged(nameof(IsAmbiguousDecisionVisible));
+            OnPropertyChanged(nameof(ActiveConfirmedDecision));
+            OnPropertyChanged(nameof(IsRevokeConfirmedVisible));
             return;
         }
         var selectedGameId = new GameId(gameValue);
-        DecisionContext = await _decisionApplication.GetContextAsync(selectedGameId, cancellationToken);
-        if (DecisionContext is not null && DecisionContext.GameId != selectedGameId)
-            DecisionContext = null;
-        if (DecisionContext is { State: IdentityResolutionState.MatchProbable or IdentityResolutionState.Ambiguous })
-            DecisionCandidates = DecisionContext.Candidates.Select(x => x.CatalogContentId).ToArray();
+        if (Filter == NotificationListFilter.Resolved && selected.State == NotificationState.Resolved)
+            ActiveConfirmedDecision = await _decisionApplication.GetActiveConfirmedAsync(selectedGameId, cancellationToken);
+        else if (selected.State != NotificationState.Resolved)
+        {
+            DecisionContext = await _decisionApplication.GetContextAsync(selectedGameId, cancellationToken);
+            if (DecisionContext is not null && DecisionContext.GameId != selectedGameId)
+                DecisionContext = null;
+            if (DecisionContext is { State: IdentityResolutionState.MatchProbable or IdentityResolutionState.Ambiguous })
+                DecisionCandidates = DecisionContext.Candidates.Select(x => x.CatalogContentId).ToArray();
+        }
         OnPropertyChanged(nameof(DecisionContext));
         OnPropertyChanged(nameof(DecisionCandidates));
         OnPropertyChanged(nameof(IsDecisionActionVisible));
         OnPropertyChanged(nameof(IsSingleCandidateDecisionVisible)); OnPropertyChanged(nameof(IsAmbiguousDecisionVisible));
+        OnPropertyChanged(nameof(ActiveConfirmedDecision));
+        OnPropertyChanged(nameof(IsRevokeConfirmedVisible));
     }
 
     public async Task ConfirmAsync(CancellationToken cancellationToken)
@@ -133,6 +147,13 @@ public sealed class NotificationCenterViewModel : INotifyPropertyChanged
         await RunDecisionAsync(() => _decisionApplication!.RejectAsync(DecisionContext.GameId, catalogContentId, cancellationToken), cancellationToken);
     }
 
+    public async Task RevokeConfirmedAsync(CancellationToken cancellationToken)
+    {
+        if (IsDecisionActionInProgress || !IsRevokeConfirmedVisible || ActiveConfirmedDecision is null) return;
+        var gameId = ActiveConfirmedDecision.GameId;
+        await RunDecisionAsync(() => _decisionApplication!.RevokeConfirmedAsync(gameId, cancellationToken), cancellationToken);
+    }
+
     private Task RejectParameterAsync(object? parameter) => parameter is CatalogContentId id ? RejectAsync(id, CancellationToken.None) : Task.CompletedTask;
     private Task RejectSingleAsync() => DecisionContext?.Candidates.Count == 1 ? RejectAsync(DecisionContext.Candidates[0].CatalogContentId, CancellationToken.None) : Task.CompletedTask;
     private Task ChooseParameterAsync(object? parameter) => parameter is CatalogContentId id ? ConfirmAsync(id, CancellationToken.None) : Task.CompletedTask;
@@ -151,6 +172,7 @@ public sealed class NotificationCenterViewModel : INotifyPropertyChanged
         RejectDecisionCommand.NotifyCanExecuteChanged();
         RejectSingleCandidateCommand.NotifyCanExecuteChanged();
         ChooseDecisionCommand.NotifyCanExecuteChanged();
+        RevokeConfirmedCommand.NotifyCanExecuteChanged();
     }
 
     private async Task TogglePanelAsync()
@@ -166,6 +188,9 @@ public sealed class NotificationCenterViewModel : INotifyPropertyChanged
             return;
         Filter = filter;
         await RefreshAsync(CancellationToken.None);
+        SelectedItem = null;
+        await LoadDecisionContextAsync(CancellationToken.None);
+        OnPropertyChanged(nameof(SelectedItem));
     }
 
     private Task SelectNotificationParameterAsync(object? parameter) => parameter is NotificationId id ? SelectAsync(id, CancellationToken.None) : Task.CompletedTask;
