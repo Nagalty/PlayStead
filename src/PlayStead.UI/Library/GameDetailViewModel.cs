@@ -7,9 +7,27 @@ public sealed class GameDetailViewModel
 {
     public GameDetailViewModel(
         LibraryItemViewModel game)
+        : this(game, launch: null, activity: null)
+    {
+    }
+
+    public GameDetailViewModel(
+        LibraryItemViewModel game,
+        GameLaunchViewModel? launch)
+        : this(game, launch, activity: null)
+    {
+    }
+
+    public GameDetailViewModel(
+        LibraryItemViewModel game,
+        GameLaunchViewModel? launch,
+        GameQuickPanelViewModel? activity)
     {
         ArgumentNullException.ThrowIfNull(
             game);
+
+        Game =
+            game;
 
         GameId =
             game.GameId;
@@ -31,19 +49,43 @@ public sealed class GameDetailViewModel
 
         SessionStatusLabel =
             game.SessionStatusLabel;
+
+        Launch =
+            launch;
+
+        Activity =
+            activity;
     }
+
+    public LibraryItemViewModel Game { get; }
 
     public GameId GameId { get; }
 
-    public GameDetailViewModel(
-        LibraryItemViewModel game,
-        GameLaunchViewModel? launch)
-        : this(game)
-    {
-        Launch = launch;
-    }
-
     public GameLaunchViewModel? Launch { get; }
+
+    public GameQuickPanelViewModel? Activity { get; }
+
+    public bool HasCover =>
+        Game.HasCover;
+
+    public string? CoverPath =>
+        Game.CoverPath;
+
+    public bool HasInstallPath =>
+        !string.IsNullOrWhiteSpace(
+            Game.InstallPath);
+
+    public bool HasInstalledSize =>
+        Game.InstalledSizeBytes.HasValue;
+
+    public bool HasSteamStatus =>
+        Game.HasSteamStatus;
+
+    public Task LoadAsync(
+        CancellationToken cancellationToken) =>
+        Activity?.LoadSessionSummaryAsync(
+            cancellationToken) ??
+        Task.CompletedTask;
 
     public string Title { get; }
 

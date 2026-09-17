@@ -329,6 +329,40 @@ public partial class MainWindow : Window
             : new GameLaunchViewModel(gameId,
                 libraryViewModel.GetLaunchInstallations(gameId), _gameLaunchService);
 
+    private GameQuickPanelViewModel? CreateActivityModel(
+        LibraryViewModel libraryViewModel,
+        GameId gameId)
+    {
+        var game =
+            libraryViewModel.Items.FirstOrDefault(
+                item => item.GameId == gameId);
+
+        if (game is null)
+        {
+            return null;
+        }
+
+        var launch =
+            CreateLaunchModel(
+                libraryViewModel,
+                gameId);
+
+        return _sessionStore is not null &&
+            _sessionCorrectionStore is not null &&
+            _sessionCorrectionPolicy is not null
+                ? new GameQuickPanelViewModel(
+                    game,
+                    _navigationService,
+                    launch,
+                    _sessionStore,
+                    _sessionCorrectionStore,
+                    _sessionCorrectionPolicy)
+                : new GameQuickPanelViewModel(
+                    game,
+                    _navigationService,
+                    launch);
+    }
+
     private void LibraryViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(LibraryViewModel.SelectedItem))
@@ -349,24 +383,9 @@ public partial class MainWindow : Window
         }
 
         var quickPanel =
-            _sessionStore is not null &&
-            _sessionCorrectionStore is not null &&
-            _sessionCorrectionPolicy is not null
-                ? new GameQuickPanelViewModel(
-                    game,
-                    _navigationService,
-                    CreateLaunchModel(
-                        viewModel,
-                        game.GameId),
-                    _sessionStore,
-                    _sessionCorrectionStore,
-                    _sessionCorrectionPolicy)
-                : new GameQuickPanelViewModel(
-                    game,
-                    _navigationService,
-                    CreateLaunchModel(
-                        viewModel,
-                        game.GameId));
+            CreateActivityModel(
+                viewModel,
+                game.GameId)!;
 
         _libraryView.QuickPanelViewModel =
             quickPanel;
@@ -596,7 +615,8 @@ public partial class MainWindow : Window
                 var gameDetailViewModel =
                     new GameDetailViewModel(
                         game,
-                        CreateLaunchModel(libraryViewModel, gameId));
+                        CreateLaunchModel(libraryViewModel, gameId),
+                        CreateActivityModel(libraryViewModel, gameId));
 
                 MainContent.Content =
                     new GameDetailView(
