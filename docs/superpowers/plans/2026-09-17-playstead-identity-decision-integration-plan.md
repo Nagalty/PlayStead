@@ -224,20 +224,79 @@ dotnet build ".\PlayStead.sln" --configuration Release --no-restore -m:1 /warnas
 
 ## Task 12 — DI and runtime wiring
 
-**Modify:** `src/PlayStead.UI/Bootstrap/PlaySteadHost.cs`, `LocalStartupPipeline.cs` only where registrations and command construction require it.
-**Test:** `tests/PlayStead.UI.Tests/Bootstrap/IdentityDecisionStartupTests.cs`.
+**Modify:** `src/PlayStead.UI/Bootstrap/PlaySteadHost.cs`, `src/PlayStead.Core/Scanning/LocalIdentityResolutionCoordinator.cs` only where the registrations and deterministic coordinator construction require it. `LocalStartupPipeline.cs` remains unchanged unless a real constructor-registration dependency requires it.
+**Test:** `tests/PlayStead.UI.Tests/Bootstrap/IdentityDecisionStartupTests.cs`, with the existing `tests/PlayStead.Core.Tests/Scanning/LocalIdentityResolutionCoordinatorTests.cs` regression suite.
 
-Register `IIdentityDecisionCandidateSource` → `EmptyIdentityDecisionCandidateSource`, `IIdentityDecisionContextProvider` → `IdentityDecisionContextProvider`, `IIdentityDecisionContextGateway` → `IdentityDecisionContextGateway`, `IIdentityDecisionNotificationOrchestrator` → `IdentityDecisionNotificationOrchestrator`, `IIdentityDecisionApplicationService` → `IdentityDecisionApplicationService`, plus existing decision store/service. Verify all resolve and the empty source is used without network or candidate fabrication. Preserve Phase 2A/2B startup order and cancellation behavior; no identity work is added to the database-only initialization path.
+The current coordinator definitions are:
 
-Task 11 étend les interfaces et implémentations déjà enregistrées sans ajouter de type concret ni de dépendance constructeur ; aucune registration DI supplémentaire n'est requise pour la révocation.
+```csharp
+public LocalIdentityResolutionCoordinator(
+    ILibraryGameLookup libraryGameLookup,
+    IGameIdentityResolver identityResolver,
+    IIdentityResolutionStore identityResolutionStore,
+    ILocalIdentityReconciler identityReconciler);
 
-Run targeted RED/GREEN, Bootstrap/Identity/Notification suites and strict UI build; commit `feat(identity): wire human decision integration`.
+public LocalIdentityResolutionCoordinator(
+    ILibraryGameLookup libraryGameLookup,
+    IGameIdentityResolver identityResolver,
+    IIdentityResolutionStore identityResolutionStore,
+    ILocalIdentityReconciler identityReconciler,
+    IIdentityNotificationProducer? notificationProducer);
+
+public LocalIdentityResolutionCoordinator(
+    ILibraryGameLookup libraryGameLookup,
+    IGameIdentityResolver identityResolver,
+    IIdentityResolutionStore identityResolutionStore,
+    ILocalIdentityReconciler identityReconciler,
+    IIdentityDecisionStore? identityDecisionStore);
+```
+
+The private six-parameter constructor is the only complete production shape:
+
+```csharp
+LocalIdentityResolutionCoordinator(
+    ILibraryGameLookup libraryGameLookup,
+    IGameIdentityResolver identityResolver,
+    IIdentityResolutionStore identityResolutionStore,
+    ILocalIdentityReconciler identityReconciler,
+    IIdentityDecisionStore? identityDecisionStore,
+    IIdentityNotificationProducer? notificationProducer);
+```
+
+Task 12 MUST use the explicit composition-root factory below as the single production DI path. It supplies both `IIdentityDecisionStore` and `IIdentityNotificationProducer` to the complete six-dependency shape; the container MUST NOT select among the partial constructors by convention. The existing public partial constructors remain only for the direct constructor calls already present in `LocalIdentityResolutionCoordinatorTests`. A Core change to `LocalIdentityResolutionCoordinator.cs` is allowed only if required to expose or normalize this exact complete shape; no second coordinator or service locator may be introduced.
+
+```csharp
+builder.Services.AddSingleton<ILocalIdentityResolutionCoordinator>(services =>
+    new LocalIdentityResolutionCoordinator(
+        services.GetRequiredService<ILibraryGameLookup>(),
+        services.GetRequiredService<IGameIdentityResolver>(),
+        services.GetRequiredService<IIdentityResolutionStore>(),
+        services.GetRequiredService<ILocalIdentityReconciler>(),
+        services.GetRequiredService<IIdentityDecisionStore>(),
+        services.GetRequiredService<IIdentityNotificationProducer>()));
+```
+
+Register exactly once, using the existing persistence lifetime:
+
+```csharp
+IIdentityDecisionStore -> SqliteIdentityDecisionStore (Singleton)
+IIdentityDecisionService -> SqliteIdentityDecisionService (Singleton)
+IIdentityDecisionCandidateSource -> EmptyIdentityDecisionCandidateSource (Singleton)
+IIdentityDecisionContextProvider -> IdentityDecisionContextProvider (Singleton)
+IIdentityDecisionContextGateway -> IdentityDecisionContextGateway (Singleton)
+IIdentityDecisionNotificationOrchestrator -> IdentityDecisionNotificationOrchestrator (Singleton)
+IIdentityDecisionApplicationService -> IdentityDecisionApplicationService (Singleton)
+```
+
+Verify all registrations resolve, the coordinator receives both decision store and automatic notification producer, and the empty source produces zero candidates without network or candidate fabrication. Preserve Phase 2A/2B startup order and cancellation behavior; no identity work is added to the database-only initialization path. Task 11's interface extensions remain consumed by the same concrete singleton instances; no additional revocation registration is needed.
+
+Run targeted RED/GREEN, the coordinator regression suite, Bootstrap/Identity/Notification suites and strict UI build; commit `feat(identity): wire human decision integration`.
 
 ## Task 13 — Final Acceptance Gate Phase 2C
 
 **Test/artifact:** `tests/PlayStead.Core.Tests`, `tests/PlayStead.Data.Tests`, `tests/PlayStead.UI.Tests`; no production changes.
 
-Run with `$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER='1'` and `-m:1`: Core full, Data full, UI full, solution build `/warnaserror`. Verify schema v10, all transactional invariants, decision context contracts/provider, UserRejected filtering and cardinalities, zero-candidate provisional fallback, no matching engine or network dependency, `IIdentityDecisionNotificationOrchestrator`, `IIdentityDecisionApplicationService`, GetContext delegation through the gateway, Confirm/Reject/RevokeConfirmed delegation through the orchestrator, active-confirmation reading through the application service, the UI consuming only the application facade, `IIdentityNotificationProducer` reserved for automatic resolution and never called by revocation, notification failure isolation, decision failure not resolving notifications, Ambiguous → MatchProbable, notification lifecycle, confirm/reject/choose UI in Task 10, revoke/reconsideration UI in Task 11, `revoked_utc` history preservation, canonical reset to `NULL`, automatic-pipeline applicability after the active confirmation is absent, DI, and `RUNTIME_CANDIDATE_GENERATION=NOT_IMPLEMENTED_BY_DESIGN`. Also run `git diff --check` and require a clean worktree. Isolate known SQLite Dispose flakes without weakening assertions.
+Run with `$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER='1'` and `-m:1`: Core full, Data full, UI full, solution build `/warnaserror`. Verify schema v10, all transactional invariants, decision context contracts/provider, UserRejected filtering and cardinalities, zero-candidate provisional fallback, no matching engine or network dependency, `IIdentityDecisionNotificationOrchestrator`, `IIdentityDecisionApplicationService`, GetContext delegation through the gateway, Confirm/Reject/RevokeConfirmed delegation through the orchestrator, active-confirmation reading through the application service, the UI consuming only the application facade, `IIdentityNotificationProducer` reserved for automatic resolution and never called by revocation, notification failure isolation, decision failure not resolving notifications, Ambiguous → MatchProbable, notification lifecycle, confirm/reject/choose UI in Task 10, revoke/reconsideration UI in Task 11, `revoked_utc` history preservation, canonical reset to `NULL`, automatic-pipeline applicability after the active confirmation is absent, DI, exactly one deterministic coordinator construction path with both producer and decision store, the empty production candidate source, and `RUNTIME_CANDIDATE_GENERATION=NOT_IMPLEMENTED_BY_DESIGN`. Also run `git diff --check` and require a clean worktree. Isolate known SQLite Dispose flakes without weakening assertions.
 
 If and only if there is no functional failure, declare `PHASE2C_IDENTITY_DECISION_INTEGRATION=GREEN`; commit `test(identity): close Phase 2C acceptance` only after the gate is complete.
 
