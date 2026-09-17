@@ -86,6 +86,34 @@ public static class PlaySteadHost
             SqliteIdentityResolutionStore>();
 
         builder.Services.AddSingleton<
+            IIdentityDecisionStore,
+            SqliteIdentityDecisionStore>();
+
+        builder.Services.AddSingleton<
+            IIdentityDecisionService,
+            SqliteIdentityDecisionService>();
+
+        builder.Services.AddSingleton<
+            IIdentityDecisionCandidateSource,
+            EmptyIdentityDecisionCandidateSource>();
+
+        builder.Services.AddSingleton<
+            IIdentityDecisionContextProvider,
+            IdentityDecisionContextProvider>();
+
+        builder.Services.AddSingleton<
+            IIdentityDecisionContextGateway,
+            IdentityDecisionContextGateway>();
+
+        builder.Services.AddSingleton<
+            IIdentityDecisionNotificationOrchestrator,
+            IdentityDecisionNotificationOrchestrator>();
+
+        builder.Services.AddSingleton<
+            IIdentityDecisionApplicationService,
+            IdentityDecisionApplicationService>();
+
+        builder.Services.AddSingleton<
             ILocalIdentityReconciler,
             SqliteLocalIdentityReconciler>();
 
@@ -93,9 +121,14 @@ public static class PlaySteadHost
             ILibraryGameLookup,
             SqliteLibraryGameLookup>();
 
-        builder.Services.AddSingleton<
-            ILocalIdentityResolutionCoordinator,
-            LocalIdentityResolutionCoordinator>();
+        builder.Services.AddSingleton<ILocalIdentityResolutionCoordinator>(services =>
+            new LocalIdentityResolutionCoordinator(
+                services.GetRequiredService<ILibraryGameLookup>(),
+                services.GetRequiredService<IGameIdentityResolver>(),
+                services.GetRequiredService<IIdentityResolutionStore>(),
+                services.GetRequiredService<ILocalIdentityReconciler>(),
+                services.GetRequiredService<IIdentityDecisionStore>(),
+                services.GetRequiredService<IIdentityNotificationProducer>()));
 
         builder.Services.AddSingleton<INotificationStore, SqliteNotificationStore>();
         builder.Services.AddSingleton<INotificationCenterService, NotificationCenterService>();

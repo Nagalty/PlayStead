@@ -48,7 +48,7 @@ public sealed class LocalIdentityResolutionCoordinator
     {
     }
 
-    private LocalIdentityResolutionCoordinator(
+    public LocalIdentityResolutionCoordinator(
         ILibraryGameLookup libraryGameLookup,
         IGameIdentityResolver identityResolver,
         IIdentityResolutionStore identityResolutionStore,
