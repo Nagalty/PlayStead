@@ -1,4 +1,4 @@
-<UserControl x:Class="PlayStead.UI.Notifications.NotificationPanel"
+<UserControl x:Class="PlayStead.UI.Notifications.NotificationPanel" x:Name="Root"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
@@ -13,7 +13,7 @@
             <ItemsControl ItemsSource="{Binding Items}" Margin="0,12,0,0">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Button Command="{Binding DataContext.SelectAsync, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding NotificationId}" HorizontalContentAlignment="Left" Margin="0,2">
+                        <Button Command="{Binding DataContext.SelectNotificationCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding NotificationId}" HorizontalContentAlignment="Left" Margin="0,2">
                             <StackPanel>
                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
                                 <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
@@ -28,6 +28,21 @@
                 <TextBlock Text="{Binding Priority}" />
                 <TextBlock Text="{Binding State}" />
                 <TextBlock Text="{Binding UpdatedUtc}" />
+                <ItemsControl ItemsSource="{Binding DataContext.DecisionCandidates, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="0,8,0,0" Visibility="{Binding DataContext.IsAmbiguousDecisionVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <Button Content="Choisir" Command="{Binding DataContext.ChooseDecisionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" Margin="0,0,8,0" />
+                                <Button Content="Rejeter" Command="{Binding DataContext.RejectDecisionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Visibility="{Binding DataContext.IsSingleCandidateDecisionVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Button Content="Confirmer" Command="{Binding DataContext.ConfirmDecisionCommand, ElementName=Root}" Margin="0,8,8,0" />
+                    <Button Content="Rejeter" Command="{Binding DataContext.RejectSingleCandidateCommand, ElementName=Root}" Margin="0,8,0,0" />
+                </StackPanel>
             </StackPanel>
         </StackPanel>
     </Border>
