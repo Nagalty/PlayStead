@@ -14,14 +14,14 @@ public sealed class SteamLocalMediaLocator
 
         string[] filenames = assetType switch
         {
-            GameMediaAssetType.Cover => [$"{appId}_library_600x900.jpg"],
+            GameMediaAssetType.Cover => ["library_600x900.jpg"],
             GameMediaAssetType.Header =>
             [
-                $"{appId}_library_header.jpg",
-                $"{appId}_header.jpg"
+                "library_header.jpg",
+                "header.jpg"
             ],
-            GameMediaAssetType.Hero => [$"{appId}_library_hero.jpg"],
-            GameMediaAssetType.Logo => [$"{appId}_logo.png"],
+            GameMediaAssetType.Hero => ["library_hero.jpg"],
+            GameMediaAssetType.Logo => ["logo.png"],
             _ => []
         };
 
@@ -31,6 +31,7 @@ public sealed class SteamLocalMediaLocator
                 steamRoot,
                 "appcache",
                 "librarycache",
+                appId,
                 filename);
 
             if (File.Exists(candidate))

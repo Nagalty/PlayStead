@@ -13,8 +13,8 @@ public sealed class SteamLocalMediaLocatorTests : IDisposable
     [Fact]
     public void TryLocate_Header_prefers_library_header_then_store_header_then_returns_null()
     {
-        var fallback = CreateLocalAsset("1874880_header.jpg");
-        var preferred = CreateLocalAsset("1874880_library_header.jpg");
+        var fallback = CreateLocalAsset("1874880", "header.jpg");
+        var preferred = CreateLocalAsset("1874880", "library_header.jpg");
         var locator = new SteamLocalMediaLocator();
 
         Assert.Equal(preferred,
@@ -31,13 +31,13 @@ public sealed class SteamLocalMediaLocatorTests : IDisposable
     }
 
     [Theory]
-    [InlineData(GameMediaAssetType.Hero, "1874880_library_hero.jpg")]
-    [InlineData(GameMediaAssetType.Logo, "1874880_logo.png")]
+    [InlineData(GameMediaAssetType.Hero, "library_hero.jpg")]
+    [InlineData(GameMediaAssetType.Logo, "logo.png")]
     public void TryLocate_returns_exact_local_asset_then_null_when_missing(
         GameMediaAssetType assetType,
         string filename)
     {
-        var expected = CreateLocalAsset(filename);
+        var expected = CreateLocalAsset("1874880", filename);
         var locator = new SteamLocalMediaLocator();
 
         Assert.Equal(expected, locator.TryLocate(_root, "1874880", assetType));
@@ -63,9 +63,10 @@ public sealed class SteamLocalMediaLocatorTests : IDisposable
         Assert.Equal(typeof(string), method.ReturnType);
     }
 
-    private string CreateLocalAsset(string filename)
+    private string CreateLocalAsset(string appId, string filename)
     {
         var directory = Path.Combine(_root, "appcache", "librarycache");
+        directory = Path.Combine(directory, appId);
         Directory.CreateDirectory(directory);
         var path = Path.GetFullPath(Path.Combine(directory, filename));
         // The locator checks file existence, not image decoding.

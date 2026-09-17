@@ -46,6 +46,10 @@ public sealed class MediaServiceRegistrationTests :
             host.Services.GetRequiredService<
                 SteamLocalMediaLocator>();
 
+        var localResolver =
+            host.Services.GetRequiredService<
+                ILocalGameMediaResolver>();
+
         var provider =
             host.Services.GetRequiredService<
                 IGameMediaProvider>();
@@ -69,6 +73,9 @@ public sealed class MediaServiceRegistrationTests :
 
         Assert.NotNull(
             localLocator);
+
+        Assert.IsType<SteamLocalGameMediaResolver>(
+            localResolver);
 
         Assert.IsType<SteamMediaProvider>(
             provider);

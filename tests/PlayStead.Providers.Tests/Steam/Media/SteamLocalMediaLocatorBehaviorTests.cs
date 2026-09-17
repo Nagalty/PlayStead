@@ -17,13 +17,14 @@ public sealed class SteamLocalMediaLocatorBehaviorTests : IDisposable
         var libraryCache = Path.Combine(
             _root,
             "appcache",
-            "librarycache");
+            "librarycache",
+            "1874880");
 
         Directory.CreateDirectory(libraryCache);
 
         var expected = Path.Combine(
             libraryCache,
-            "1874880_library_600x900.jpg");
+            "library_600x900.jpg");
 
         File.WriteAllBytes(
             expected,
@@ -47,14 +48,15 @@ public sealed class SteamLocalMediaLocatorBehaviorTests : IDisposable
         var libraryCache = Path.Combine(
             _root,
             "appcache",
-            "librarycache");
+            "librarycache",
+            "1874880");
 
         Directory.CreateDirectory(libraryCache);
 
         File.WriteAllBytes(
             Path.Combine(
                 libraryCache,
-                "1874880_library_600x900.jpg"),
+                "library_600x900.jpg"),
             [0xFF, 0xD8, 0xFF, 0xD9]);
 
         var locator = new SteamLocalMediaLocator();

@@ -233,6 +233,10 @@ public static class PlaySteadHost
             SteamLocalMediaLocator>();
 
         builder.Services.AddSingleton<
+            ILocalGameMediaResolver,
+            SteamLocalGameMediaResolver>();
+
+        builder.Services.AddSingleton<
             ISteamMediaTransport,
             HttpSteamMediaTransport>();
 
