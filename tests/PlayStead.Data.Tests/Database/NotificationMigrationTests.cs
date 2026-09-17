@@ -17,7 +17,7 @@ public sealed class NotificationMigrationTests : IDisposable
         var options = await CreateDatabaseAsync("fresh.db");
 
         await using var connection = await OpenAsync(options.DatabasePath);
-        Assert.Equal(9, await ScalarIntAsync(connection,
+        Assert.Equal(10, await ScalarIntAsync(connection,
             "SELECT MAX(version) FROM schema_migrations;"));
         Assert.Equal(1, await ScalarIntAsync(connection,
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='notifications';"));
@@ -42,7 +42,7 @@ public sealed class NotificationMigrationTests : IDisposable
         await new DatabaseInitializer(options).InitializeAsync(CancellationToken.None);
 
         await using var upgraded = await OpenAsync(options.DatabasePath);
-        Assert.Equal(9, await ScalarIntAsync(upgraded,
+        Assert.Equal(10, await ScalarIntAsync(upgraded,
             "SELECT MAX(version) FROM schema_migrations;"));
         Assert.Equal(1, await ScalarIntAsync(upgraded,
             $"SELECT COUNT(*) FROM games WHERE game_id='{gameId}';"));
@@ -122,7 +122,8 @@ public sealed class NotificationMigrationTests : IDisposable
         var options = await CreateDatabaseAsync(fileName);
         await using var connection = await OpenAsync(options.DatabasePath);
         await ExecuteAsync(connection, "DROP TABLE notifications;");
-        await ExecuteAsync(connection, "DELETE FROM schema_migrations WHERE version = 9;");
+        await ExecuteAsync(connection, "DELETE FROM schema_migrations WHERE version IN (9, 10);");
+        await ExecuteAsync(connection, "DROP INDEX IF EXISTS ux_game_identity_decisions_active_confirm; DROP INDEX IF EXISTS ux_game_identity_decisions_active_candidate; DROP TABLE IF EXISTS game_identity_decisions;");
         return options;
     }
 
