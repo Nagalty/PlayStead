@@ -107,25 +107,34 @@ Une erreur non-cancellation du Notification Center ne rollback jamais la décisi
 
 TDD : RED puis GREEN pour confirm MatchProbable/Ambiguous, rejets zéro/uno/multiples, clés et réactivation stables, isolation des erreurs, cancellation et absence de rejet implicite. Gate Core notification/decision ; commit `feat(identity): add decision notification orchestrator`.
 
-## Task 8 — Notification Decision Integration
+## Task 8 — Runtime Decision Context Gateway
 
-**Modify:** application/runtime integration files identified by inspection, consuming `IIdentityDecisionNotificationOrchestrator` and `IdentityDecisionContext`; do not extend `IIdentityNotificationProducer`.
+**Create:** `src/PlayStead.Core/Identity/IIdentityDecisionContextGateway.cs`, `IdentityDecisionContextGateway.cs`, `EmptyIdentityDecisionCandidateSource.cs`.
+**Test:** `tests/PlayStead.Core.Tests/Identity/IdentityDecisionContextGatewayTests.cs`.
+
+Le gateway expose `Task<IdentityDecisionContext?> GetAsync(GameId gameId, CancellationToken cancellationToken)` et délègue exclusivement à `IIdentityDecisionContextProvider`. Il ne découvre, ne filtre et ne fabrique aucun candidat. `EmptyIdentityDecisionCandidateSource` implémente `IIdentityDecisionCandidateSource`, retourne toujours une collection vide, n’utilise aucun réseau et ne produit aucune notification. Le wiring est réservé à la Task 12.
+
+TDD : RED puis GREEN pour contexte absent, contextes synthétiques MatchProbable/Ambiguous, candidats préservés, UserRejected déjà filtré, UserConfirmed sans contexte, source vide, cancellation, absence de mutation DB et absence de notification. Gate Core identity ; commit `feat(identity): add runtime decision context gateway`.
+
+## Task 9 — Notification Decision Integration
+
+**Modify:** application/runtime integration files identified by inspection, consuming `IIdentityDecisionContextGateway` and `IIdentityDecisionNotificationOrchestrator`; do not extend `IIdentityNotificationProducer`.
 **Test:** `tests/PlayStead.Core.Tests/Notifications/IdentityDecisionNotificationTests.cs`.
 
-Consume `IIdentityDecisionContextProvider` from Task 6; every action receives a concrete `GameId`, state and `CatalogContentId` candidate(s). Confirm/choose resolves the stable Identity notification. Partial rejection leaves it active; all known candidates rejected may resolve it. Revoke permits reactivation through the existing Phase 2B deduplication key. Propagate cancellation and isolate only non-cancellation side-effect failures. No candidate set is invented here.
+Consume `IIdentityDecisionContextGateway` from Task 8; every action receives a concrete `GameId`, state and `CatalogContentId` candidate(s). Confirm/choose resolves the stable Identity notification. Partial rejection leaves it active; all known candidates rejected may resolve it. Revoke permits reactivation through the existing Phase 2B deduplication key. Propagate cancellation and isolate only non-cancellation side-effect failures. No candidate set is invented here.
 
 Run targeted RED/GREEN and notification regressions; commit `feat(identity): integrate decision notification lifecycle`.
 
-## Task 9 — Notification Center Decision UI
+## Task 10 — Notification Center Decision UI
 
 **Modify:** `src/PlayStead.UI/Notifications/NotificationCenterViewModel.cs`, `NotificationPanel.xaml`, `NotificationPanel.xaml.cs`.
 **Test:** `tests/PlayStead.UI.Tests/Notifications/IdentityDecisionNotificationUiTests.cs`.
 
-Expose actions only for relevant Identity `ActionRequired` records. Confirm, reject and candidate selection call `IIdentityDecisionNotificationOrchestrator` with exact GameId/CatalogContentId; refresh panel and badge after success; show minimal busy/non-critical error state; do not expose raw payload. Other notification types expose no decision controls. No redesign or new page.
+Consume `IIdentityDecisionContextGateway` and `IIdentityDecisionNotificationOrchestrator`. For an Identity `ActionRequired` record, expose no action when the gateway returns null; expose Confirm/Reject for one `MatchProbable` candidate and candidate selection/rejection for `Ambiguous`. Call the orchestrator with exact GameId/CatalogContentId, refresh panel and badge after success; with the empty production source, no artificial decision action appears. Other notification types expose no decision controls. No redesign or new page.
 
 Run targeted RED/GREEN, then Notification/Shell UI regressions; commit `feat(identity): add notification decision actions`.
 
-## Task 10 — Revocation / Reconsideration Entry Point
+## Task 11 — Revocation / Reconsideration Entry Point
 
 **Modify:** the existing Notification Center history surface chosen after inspection, limited to `NotificationCenterViewModel`/`NotificationPanel` if that is the natural surface.
 **Test:** `tests/PlayStead.UI.Tests/Notifications/IdentityDecisionRevocationTests.cs`.
@@ -134,16 +143,16 @@ Add one `Annuler le choix` action for an active human confirmation. It calls `Re
 
 Run targeted RED/GREEN and UI regressions; commit `feat(identity): add decision revocation entry point`.
 
-## Task 11 — DI and runtime wiring
+## Task 12 — DI and runtime wiring
 
 **Modify:** `src/PlayStead.UI/Bootstrap/PlaySteadHost.cs`, `LocalStartupPipeline.cs` only where registrations and command construction require it.
 **Test:** `tests/PlayStead.UI.Tests/Bootstrap/IdentityDecisionStartupTests.cs`.
 
-Register decision store/service, decision-aware coordinator and UI command dependencies while preserving Phase 2A/2B startup order and cancellation behavior. No identity work is added to the database-only initialization path.
+Register `IIdentityDecisionCandidateSource` → `EmptyIdentityDecisionCandidateSource`, `IIdentityDecisionContextProvider` → `IdentityDecisionContextProvider`, `IIdentityDecisionContextGateway` → `IdentityDecisionContextGateway`, `IIdentityDecisionNotificationOrchestrator` → `IdentityDecisionNotificationOrchestrator`, plus existing decision store/service. Verify all resolve and the empty source is used without network or candidate fabrication. Preserve Phase 2A/2B startup order and cancellation behavior; no identity work is added to the database-only initialization path.
 
 Run targeted RED/GREEN, Bootstrap/Identity/Notification suites and strict UI build; commit `feat(identity): wire human decision integration`.
 
-## Task 12 — Final Acceptance Gate Phase 2C
+## Task 13 — Final Acceptance Gate Phase 2C
 
 **Test/artifact:** `tests/PlayStead.Core.Tests`, `tests/PlayStead.Data.Tests`, `tests/PlayStead.UI.Tests`; no production changes.
 
