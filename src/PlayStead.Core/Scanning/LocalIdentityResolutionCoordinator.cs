@@ -11,6 +11,7 @@ public sealed class LocalIdentityResolutionCoordinator
     private readonly IGameIdentityResolver _identityResolver;
     private readonly IIdentityResolutionStore _identityResolutionStore;
     private readonly ILocalIdentityReconciler _identityReconciler;
+    private readonly IIdentityDecisionStore? _identityDecisionStore;
     private readonly IIdentityNotificationProducer? _notificationProducer;
 
     public LocalIdentityResolutionCoordinator(
@@ -33,6 +34,27 @@ public sealed class LocalIdentityResolutionCoordinator
         IIdentityResolutionStore identityResolutionStore,
         ILocalIdentityReconciler identityReconciler,
         IIdentityNotificationProducer? notificationProducer)
+        : this(libraryGameLookup, identityResolver, identityResolutionStore, identityReconciler, identityDecisionStore: null, notificationProducer)
+    {
+    }
+
+    public LocalIdentityResolutionCoordinator(
+        ILibraryGameLookup libraryGameLookup,
+        IGameIdentityResolver identityResolver,
+        IIdentityResolutionStore identityResolutionStore,
+        ILocalIdentityReconciler identityReconciler,
+        IIdentityDecisionStore? identityDecisionStore)
+        : this(libraryGameLookup, identityResolver, identityResolutionStore, identityReconciler, identityDecisionStore, notificationProducer: null)
+    {
+    }
+
+    private LocalIdentityResolutionCoordinator(
+        ILibraryGameLookup libraryGameLookup,
+        IGameIdentityResolver identityResolver,
+        IIdentityResolutionStore identityResolutionStore,
+        ILocalIdentityReconciler identityReconciler,
+        IIdentityDecisionStore? identityDecisionStore,
+        IIdentityNotificationProducer? notificationProducer)
     {
         ArgumentNullException.ThrowIfNull(libraryGameLookup);
         ArgumentNullException.ThrowIfNull(identityResolver);
@@ -43,6 +65,7 @@ public sealed class LocalIdentityResolutionCoordinator
         _identityResolver = identityResolver;
         _identityResolutionStore = identityResolutionStore;
         _identityReconciler = identityReconciler;
+        _identityDecisionStore = identityDecisionStore;
         _notificationProducer = notificationProducer;
     }
 
@@ -72,6 +95,14 @@ public sealed class LocalIdentityResolutionCoordinator
             if (gameId is null)
                 continue;
 
+            if (_identityDecisionStore is not null)
+            {
+                var confirmed = await _identityDecisionStore
+                    .GetActiveConfirmedAsync(gameId.Value, cancellationToken);
+                if (confirmed is not null)
+                    continue;
+            }
+
             var resolution = await _identityResolver.ResolveAsync(
                 new GameIdentityObservation(
                     catalogProvider,
@@ -79,6 +110,22 @@ public sealed class LocalIdentityResolutionCoordinator
                     installation.Title,
                     installation.ObservedAtUtc),
                 cancellationToken);
+
+            if (_identityDecisionStore is not null &&
+                resolution.CandidateContentId is { } resolvedCandidate)
+            {
+                var rejected = await _identityDecisionStore
+                    .ListActiveRejectedAsync(gameId.Value, cancellationToken);
+                if (rejected.Any(decision =>
+                        decision.CatalogContentId == resolvedCandidate))
+                {
+                    resolution = resolution with
+                    {
+                        State = IdentityResolutionState.New,
+                        CandidateContentId = null
+                    };
+                }
+            }
 
             switch (resolution.State)
             {

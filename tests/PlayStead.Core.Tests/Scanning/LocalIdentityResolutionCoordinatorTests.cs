@@ -204,6 +204,37 @@ public sealed class LocalIdentityResolutionCoordinatorTests
     }
 
     [Fact]
+    public async Task Active_human_confirmation_skips_automatic_resolver()
+    {
+        var content = CatalogContentId.New();
+        var resolver = new RecordingResolver(new IdentityResolutionResult(IdentityResolutionState.New, null, NoMatch()));
+        var store = new RecordingDecisionStore(new GameIdentityDecision(IdentityDecisionId.New(), Game(1), content, IdentityDecisionType.UserConfirmed, ObservedAt, ObservedAt, null));
+        var reconciler = new RecordingReconciler();
+        var sut = new LocalIdentityResolutionCoordinator(new RecordingLookup(Game(1)), resolver, new RecordingResolutionStore(), reconciler, store);
+
+        await sut.ResolveAfterScanAsync(SteamScan(), CancellationToken.None);
+
+        Assert.Equal(0, resolver.CallCount);
+        Assert.Empty(reconciler.Calls);
+    }
+
+    [Fact]
+    public async Task Rejected_exact_match_becomes_provisional_without_reconciliation()
+    {
+        var content = CatalogContentId.New();
+        var resolver = new RecordingResolver(new IdentityResolutionResult(IdentityResolutionState.MatchConfirmed, content, ExactMatch(content)));
+        var store = new RecordingDecisionStore(rejected: [new GameIdentityDecision(IdentityDecisionId.New(), Game(1), content, IdentityDecisionType.UserRejected, ObservedAt, ObservedAt, null)]);
+        var resolutionStore = new RecordingResolutionStore();
+        var reconciler = new RecordingReconciler();
+        var sut = new LocalIdentityResolutionCoordinator(new RecordingLookup(Game(1)), resolver, resolutionStore, reconciler, store);
+
+        await sut.ResolveAfterScanAsync(SteamScan(), CancellationToken.None);
+
+        Assert.Equal(1, resolutionStore.GetOrCreateCount);
+        Assert.Empty(reconciler.Calls);
+    }
+
+    [Fact]
     public async Task Notification_failure_does_not_break_new_identity_persistence()
     {
         var store = new RecordingResolutionStore();
@@ -375,6 +406,17 @@ public sealed class LocalIdentityResolutionCoordinatorTests
         public Task<IReadOnlyList<GameIdentityResolution>> ListAsync(
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class RecordingDecisionStore(GameIdentityDecision? confirmed = null, IReadOnlyList<GameIdentityDecision>? rejected = null) : IIdentityDecisionStore
+    {
+        private readonly GameIdentityDecision? _confirmed = confirmed;
+        private readonly IReadOnlyList<GameIdentityDecision> _rejected = rejected ?? [];
+        public Task<GameIdentityDecision?> GetActiveConfirmedAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult(_confirmed?.GameId == gameId ? _confirmed : null);
+        public Task<IReadOnlyList<GameIdentityDecision>> ListActiveRejectedAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameIdentityDecision>>(_rejected.Where(x => x.GameId == gameId).ToArray());
+        public Task<IReadOnlyList<GameIdentityDecision>> ListActiveAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameIdentityDecision>>(_rejected.Where(x => x.GameId == gameId).ToArray());
+        public Task InsertAsync(GameIdentityDecision decision, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task RevokeAsync(IdentityDecisionId decisionId, DateTimeOffset revokedUtc, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class RecordingReconciler : ILocalIdentityReconciler
