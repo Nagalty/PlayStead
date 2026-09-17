@@ -20,37 +20,58 @@
                     BorderThickness="1"
                     CornerRadius="10">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                    <controls:GameArtwork SourcePath="{Binding CoverPath}"
+                                          HasArtwork="{Binding HasCover}"
+                                          Title="{Binding Title}"
+                                          ProviderLabel="{Binding ProviderLabel}"
+                                          Height="240"/>
 
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="{Binding Title}"
-                                   Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
-                                   FontSize="28"
-                                   FontWeight="SemiBold"
-                                   TextTrimming="CharacterEllipsis"/>
-
-                        <TextBlock Margin="0,8,0,0"
-                                   Text="{Binding ProviderLabel}"
-                                   Foreground="{DynamicResource PlayStead.Brush.Copper}"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"/>
-                    </StackPanel>
-
-                    <Border Grid.Column="1"
-                            Margin="24,0,0,0"
-                            Padding="14,8"
-                            VerticalAlignment="Top"
-                            Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
-                            BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
+                    <Border Margin="12"
+                            Padding="22"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Stretch"
+                            MinWidth="300"
+                            Background="{DynamicResource PlayStead.Brush.Surface}"
+                            BorderBrush="{DynamicResource PlayStead.Brush.Border}"
                             BorderThickness="1"
-                            CornerRadius="6">
-                        <TextBlock Text="{Binding SessionStatusLabel}"
-                                   Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
-                                   FontSize="13"
-                                   FontWeight="SemiBold"/>
+                            CornerRadius="8">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}"
+                                       Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                       FontSize="28"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"/>
+
+                            <TextBlock Margin="0,8,0,0"
+                                       Text="{Binding ProviderLabel}"
+                                       Foreground="{DynamicResource PlayStead.Brush.Copper}"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBlock Margin="0,18,0,0"
+                                       Text="{Binding InstallPath}"
+                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                       FontSize="13"
+                                       TextTrimming="CharacterEllipsis"/>
+
+                            <TextBlock Margin="0,6,0,0"
+                                       Text="{Binding InstalledSizeLabel}"
+                                       Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                       FontSize="13"/>
+
+                            <TextBlock Margin="0,6,0,0"
+                                       Text="{Binding SteamStatusLabel}"
+                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                       FontSize="13"/>
+
+                            <TextBlock Margin="0,6,0,0"
+                                       Text="{Binding SessionStatusLabel}"
+                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                       FontSize="13"/>
+
+                            <controls:PlaySplitButton Margin="0,20,0,0"
+                                                      DataContext="{Binding Launch}"/>
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>
@@ -129,8 +150,6 @@
                                TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
-            <controls:PlaySplitButton Grid.Row="3" Margin="0,18,0,0"
-                                      DataContext="{Binding Launch}"/>
         </Grid>
     </ScrollViewer>
 </UserControl>

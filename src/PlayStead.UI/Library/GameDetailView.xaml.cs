@@ -15,5 +15,22 @@ public partial class GameDetailView :
 
         DataContext =
             viewModel;
+
+        Loaded +=
+            GameDetailView_OnLoaded;
+    }
+
+    private async void GameDetailView_OnLoaded(
+        object sender,
+        System.Windows.RoutedEventArgs e)
+    {
+        Loaded -=
+            GameDetailView_OnLoaded;
+
+        if (DataContext is GameDetailViewModel viewModel)
+        {
+            await viewModel.LoadAsync(
+                CancellationToken.None);
+        }
     }
 }
