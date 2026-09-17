@@ -144,12 +144,83 @@ Run targeted RED/GREEN, then Notification/Shell UI regressions; commit `feat(ide
 
 ## Task 11 — Revocation / Reconsideration Entry Point
 
-**Modify:** the existing Notification Center history surface chosen after inspection, limited to `NotificationCenterViewModel`/`NotificationPanel` if that is the natural surface.
-**Test:** `tests/PlayStead.UI.Tests/Notifications/IdentityDecisionRevocationTests.cs`.
+**Modify:** `src/PlayStead.Core/Identity/IIdentityDecisionService.cs`, `src/PlayStead.Data/Identity/SqliteIdentityDecisionService.cs`, `src/PlayStead.Core/Notifications/IIdentityDecisionNotificationOrchestrator.cs`, `src/PlayStead.Core/Notifications/IdentityDecisionNotificationOrchestrator.cs`, `src/PlayStead.Core/Identity/IIdentityDecisionApplicationService.cs`, `src/PlayStead.Core/Identity/IdentityDecisionApplicationService.cs`, `src/PlayStead.UI/Notifications/NotificationCenterViewModel.cs`, `src/PlayStead.UI/Notifications/NotificationPanel.xaml`.
 
-Add one `Annuler le choix` action for an active human confirmation. It calls `RevokeConfirmedAsync`, clears canonical through the service, retains rejections, and refreshes the panel. No new route or page is created.
+**Create:** `tests/PlayStead.UI.Tests/Notifications/IdentityDecisionRevocationTests.cs`.
 
-Run targeted RED/GREEN and UI regressions; commit `feat(identity): add decision revocation entry point`.
+**Modify tests:** `tests/PlayStead.Data.Tests/Identity/IdentityDecisionServiceTests.cs`, `tests/PlayStead.Core.Tests/Notifications/IdentityDecisionNotificationOrchestratorTests.cs`, `tests/PlayStead.Core.Tests/Identity/IdentityDecisionApplicationServiceTests.cs`, and only the fakes in `tests/PlayStead.UI.Tests/Notifications/IdentityDecisionNotificationUiTests.cs` required by the extended application-service contract.
+
+### Contracts exacts
+
+`GetContextAsync` ne constitue pas une lecture de confirmation active : `IdentityDecisionContextProvider.GetAsync` retourne `null` lorsqu'un `UserConfirmed` actif existe et `IdentityDecisionContext.Create` refuse l'état `MatchConfirmed`. Sans changer la sémantique déjà livrée des Tasks 6–10, étendre les trois interfaces existantes avec les signatures suivantes et ne créer aucun nouveau type :
+
+```csharp
+// IIdentityDecisionService
+Task<GameIdentityDecision?> GetActiveConfirmedAsync(
+    GameId gameId,
+    CancellationToken cancellationToken);
+
+// IIdentityDecisionNotificationOrchestrator
+Task<GameIdentityDecision?> GetActiveConfirmedAsync(
+    GameId gameId,
+    CancellationToken cancellationToken);
+Task RevokeConfirmedAsync(
+    GameId gameId,
+    CancellationToken cancellationToken);
+
+// IIdentityDecisionApplicationService
+Task<GameIdentityDecision?> GetActiveConfirmedAsync(
+    GameId gameId,
+    CancellationToken cancellationToken);
+Task RevokeConfirmedAsync(
+    GameId gameId,
+    CancellationToken cancellationToken);
+```
+
+`SqliteIdentityDecisionService.GetActiveConfirmedAsync` réutilise la lecture exacte existante de la confirmation active dans `game_identity_decisions`, avec le prédicat `game_id = $game AND decision_type = 1 AND revoked_utc IS NULL`, une connexion `Mode=ReadOnly;Pooling=False`, des paramètres SQL et propagation du `CancellationToken`. Il ne modifie aucune donnée. `IdentityDecisionNotificationOrchestrator.GetActiveConfirmedAsync` délègue uniquement à `IIdentityDecisionService.GetActiveConfirmedAsync`; `IdentityDecisionApplicationService.GetActiveConfirmedAsync` délègue uniquement à l'orchestrateur. Aucune couche UI ne dépend du store ou du service transactionnel.
+
+`IdentityDecisionApplicationService.RevokeConfirmedAsync` délègue uniquement à `IIdentityDecisionNotificationOrchestrator.RevokeConfirmedAsync`. L'orchestrateur appelle `IIdentityDecisionService.RevokeConfirmedAsync(gameId, DateTimeOffset.UtcNow, cancellationToken)`. Le service transactionnel reste l'unique propriétaire de la mutation : il renseigne `revoked_utc`, conserve la ligne historique, remet `games.canonical_content_id` à `NULL`, conserve les `UserRejected`, garantit l'atomicité et retourne `null` si aucune confirmation active n'existe.
+
+### Sémantique Notification exacte
+
+Une révocation réussie ne modifie aucun `NotificationRecord` existant et ne crée aucune notification : l'orchestrateur n'appelle ni `INotificationCenterService.PublishOrRefreshAsync`, ni `ResolveAsync`, ni `MarkReadAsync`, ni `IIdentityNotificationProducer`. La notification historique depuis laquelle l'action est déclenchée reste `Resolved`. Le ViewModel appelle ensuite son `RefreshAsync` existant pour rafraîchir liste et badge, sans mutation Notification supplémentaire. Si un passage automatique futur produit `MatchProbable` ou `Ambiguous`, seul `IIdentityNotificationProducer.PublishForResolutionAsync` peut publier ou réactiver la clé stable correspondante.
+
+Si `IIdentityDecisionService.RevokeConfirmedAsync` échoue, l'exception est propagée et aucune méthode de `INotificationCenterService` n'est appelée par l'orchestrateur. Une `OperationCanceledException` associée au token annulé est propagée de la même façon, sans fausse résolution. Un retour `null` signifie qu'aucune confirmation active n'existait ; l'opération reste idempotente et ne touche pas aux notifications.
+
+### Entrée UI
+
+Sur le filtre `Resolved`, pour une notification `IdentityResolution`/`ActionRequired` dont `SubjectId` est un `GameId` valide, le ViewModel charge `GetActiveConfirmedAsync`. Il expose `Annuler le choix` uniquement si le résultat est un `GameIdentityDecision` actif (`DecisionType == UserConfirmed`, `RevokedUtc == null`) portant exactement ce `GameId`. Le bouton est lié à un `RevokeConfirmedCommand` qui appelle exclusivement `IIdentityDecisionApplicationService.RevokeConfirmedAsync`; il réutilise `IsDecisionActionInProgress` et le verrou `CanExecute` commun de Task 10, propage l'annulation et appelle `RefreshAsync` puis recharge l'état de décision seulement après succès. En cas d'échec, aucun refresh ne doit masquer l'erreur. Après succès, la lecture active retourne `null` et l'action disparaît. Aucun contrôle n'est ajouté pour les notifications non Identity, actives, sans confirmation active ou dont le `SubjectId` est invalide. Aucun nouveau route/page ni code métier dans `NotificationPanel.xaml.cs`.
+
+### TDD RED → GREEN
+
+1. Ajouter d'abord les tests de contrat/délégation dans `IdentityDecisionApplicationServiceTests` : résultat actif/null transmis sans transformation, `GameId` et token exacts, révocation déléguée à l'orchestrateur, cancellation propagée. RED attendu : méthodes absentes sur les interfaces.
+2. Ajouter les tests orchestrateur : lecture déléguée au service métier ; révocation réussie appelle une fois le service ; retour `null`, échec métier et cancellation n'appellent aucune méthode de `INotificationCenterService` ; aucune dépendance ou invocation de `IIdentityNotificationProducer`. RED attendu : API orchestrateur absente.
+3. Étendre `IdentityDecisionServiceTests` uniquement pour la lecture active et réutiliser les tests existants de révocation afin de prouver `revoked_utc`, canonical `NULL`, conservation des rejets, unicité et atomicité. RED attendu : lecture absente du contrat/service.
+4. Créer `IdentityDecisionRevocationTests` : action visible uniquement dans l'historique Identity avec confirmation active correspondante ; action masquée pour null, décision révoquée, rejet, mauvais `GameId`, notification active/non Identity ; commande transmet le `GameId` exact, se verrouille contre une action concurrente, propage la cancellation, rafraîchit seulement après succès et disparaît après succès. Ajouter un contract test XAML vérifiant le libellé `Annuler le choix`, `RevokeConfirmedCommand` et la visibilité dérivée.
+5. Exécuter les RED séparément avant toute production :
+
+```powershell
+$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER = "1"
+dotnet test ".\tests\PlayStead.Core.Tests\PlayStead.Core.Tests.csproj" --configuration Release --filter "FullyQualifiedName~IdentityDecisionApplicationServiceTests|FullyQualifiedName~IdentityDecisionNotificationOrchestratorTests" --no-restore -m:1
+dotnet test ".\tests\PlayStead.Data.Tests\PlayStead.Data.Tests.csproj" --configuration Release --filter "FullyQualifiedName~IdentityDecisionServiceTests" --no-restore -m:1
+dotnet test ".\tests\PlayStead.UI.Tests\PlayStead.UI.Tests.csproj" --configuration Release --filter "FullyQualifiedName~IdentityDecisionRevocationTests" --no-restore -m:1
+```
+
+6. Implémenter le minimum dans l'ordre service métier/lecture, orchestrateur, façade, puis UI ; relancer chaque filtre jusqu'au GREEN sans modifier les assertions pour contourner un échec.
+7. Exécuter les régressions :
+
+```powershell
+dotnet test ".\tests\PlayStead.Core.Tests\PlayStead.Core.Tests.csproj" --configuration Release --filter "FullyQualifiedName~IdentityDecision" --no-restore -m:1
+dotnet test ".\tests\PlayStead.Data.Tests\PlayStead.Data.Tests.csproj" --configuration Release --filter "FullyQualifiedName~IdentityDecision" --no-restore -m:1
+dotnet test ".\tests\PlayStead.UI.Tests\PlayStead.UI.Tests.csproj" --configuration Release --filter "FullyQualifiedName~Notification" --no-restore -m:1
+dotnet test ".\tests\PlayStead.Core.Tests\PlayStead.Core.Tests.csproj" --configuration Release --no-restore -m:1
+dotnet test ".\tests\PlayStead.UI.Tests\PlayStead.UI.Tests.csproj" --configuration Release --no-restore -m:1
+dotnet build ".\PlayStead.sln" --configuration Release --no-restore -m:1 /warnaserror
+```
+
+8. Auditer le diff : UI dépend uniquement de `IIdentityDecisionApplicationService`; aucun SQL dans UI/Core ; aucun appel direct UI à `IIdentityDecisionService`, `INotificationCenterService` pour la révocation ou `IIdentityNotificationProducer`; aucun matching, candidat runtime ou réseau ajouté. Terminer par `git diff --check`, `git status --short` et `git diff --stat`.
+
+**Gate/commit prévu après validation :** historique par `revoked_utc`, canonical remis à `NULL` atomiquement, rejets conservés, aucune mutation Notification lors de la révocation, pipeline automatique de nouveau applicable au prochain passage, suites ci-dessus GREEN ; commit `feat(identity): add decision revocation entry point`.
 
 ## Task 12 — DI and runtime wiring
 
@@ -158,13 +229,15 @@ Run targeted RED/GREEN and UI regressions; commit `feat(identity): add decision 
 
 Register `IIdentityDecisionCandidateSource` → `EmptyIdentityDecisionCandidateSource`, `IIdentityDecisionContextProvider` → `IdentityDecisionContextProvider`, `IIdentityDecisionContextGateway` → `IdentityDecisionContextGateway`, `IIdentityDecisionNotificationOrchestrator` → `IdentityDecisionNotificationOrchestrator`, `IIdentityDecisionApplicationService` → `IdentityDecisionApplicationService`, plus existing decision store/service. Verify all resolve and the empty source is used without network or candidate fabrication. Preserve Phase 2A/2B startup order and cancellation behavior; no identity work is added to the database-only initialization path.
 
+Task 11 étend les interfaces et implémentations déjà enregistrées sans ajouter de type concret ni de dépendance constructeur ; aucune registration DI supplémentaire n'est requise pour la révocation.
+
 Run targeted RED/GREEN, Bootstrap/Identity/Notification suites and strict UI build; commit `feat(identity): wire human decision integration`.
 
 ## Task 13 — Final Acceptance Gate Phase 2C
 
 **Test/artifact:** `tests/PlayStead.Core.Tests`, `tests/PlayStead.Data.Tests`, `tests/PlayStead.UI.Tests`; no production changes.
 
-Run with `$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER='1'` and `-m:1`: Core full, Data full, UI full, solution build `/warnaserror`. Verify schema v10, all transactional invariants, decision context contracts/provider, UserRejected filtering and cardinalities, zero-candidate provisional fallback, no matching engine or network dependency, `IIdentityDecisionNotificationOrchestrator`, `IIdentityDecisionApplicationService`, GetContext delegation through the gateway, Confirm/Reject delegation through the orchestrator, the UI consuming only the application facade, `IIdentityNotificationProducer` reserved for automatic resolution, notification failure isolation, decision failure not resolving notifications, Ambiguous → MatchProbable, notification lifecycle, confirm/reject/choose/revoke UI in Task 10, DI, and `RUNTIME_CANDIDATE_GENERATION=NOT_IMPLEMENTED_BY_DESIGN`. Also run `git diff --check` and require a clean worktree. Isolate known SQLite Dispose flakes without weakening assertions.
+Run with `$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER='1'` and `-m:1`: Core full, Data full, UI full, solution build `/warnaserror`. Verify schema v10, all transactional invariants, decision context contracts/provider, UserRejected filtering and cardinalities, zero-candidate provisional fallback, no matching engine or network dependency, `IIdentityDecisionNotificationOrchestrator`, `IIdentityDecisionApplicationService`, GetContext delegation through the gateway, Confirm/Reject/RevokeConfirmed delegation through the orchestrator, active-confirmation reading through the application service, the UI consuming only the application facade, `IIdentityNotificationProducer` reserved for automatic resolution and never called by revocation, notification failure isolation, decision failure not resolving notifications, Ambiguous → MatchProbable, notification lifecycle, confirm/reject/choose UI in Task 10, revoke/reconsideration UI in Task 11, `revoked_utc` history preservation, canonical reset to `NULL`, automatic-pipeline applicability after the active confirmation is absent, DI, and `RUNTIME_CANDIDATE_GENERATION=NOT_IMPLEMENTED_BY_DESIGN`. Also run `git diff --check` and require a clean worktree. Isolate known SQLite Dispose flakes without weakening assertions.
 
 If and only if there is no functional failure, declare `PHASE2C_IDENTITY_DECISION_INTEGRATION=GREEN`; commit `test(identity): close Phase 2C acceptance` only after the gate is complete.
 
