@@ -38,9 +38,21 @@
 **Modify:** `src/PlayStead.Data/Database/DatabaseInitializer.cs` only for target version/resource discovery if required; update only current/latest schema expectations in `tests/PlayStead.Data.Tests`.
 **Test:** `tests/PlayStead.Data.Tests/Database/IdentityDecisionDatabaseTests.cs`.
 
-Schema: `game_identity_decisions(decision_id TEXT PRIMARY KEY, game_id TEXT NOT NULL REFERENCES games(game_id) ON DELETE CASCADE, catalog_content_id TEXT NOT NULL, decision_type INTEGER NOT NULL CHECK(decision_type IN (1,2)), created_utc TEXT NOT NULL, updated_utc TEXT NOT NULL, revoked_utc TEXT NULL)`. Add partial unique index on `game_id` where `decision_type=1 AND revoked_utc IS NULL`; add partial unique index preventing active confirmed/rejected overlap for the same `(game_id,catalog_content_id)`; no uniqueness on rejected rows, no cross-database FK, and retain revoked history. Migration v9→v10 preserves all rows.
+Schema: `game_identity_decisions(decision_id TEXT NOT NULL PRIMARY KEY, game_id TEXT NOT NULL REFERENCES games(game_id) ON DELETE CASCADE, catalog_content_id TEXT NOT NULL, decision_type INTEGER NOT NULL CHECK(decision_type IN (1,2)), created_utc TEXT NOT NULL, updated_utc TEXT NOT NULL, revoked_utc TEXT NULL)`. Use exactly two unique partial indexes, with no trigger, extra table, or extra column:
 
-**TDD:** tests for fresh v10, v9→v10, constraints, multiple rejects, FK and absence of cross-db FK; run targeted RED, implement SQL/resource registration, run GREEN. Gate with Data build and database regression tests; commit `feat(identity): add decision schema v10`.
+```sql
+CREATE UNIQUE INDEX ux_game_identity_decisions_active_confirm
+ON game_identity_decisions(game_id)
+WHERE decision_type = 1 AND revoked_utc IS NULL;
+
+CREATE UNIQUE INDEX ux_game_identity_decisions_active_candidate
+ON game_identity_decisions(game_id, catalog_content_id)
+WHERE revoked_utc IS NULL;
+```
+
+The first index allows at most one active `UserConfirmed` for a `GameId`. The second allows at most one active decision of either type for a given `GameId + CatalogContentId`, therefore forbids an active confirm/reject contradiction while allowing multiple active rejects for different candidates. Thus `Game X + Candidate A + UserConfirmed`, `Candidate B + UserRejected`, and `Candidate C + UserRejected` are valid; two active confirmations for one game, two active decisions for one pair, or an active confirmation plus rejection for one pair are invalid. A row with non-null `revoked_utc` leaves both indexes, so a new active decision for the same game/candidate is allowed and history is retained. There is no cross-database FK. Migration v9→v10 preserves all rows.
+
+**TDD:** tests for fresh v10, v9→v10, table/columns, FK and absence of cross-db FK, invalid `decision_type`, second active confirmation for the same game with another candidate (fails), active confirmation plus active rejection for the same pair (fails), multiple active rejects for different candidates (pass), revoked pair followed by a new active decision (pass), and revoked confirmation followed by a new confirmation for another candidate (pass). Run targeted RED, implement SQL/resource registration, run GREEN. Gate with Data build and database regression tests; commit `feat(identity): add decision schema v10`.
 
 ## Task 3 — SQLite Identity Decision Store
 
