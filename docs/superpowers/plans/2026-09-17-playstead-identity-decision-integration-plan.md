@@ -83,16 +83,27 @@ Before automatic resolution, read active confirmation and use it directly. Other
 
 Run targeted RED/GREEN, then all Identity and scan tests; commit `feat(identity): honor human decisions in resolution pipeline`.
 
-## Task 6 — Notification Decision Integration
+## Task 6 — Identity Decision Context Foundation
+
+**Create:** `src/PlayStead.Core/Identity/IdentityDecisionCandidate.cs`, `IdentityDecisionContext.cs`, `IIdentityDecisionContextProvider.cs`.
+**Test:** `tests/PlayStead.Core.Tests/Identity/IdentityDecisionContextTests.cs`.
+
+Cette tâche transporte explicitement les candidats fournis par une source locale ou synthétique ; elle ne découvre aucun candidat et n’ajoute ni fuzzy matching, ni ranking, ni scoring, ni réseau. `IdentityDecisionCandidate` contient au minimum `CatalogContentId` et les seules données d’affichage déjà disponibles. `IdentityDecisionContext` contient `GameId`, `IdentityResolutionState`, une collection immuable de candidats et l’instant d’observation selon les conventions existantes. `IIdentityDecisionContextProvider` expose `Task<IdentityDecisionContext?> GetAsync(GameId gameId, CancellationToken cancellationToken)`.
+
+Le provider filtre les `UserRejected` actifs via `IIdentityDecisionStore` avant d’exposer le contexte. Un candidat restant produit `MatchProbable`, au moins deux produisent `Ambiguous`, zéro produit un contexte fonctionnel `New/provisional`. Un `UserConfirmed` actif retourne `null`. Le PS-TEMP existant est conservé et aucune liaison canonique n’est créée par cette tâche.
+
+TDD : RED ciblé sur les contrats et le provider synthétique, puis GREEN minimal pour les cardinalités, le filtrage exact, la conservation des candidats non rejetés, le fallback zéro candidat, la cancellation et l’absence de dépendance réseau. Gate Core identity et commit `feat(identity): add decision context foundation`.
+
+## Task 7 — Notification Decision Integration
 
 **Modify:** `src/PlayStead.Core/Notifications/IdentityNotificationProducer.cs`, `NotificationCenterService.cs`, and the minimal decision service collaborator.
 **Test:** `tests/PlayStead.Core.Tests/Notifications/IdentityDecisionNotificationTests.cs`.
 
-Confirm/choose resolves the stable Identity notification. Partial rejection leaves it active; all known candidates rejected may resolve it. Revoke permits reactivation through the existing Phase 2B deduplication key. Propagate cancellation and isolate only non-cancellation side-effect failures.
+Consume `IIdentityDecisionContextProvider` from Task 6; every action receives a concrete `GameId`, state and `CatalogContentId` candidate(s). Confirm/choose resolves the stable Identity notification. Partial rejection leaves it active; all known candidates rejected may resolve it. Revoke permits reactivation through the existing Phase 2B deduplication key. Propagate cancellation and isolate only non-cancellation side-effect failures. No candidate set is invented here.
 
 Run targeted RED/GREEN and notification regressions; commit `feat(identity): integrate decision notification lifecycle`.
 
-## Task 7 — Notification Center Decision UI
+## Task 8 — Notification Center Decision UI
 
 **Modify:** `src/PlayStead.UI/Notifications/NotificationCenterViewModel.cs`, `NotificationPanel.xaml`, `NotificationPanel.xaml.cs`.
 **Test:** `tests/PlayStead.UI.Tests/Notifications/IdentityDecisionNotificationUiTests.cs`.
@@ -101,7 +112,7 @@ Expose actions only for relevant Identity `ActionRequired` records. Confirm, rej
 
 Run targeted RED/GREEN, then Notification/Shell UI regressions; commit `feat(identity): add notification decision actions`.
 
-## Task 8 — Revocation / Reconsideration Entry Point
+## Task 9 — Revocation / Reconsideration Entry Point
 
 **Modify:** the existing Notification Center history surface chosen after inspection, limited to `NotificationCenterViewModel`/`NotificationPanel` if that is the natural surface.
 **Test:** `tests/PlayStead.UI.Tests/Notifications/IdentityDecisionRevocationTests.cs`.
@@ -110,7 +121,7 @@ Add one `Annuler le choix` action for an active human confirmation. It calls `Re
 
 Run targeted RED/GREEN and UI regressions; commit `feat(identity): add decision revocation entry point`.
 
-## Task 9 — DI and runtime wiring
+## Task 10 — DI and runtime wiring
 
 **Modify:** `src/PlayStead.UI/Bootstrap/PlaySteadHost.cs`, `LocalStartupPipeline.cs` only where registrations and command construction require it.
 **Test:** `tests/PlayStead.UI.Tests/Bootstrap/IdentityDecisionStartupTests.cs`.
@@ -119,11 +130,11 @@ Register decision store/service, decision-aware coordinator and UI command depen
 
 Run targeted RED/GREEN, Bootstrap/Identity/Notification suites and strict UI build; commit `feat(identity): wire human decision integration`.
 
-## Task 10 — Final Acceptance Gate Phase 2C
+## Task 11 — Final Acceptance Gate Phase 2C
 
 **Test/artifact:** `tests/PlayStead.Core.Tests`, `tests/PlayStead.Data.Tests`, `tests/PlayStead.UI.Tests`; no production changes.
 
-Run with `$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER='1'` and `-m:1`: Core full, Data full, UI full, solution build `/warnaserror`. Verify schema v10, all transactional invariants, priority/filtering, PS-TEMP retention, notification lifecycle, confirm/reject/choose/revoke UI, DI, `git diff --check`, and clean worktree. Isolate known SQLite Dispose flakes without weakening assertions.
+Run with `$env:DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER='1'` and `-m:1`: Core full, Data full, UI full, solution build `/warnaserror`. Verify schema v10, all transactional invariants, decision context contracts/provider, UserRejected filtering and cardinalities, zero-candidate provisional fallback, no matching engine or network dependency, priority/filtering, PS-TEMP retention, notification lifecycle, confirm/reject/choose/revoke UI, DI, and that Task 7 consumes concrete contexts. Also run `git diff --check` and require a clean worktree. Isolate known SQLite Dispose flakes without weakening assertions.
 
 If and only if there is no functional failure, declare `PHASE2C_IDENTITY_DECISION_INTEGRATION=GREEN`; commit `test(identity): close Phase 2C acceptance` only after the gate is complete.
 
