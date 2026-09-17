@@ -89,7 +89,8 @@
                     <controls:GameArtwork SourcePath="{Binding CoverPath}"
                                           Title="{Binding Title}"
                                           ProviderLabel="{Binding ProviderLabel}"
-                                          HasArtwork="{Binding HasCover}" />
+                                          HasArtwork="{Binding HasCover}"
+                                          MouseDoubleClick="GameArtwork_OnMouseDoubleClick" />
                 </Border>
 
                 <Grid Grid.Row="1"

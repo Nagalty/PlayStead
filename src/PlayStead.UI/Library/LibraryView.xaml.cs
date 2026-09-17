@@ -128,6 +128,19 @@ public partial class LibraryView :
             item);
     }
 
+    private void GameCard_OnDetailsRequested(
+        object? sender,
+        LibraryItemViewModel item)
+    {
+        if (DataContext is not LibraryViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.SelectGame(item);
+        GameDetailsRequested?.Invoke(this, EventArgs.Empty);
+    }
+
     private async void GameCard_OnMediaRequested(
         object? sender,
         LibraryItemViewModel item)

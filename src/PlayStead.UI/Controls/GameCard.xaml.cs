@@ -23,6 +23,9 @@ public partial class GameCard :
     public event EventHandler?
         SelectionRequested;
 
+    public event EventHandler<LibraryItemViewModel>?
+        DetailsRequested;
+
     private void GameCard_OnLoaded(
         object sender,
         RoutedEventArgs e)
@@ -52,5 +55,16 @@ public partial class GameCard :
         SelectionRequested?.Invoke(
             this,
             EventArgs.Empty);
+    }
+
+    private void GameArtwork_OnMouseDoubleClick(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (DataContext is LibraryItemViewModel item)
+        {
+            DetailsRequested?.Invoke(this, item);
+            e.Handled = true;
+        }
     }
 }
