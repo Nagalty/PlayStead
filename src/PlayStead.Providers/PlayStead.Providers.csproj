@@ -1,8 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\PlayStead.Core\PlayStead.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ValveKeyValue" />
   </ItemGroup>
 </Project>
