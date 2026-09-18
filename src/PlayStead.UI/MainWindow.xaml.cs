@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using PlayStead.Core.Library;
+using PlayStead.Core.Media;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
@@ -34,12 +35,15 @@ public partial class MainWindow : Window
     private readonly HomeViewModel? _homeViewModel;
     private HomeView? _homeView;
     private readonly GameLaunchService? _gameLaunchService;
+    private readonly IGameMediaResolver? _gameMediaResolver;
+    private readonly ILocalGameMediaResolver? _localGameMediaResolver;
     private readonly AttentionViewModel? _attentionViewModel;
     private AttentionView? _attentionView;
     private readonly ISessionStore? _sessionStore;
     private readonly ISessionCorrectionStore? _sessionCorrectionStore;
     private readonly SessionCorrectionPolicy? _sessionCorrectionPolicy;
     private readonly NotificationCenterViewModel? _notificationCenterViewModel;
+    private readonly SessionMonitor? _sessionMonitor;
 
     public MainWindow()
         : this(
@@ -319,6 +323,70 @@ public partial class MainWindow : Window
         NotificationPanelHost.DataContext = notificationCenterViewModel;
 
         UpdateQuickPanel();
+        ApplyCurrentRoute();
+    }
+
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy,
+        SessionViewModel sessionViewModel,
+        NavigationService navigationService,
+        ShellViewModel shellViewModel,
+        SettingsViewModel settingsViewModel,
+        UiMotionController uiMotionController,
+        HomeViewModel homeViewModel,
+        GameLaunchService gameLaunchService,
+        AttentionViewModel attentionViewModel,
+        ISessionStore sessionStore,
+        ISessionCorrectionStore sessionCorrectionStore,
+        SessionCorrectionPolicy sessionCorrectionPolicy,
+        NotificationCenterViewModel notificationCenterViewModel,
+        IGameMediaResolver gameMediaResolver,
+        ILocalGameMediaResolver localGameMediaResolver,
+        SessionMonitor sessionMonitor)
+        : this(viewModel, windowPlacementService, windowClosePolicy,
+            sessionViewModel, navigationService, shellViewModel,
+            settingsViewModel, uiMotionController, homeViewModel,
+            gameLaunchService, attentionViewModel, sessionStore,
+            sessionCorrectionStore, sessionCorrectionPolicy,
+            notificationCenterViewModel, gameMediaResolver,
+            localGameMediaResolver)
+    {
+        ArgumentNullException.ThrowIfNull(sessionMonitor);
+        _sessionMonitor = sessionMonitor;
+        ApplyCurrentRoute();
+    }
+
+    public MainWindow(
+        LibraryViewModel viewModel,
+        WindowPlacementService windowPlacementService,
+        WindowClosePolicy windowClosePolicy,
+        SessionViewModel sessionViewModel,
+        NavigationService navigationService,
+        ShellViewModel shellViewModel,
+        SettingsViewModel settingsViewModel,
+        UiMotionController uiMotionController,
+        HomeViewModel homeViewModel,
+        GameLaunchService gameLaunchService,
+        AttentionViewModel attentionViewModel,
+        ISessionStore sessionStore,
+        ISessionCorrectionStore sessionCorrectionStore,
+        SessionCorrectionPolicy sessionCorrectionPolicy,
+        NotificationCenterViewModel notificationCenterViewModel,
+        IGameMediaResolver gameMediaResolver,
+        ILocalGameMediaResolver localGameMediaResolver)
+        : this(viewModel, windowPlacementService, windowClosePolicy,
+            sessionViewModel, navigationService, shellViewModel,
+            settingsViewModel, uiMotionController, homeViewModel,
+            gameLaunchService, attentionViewModel, sessionStore,
+            sessionCorrectionStore, sessionCorrectionPolicy,
+            notificationCenterViewModel)
+    {
+        ArgumentNullException.ThrowIfNull(gameMediaResolver);
+        ArgumentNullException.ThrowIfNull(localGameMediaResolver);
+        _gameMediaResolver = gameMediaResolver;
+        _localGameMediaResolver = localGameMediaResolver;
         ApplyCurrentRoute();
     }
 
@@ -612,11 +680,21 @@ public partial class MainWindow : Window
                     break;
                 }
 
-                var gameDetailViewModel =
-                    new GameDetailViewModel(
+                var activity = CreateActivityModel(libraryViewModel, gameId);
+                var gameDetailViewModel = _sessionMonitor is null
+                    ? new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
-                        CreateActivityModel(libraryViewModel, gameId));
+                        activity,
+                        CreateHeroPath(libraryViewModel, game))
+                    : new GameDetailViewModel(
+                        game,
+                        CreateLaunchModel(libraryViewModel, gameId),
+                        activity,
+                        CreateHeroPath(libraryViewModel, game),
+                        _sessionMonitor,
+                        () => activity?.LoadSessionSummaryAsync(CancellationToken.None)
+                            ?? Task.CompletedTask);
 
                 MainContent.Content =
                     new GameDetailView(
@@ -641,6 +719,43 @@ public partial class MainWindow : Window
             default:
                 throw new InvalidOperationException(
                     $"Unsupported route: {_navigationService.CurrentRoute}.");
+        }
+    }
+
+    private string? CreateHeroPath(
+        LibraryViewModel libraryViewModel,
+        LibraryItemViewModel game)
+    {
+        if (_gameMediaResolver is null)
+        {
+            return null;
+        }
+
+        var installation =
+            libraryViewModel.GetDefaultLaunchInstallation(game.GameId);
+
+        if (installation is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var identity = new GameMediaIdentity(
+                installation.Provider,
+                installation.ExternalId,
+                game.Title);
+
+            return _gameMediaResolver.TryGetCachedPath(
+                       identity,
+                       GameMediaAssetType.Hero)
+                ?? _localGameMediaResolver?.TryGetPath(
+                    identity,
+                    GameMediaAssetType.Hero);
+        }
+        catch (ArgumentException)
+        {
+            return null;
         }
     }
 

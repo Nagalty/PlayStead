@@ -134,9 +134,11 @@ public sealed class GameDetailFoundationTests
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "new GameDetailViewModel(\n                        game,\n                        CreateLaunchModel(libraryViewModel, gameId),\n                        CreateActivityModel(libraryViewModel, gameId))",
+            "CreateHeroPath",
             source,
             StringComparison.Ordinal);
+
+        Assert.Contains("var activity = CreateActivityModel(libraryViewModel, gameId);", source, StringComparison.Ordinal);
     }
 
     private static object? GetProperty(

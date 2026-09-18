@@ -1,4 +1,5 @@
 <UserControl x:Class="PlayStead.UI.Library.GameDetailView"
+             x:Name="GameDetailRoot"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:PlayStead.UI.Controls"
@@ -10,84 +11,143 @@
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
-        <Grid Margin="{DynamicResource PlayStead.Spacing.4}">
+        <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
-                    Padding="{DynamicResource PlayStead.Spacing.4}"
-                    Background="{DynamicResource PlayStead.Brush.Surface}"
-                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
-                    BorderThickness="1"
-                    CornerRadius="{DynamicResource PlayStead.Radius.Large}">
+                    x:Name="GameDetailHero"
+                    MinHeight="320"
+                    Padding="0"
+                    ClipToBounds="True">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background"
+                                Value="{DynamicResource PlayStead.Brush.Surface}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasHero}"
+                                         Value="True">
+                                <Setter Property="Background">
+                                    <Setter.Value>
+                                        <ImageBrush ImageSource="{Binding HeroPath}"
+                                                    Stretch="UniformToFill"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid>
-                    <controls:GameArtwork SourcePath="{Binding CoverPath}"
-                                          HasArtwork="{Binding HasCover}"
-                                          Title="{Binding Title}"
-                                          ProviderLabel="{Binding ProviderLabel}"
-                                          Height="240"/>
+                    <Border x:Name="HeroContentRail"
+                            HorizontalAlignment="Left"
+                            Margin="0"
+                            Width="520"
+                            Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                            Opacity="0.86">
+                        <Border.OpacityMask>
+                            <LinearGradientBrush StartPoint="0,0.5"
+                                                 EndPoint="1,0.5">
+                                <GradientStop Offset="0"
+                                              Color="#FF000000"/>
+                                <GradientStop Offset="0.72"
+                                              Color="#EE000000"/>
+                                <GradientStop Offset="1"
+                                              Color="#00000000"/>
+                            </LinearGradientBrush>
+                        </Border.OpacityMask>
+                    </Border>
 
-                    <Border Margin="12"
-                            Padding="{DynamicResource PlayStead.Spacing.4}"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Stretch"
-                            MinWidth="300"
-                            Background="{DynamicResource PlayStead.Brush.Surface}"
-                            BorderBrush="{DynamicResource PlayStead.Brush.Border}"
-                            BorderThickness="1"
-                            CornerRadius="{DynamicResource PlayStead.Radius.Medium}">
-                        <StackPanel>
-                            <TextBlock Text="{Binding Title}"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
-                                       FontSize="28"
-                                       FontWeight="SemiBold"
-                                       TextTrimming="CharacterEllipsis"/>
+                    <Border Width="176"
+                            Height="264"
+                            Margin="24,24,0,24"
+                            CornerRadius="9"
+                            ClipToBounds="True"
+                            Background="Transparent"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center">
+                        <controls:GameArtwork SourcePath="{Binding CoverPath}"
+                                              HasArtwork="{Binding HasCover}"
+                                              Title="{Binding Title}"
+                                              ProviderLabel="{Binding ProviderLabel}"
+                                              Width="176"
+                                              Height="264"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"/>
+                    </Border>
 
-                            <controls:StatusBadge Margin="0,8,0,0"
-                                                  Text="{Binding ProviderLabel}"/>
+                    <StackPanel x:Name="HeroContent"
+                                Margin="214,44,20,44"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="{Binding DisplayTitle}"
+                                   Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                   FontSize="30"
+                                   FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis"/>
 
-                            <TextBlock Margin="0,18,0,0"
-                                       Text="{Binding InstallPath}"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                       FontSize="13"
-                                       Visibility="{Binding HasInstallPath,
-                                                    Converter={StaticResource BooleanToVisibilityConverter}}"
-                                       TextTrimming="CharacterEllipsis"/>
+                        <StackPanel x:Name="HeroPlatformRow"
+                                    Margin="0,8,0,0"
+                                    Orientation="Horizontal">
+                            <controls:StatusBadge Text="{Binding ProviderLabel}"/>
+                        </StackPanel>
 
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="{Binding InstalledSizeLabel}"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
-                                       FontSize="13"
-                                       Visibility="{Binding HasInstalledSize,
-                                                    Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <WrapPanel Margin="0,12,0,0"
+                                   Orientation="Horizontal"
+                                   Visibility="{Binding Activity.HasSessionHistory,
+                                                Converter={StaticResource BooleanToVisibilityConverter},
+                                                FallbackValue=Collapsed}">
+                            <StackPanel Margin="0,0,32,0">
+                                <TextBlock Text="Temps joué"
+                                           Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"/>
+                                <StackPanel Margin="0,3,0,0" Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Activity.TotalPlayTimeLabel}"
+                                               Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Dernière partie"
+                                           Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Margin="0,3,0,0"
+                                           Text="{Binding Activity.LastActivityLabel}"
+                                           Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </WrapPanel>
 
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="{Binding SteamStatusLabel}"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                       FontSize="13"
-                                       Visibility="{Binding HasSteamStatus,
-                                                    Converter={StaticResource BooleanToVisibilityConverter}}"/>
-
-                            <TextBlock Margin="0,6,0,0"
+                        <TextBlock Margin="0,8,0,0"
                                        Text="{Binding SessionStatusLabel}"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                       FontSize="13"
+                                       Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
                                        Visibility="{Binding Game.IsSessionActive,
                                                     Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                            <controls:PlaySplitButton Margin="0,20,0,0"
-                                                      DataContext="{Binding Launch}"/>
-                        </StackPanel>
-                    </Border>
+                        <controls:PlaySplitButton Margin="0,22,0,0"
+                                                  PrimaryButtonMinWidth="150"
+                                                  PrimaryButtonPadding="20,14"
+                                                  IsSessionActive="{Binding DataContext.Game.IsSessionActive, ElementName=GameDetailRoot}"
+                                                  PlayLabel="{Binding DataContext.SessionStatusLabel,
+                                                              ElementName=GameDetailRoot,
+                                                              TargetNullValue=Jouer,
+                                                              FallbackValue=Jouer}"
+                                                  DataContext="{Binding Launch}"/>
+                    </StackPanel>
                 </Grid>
             </Border>
 
+            <StackPanel Grid.Row="1"
+                        Margin="{DynamicResource PlayStead.Spacing.4}">
             <Grid x:Name="DetailColumns"
-                  Grid.Row="1"
                   Margin="0,18,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -225,8 +285,7 @@
 
             </Grid>
 
-            <Border Grid.Row="3"
-                    Margin="0,18,0,0"
+            <Border Margin="0,18,0,0"
                     Padding="{DynamicResource PlayStead.Spacing.3}"
                     Background="{DynamicResource PlayStead.Brush.SurfaceSubtle}"
                     BorderBrush="{DynamicResource PlayStead.Brush.Border}"
@@ -242,6 +301,7 @@
                                TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
+            </StackPanel>
         </Grid>
     </ScrollViewer>
 </UserControl>

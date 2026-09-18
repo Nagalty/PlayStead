@@ -218,11 +218,36 @@ public sealed class GameQuickPanelViewModel :
 
     private static string FormatTimestamp(
         DateTimeOffset timestamp) =>
-        timestamp
-            .ToLocalTime()
-            .ToString(
-                "g",
-                CultureInfo.CurrentCulture);
+        FormatTimestampForDisplay(
+            timestamp,
+            DateTimeOffset.Now);
+
+    public static string FormatTimestampForDisplay(
+        DateTimeOffset timestamp,
+        DateTimeOffset now)
+    {
+        var localTimestamp = timestamp.ToLocalTime();
+        var localNow = now.ToLocalTime();
+        var date = localTimestamp.Date;
+
+        if (date == localNow.Date)
+        {
+            return $"aujourd’hui à {localTimestamp:HH:mm}";
+        }
+
+        if (date == localNow.Date.AddDays(-1))
+        {
+            return $"hier à {localTimestamp:HH:mm}";
+        }
+
+        var format = localTimestamp.Year == localNow.Year
+            ? "d MMM 'à' HH:mm"
+            : "d MMM yyyy 'à' HH:mm";
+
+        return localTimestamp.ToString(
+            format,
+            CultureInfo.GetCultureInfo("fr-FR"));
+    }
 
     private static string FormatDuration(
         TimeSpan duration)

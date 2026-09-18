@@ -19,19 +19,27 @@ public partial class GameDetailView :
 
         Loaded +=
             GameDetailView_OnLoaded;
+        Unloaded +=
+            GameDetailView_OnUnloaded;
     }
 
     private async void GameDetailView_OnLoaded(
         object sender,
         System.Windows.RoutedEventArgs e)
     {
-        Loaded -=
-            GameDetailView_OnLoaded;
-
         if (DataContext is GameDetailViewModel viewModel)
         {
+            viewModel.Activate();
             await viewModel.LoadAsync(
                 CancellationToken.None);
+        }
+    }
+
+    private void GameDetailView_OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is GameDetailViewModel viewModel)
+        {
+            viewModel.Deactivate();
         }
     }
 
