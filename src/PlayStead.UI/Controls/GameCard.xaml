@@ -60,7 +60,7 @@
                 Background="{DynamicResource PlayStead.Brush.Surface}"
                 BorderBrush="{DynamicResource PlayStead.Brush.Border}"
                 BorderThickness="1"
-                CornerRadius="8">
+                CornerRadius="{DynamicResource PlayStead.Radius.Small}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="300" />

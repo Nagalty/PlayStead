@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
     <!-- =========================================================
          PLAYSTEAD — AUTHORITATIVE COLOR PALETTE
@@ -31,6 +32,17 @@
     <SolidColorBrush x:Key="PlayStead.Brush.CopperHover" Color="#FF9B4A"/>
     <SolidColorBrush x:Key="PlayStead.Brush.CopperPressed" Color="#D97025"/>
 
+    <!-- Semantic design roles -->
+    <SolidColorBrush x:Key="PlayStead.Brush.Accent"
+                     Color="{StaticResource PlayStead.Color.Copper}"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.AccentHover" Color="#FF9B4A"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.AccentPressed" Color="#D97025"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.AccentMuted" Color="#8D623E"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.SurfaceElevated" Color="#17222D"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.SurfaceNested" Color="#141D26"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.Error" Color="#FF5D57"/>
+    <SolidColorBrush x:Key="PlayStead.Brush.Neutral" Color="#718092"/>
+
     <!-- Semantic states -->
     <SolidColorBrush x:Key="PlayStead.Brush.Success" Color="#26D98B"/>
     <SolidColorBrush x:Key="PlayStead.Brush.Warning" Color="#F4B740"/>
@@ -61,6 +73,18 @@
     <Thickness x:Key="PlayStead.Spacing.5">32</Thickness>
     <Thickness x:Key="PlayStead.Spacing.6">48</Thickness>
 
+    <!-- Semantic layout roles -->
+    <Thickness x:Key="PlayStead.Inset.Page">24</Thickness>
+    <Thickness x:Key="PlayStead.Inset.Card">16</Thickness>
+    <Thickness x:Key="PlayStead.Inset.Control">8</Thickness>
+    <Thickness x:Key="PlayStead.Gap.Block.Small">0,8,0,0</Thickness>
+    <Thickness x:Key="PlayStead.Gap.Inline.XSmall">2,0,0,0</Thickness>
+    <Thickness x:Key="PlayStead.Border.None">0</Thickness>
+    <Thickness x:Key="PlayStead.Border.Thin">1</Thickness>
+    <Thickness x:Key="PlayStead.Border.Emphasis">2</Thickness>
+    <Thickness x:Key="PlayStead.Control.Padding">12,8</Thickness>
+    <Thickness x:Key="PlayStead.Control.IconPadding">8</Thickness>
+
     <!-- Radius -->
     <CornerRadius x:Key="PlayStead.Radius.Small">8</CornerRadius>
     <CornerRadius x:Key="PlayStead.Radius.Medium">12</CornerRadius>
@@ -71,6 +95,26 @@
     <Duration x:Key="PlayStead.Duration.Normal">0:0:0.180</Duration>
 
     <!-- Typography -->
-    <FontFamily x:Key="PlayStead.Font.Body">Segoe UI Variable, Segoe UI</FontFamily>
+    <FontFamily x:Key="PlayStead.Font.Sans">Geist Sans, Segoe UI Variable, Segoe UI</FontFamily>
+    <FontFamily x:Key="PlayStead.Font.Body">Geist Sans, Segoe UI Variable, Segoe UI</FontFamily>
+
+    <!-- Audited typography primitives -->
+    <sys:Double x:Key="PlayStead.FontSize.11">11</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.12">12</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.13">13</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.14">14</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.15">15</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.16">16</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.17">17</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.20">20</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.22">22</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.24">24</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.26">26</sys:Double>
+    <sys:Double x:Key="PlayStead.FontSize.30">30</sys:Double>
+
+    <!-- Control metrics -->
+    <sys:Double x:Key="PlayStead.Control.Height">36</sys:Double>
+    <sys:Double x:Key="PlayStead.Control.IconSize">36</sys:Double>
+    <sys:Double x:Key="PlayStead.Control.Radius">8</sys:Double>
 
 </ResourceDictionary>

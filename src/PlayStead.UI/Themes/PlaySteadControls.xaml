@@ -13,7 +13,7 @@
     </Style>
 
     <Style x:Key="PlayStead.ControlBase" TargetType="Control">
-        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Body}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Sans}"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
         <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Surface}"/>
