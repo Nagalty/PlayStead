@@ -56,11 +56,7 @@
     </UserControl.Triggers>
 
     <Grid>
-        <Border x:Name="CardShell"
-                Background="{DynamicResource PlayStead.Brush.Surface}"
-                BorderBrush="{DynamicResource PlayStead.Brush.Border}"
-                BorderThickness="1"
-                CornerRadius="{DynamicResource PlayStead.Radius.Small}">
+        <Border x:Name="CardShell" Style="{DynamicResource PlayStead.Surface.Card}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="300" />

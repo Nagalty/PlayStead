@@ -2,11 +2,7 @@
              x:Name="Root"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Border Padding="{DynamicResource PlayStead.Spacing.1}"
-            Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
-            BorderBrush="{DynamicResource PlayStead.Brush.Border}"
-            BorderThickness="1"
-            CornerRadius="{DynamicResource PlayStead.Radius.Small}">
+    <Border Style="{DynamicResource PlayStead.Status.Badge.Neutral}">
         <TextBlock Text="{Binding Text, ElementName=Root}"
                    Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
                    FontFamily="{DynamicResource PlayStead.Font.Body}"

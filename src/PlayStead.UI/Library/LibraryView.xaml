@@ -393,13 +393,6 @@
                                         <TextBlock Text="{Binding ProviderLabel}"
                                                    Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
                                                    FontSize="12"/>
-                                        <TextBlock Margin="7,0"
-                                                   Text="·"
-                                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
-                                                   FontSize="12"/>
-                                        <TextBlock Text="{Binding InstalledSizeLabel, Mode=OneWay}"
-                                                   Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                                   FontSize="12"/>
                                     </StackPanel>
 
                                     <Border Grid.Column="1"

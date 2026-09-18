@@ -187,11 +187,7 @@
                             Grid.Column="1">
                 <Border x:Name="InstallationPanel"
                         Margin="0,0,0,9"
-                        Padding="{DynamicResource PlayStead.Spacing.3}"
-                        Background="{DynamicResource PlayStead.Brush.Surface}"
-                        BorderBrush="{DynamicResource PlayStead.Brush.Border}"
-                        BorderThickness="1"
-                        CornerRadius="{DynamicResource PlayStead.Radius.Medium}">
+                        Style="{DynamicResource PlayStead.Surface.Card}">
                     <StackPanel>
                         <controls:SectionHeader Title="Source / plateforme"/>
 

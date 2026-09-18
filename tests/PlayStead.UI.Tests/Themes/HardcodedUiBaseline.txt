@@ -80,7 +80,7 @@ src/PlayStead.UI/Library/LibraryView.xaml|CornerRadius|5|1
 src/PlayStead.UI/Library/LibraryView.xaml|CornerRadius|6|1
 src/PlayStead.UI/Library/LibraryView.xaml|CornerRadius|8|4
 src/PlayStead.UI/Library/LibraryView.xaml|FontSize|11|3
-src/PlayStead.UI/Library/LibraryView.xaml|FontSize|12|20
+src/PlayStead.UI/Library/LibraryView.xaml|FontSize|12|18
 src/PlayStead.UI/Library/LibraryView.xaml|FontSize|13|8
 src/PlayStead.UI/Library/LibraryView.xaml|FontSize|14|3
 src/PlayStead.UI/Library/LibraryView.xaml|FontSize|15|1
@@ -113,7 +113,6 @@ src/PlayStead.UI/Library/LibraryView.xaml|Spacing|16,0,0,0|2
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|18|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|20,16,0,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|28|1
-src/PlayStead.UI/Library/LibraryView.xaml|Spacing|7,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|8,0,0,0|8
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|8,3|2
 src/PlayStead.UI/MainWindow.xaml|FontSize|24|1

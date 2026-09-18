@@ -117,6 +117,41 @@
         <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextSecondary}"/>
     </Style>
 
+    <Style x:Key="PlayStead.Surface.Panel" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource PlayStead.Radius.Medium}"/>
+        <Setter Property="Padding" Value="{DynamicResource PlayStead.Inset.Card}"/>
+    </Style>
+    <Style x:Key="PlayStead.Surface.Card" TargetType="Border" BasedOn="{StaticResource PlayStead.Surface.Panel}"/>
+    <Style x:Key="PlayStead.Surface.CardNested" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceNested}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource PlayStead.Radius.Small}"/>
+        <Setter Property="Padding" Value="{DynamicResource PlayStead.Spacing.2}"/>
+    </Style>
+    <Style x:Key="PlayStead.Surface.Metric" TargetType="Border" BasedOn="{StaticResource PlayStead.Surface.CardNested}"/>
+    <Style x:Key="PlayStead.Surface.Selected" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}"/>
+        <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource PlayStead.Radius.Medium}"/>
+        <Setter Property="Padding" Value="{DynamicResource PlayStead.Inset.Card}"/>
+    </Style>
+    <Style x:Key="PlayStead.Status.Badge.Neutral" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
+        <Setter Property="CornerRadius" Value="{DynamicResource PlayStead.Radius.Small}"/>
+        <Setter Property="Padding" Value="{DynamicResource PlayStead.Spacing.1}"/>
+    </Style>
+    <Style x:Key="PlayStead.Status.Badge.Success" TargetType="Border" BasedOn="{StaticResource PlayStead.Status.Badge.Neutral}"><Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Success}"/></Style>
+    <Style x:Key="PlayStead.Status.Badge.Warning" TargetType="Border" BasedOn="{StaticResource PlayStead.Status.Badge.Neutral}"><Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Warning}"/></Style>
+    <Style x:Key="PlayStead.Status.Badge.Error" TargetType="Border" BasedOn="{StaticResource PlayStead.Status.Badge.Neutral}"><Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Error}"/></Style>
+    <Style x:Key="PlayStead.Status.Badge.Info" TargetType="Border" BasedOn="{StaticResource PlayStead.Status.Badge.Neutral}"><Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Info}"/></Style>
+
     <ControlTemplate x:Key="PlayStead.ButtonTemplate" TargetType="ButtonBase">
         <Border Background="{TemplateBinding Background}"
                 BorderBrush="{TemplateBinding BorderBrush}"
