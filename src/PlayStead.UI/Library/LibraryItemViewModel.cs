@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Globalization;
 using PlayStead.Core.Library;
+using PlayStead.Core.Catalog;
 using PlayStead.Core.Steam;
 
 namespace PlayStead.UI.Library;
@@ -13,7 +14,8 @@ public sealed record LibraryItemViewModel(
     string InstallPath,
     long? InstalledSizeBytes,
     SteamUpdateState? SteamState = null,
-    bool IsSessionActive = false)
+    bool IsSessionActive = false,
+    CatalogContentId? CanonicalContentId = null)
     : INotifyPropertyChanged
 {
     private string? _coverPath;

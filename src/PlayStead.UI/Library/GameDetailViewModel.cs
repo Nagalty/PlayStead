@@ -3,6 +3,9 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.IO;
 using PlayStead.Core.Library;
+using PlayStead.Core.Catalog;
+using PlayStead.Core.Persistence;
+using System.Globalization;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Launching;
 using PlayStead.UI.Sessions;
@@ -14,6 +17,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly SessionMonitor? _sessionMonitor;
     private readonly Func<Task>? _refreshActivityAsync;
     private bool _isActive;
+    private readonly ICanonicalCatalogStore? _catalogStore;
     public GameDetailViewModel(
         LibraryItemViewModel game)
         : this(game, launch: null, activity: null)
@@ -39,7 +43,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         LibraryItemViewModel game,
         GameLaunchViewModel? launch,
         GameQuickPanelViewModel? activity,
-        string? heroPath)
+        string? heroPath,
+        ICanonicalCatalogStore? catalogStore = null)
     {
         ArgumentNullException.ThrowIfNull(
             game);
@@ -79,6 +84,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
 
         HeroPath =
             heroPath;
+
+        _catalogStore = catalogStore;
     }
 
     public GameDetailViewModel(
@@ -87,8 +94,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         GameQuickPanelViewModel? activity,
         string? heroPath,
         SessionMonitor sessionMonitor,
-        Func<Task>? refreshActivityAsync = null)
-        : this(game, launch, activity, heroPath)
+        Func<Task>? refreshActivityAsync = null,
+        ICanonicalCatalogStore? catalogStore = null)
+        : this(game, launch, activity, heroPath, catalogStore)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -130,11 +138,22 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public bool HasSteamStatus =>
         Game.HasSteamStatus;
 
-    public Task LoadAsync(
-        CancellationToken cancellationToken) =>
-        Activity?.LoadSessionSummaryAsync(
-            cancellationToken) ??
-        Task.CompletedTask;
+    public async Task LoadAsync(CancellationToken cancellationToken)
+    {
+        await (Activity?.LoadSessionSummaryAsync(cancellationToken) ?? Task.CompletedTask);
+        if (_catalogStore is null || Game.CanonicalContentId is not CatalogContentId contentId)
+        {
+            return;
+        }
+
+        var content = await _catalogStore.GetByIdAsync(contentId, cancellationToken);
+        DeveloperDisplay = content?.Developer;
+        PublisherDisplay = content?.Publisher;
+        ReleaseDateDisplay = content?.ReleaseDate?.ToString("d MMMM yyyy", CultureInfo.CurrentCulture);
+        OnPropertyChanged(nameof(DeveloperDisplay));
+        OnPropertyChanged(nameof(PublisherDisplay));
+        OnPropertyChanged(nameof(ReleaseDateDisplay));
+    }
 
     public string Title { get; }
 
@@ -149,6 +168,10 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public string InstalledSizeLabel { get; }
 
     public string SteamStatusLabel { get; }
+
+    public string? DeveloperDisplay { get; private set; }
+    public string? PublisherDisplay { get; private set; }
+    public string? ReleaseDateDisplay { get; private set; }
 
     private static string GetDriveLabel(string path)
     {

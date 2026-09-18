@@ -355,7 +355,8 @@ public static class PlaySteadHost
                     services.GetRequiredService<
                         UiPreferencesStore>(),
                     services.GetRequiredService<
-                        IGameMediaResolver>()));
+                        IGameMediaResolver>(),
+                    services.GetRequiredService<ICanonicalCatalogStore>()));
 
         builder.Services.AddSingleton<
             SessionViewModel>();

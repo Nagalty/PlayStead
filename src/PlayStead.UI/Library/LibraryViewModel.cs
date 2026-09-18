@@ -19,6 +19,7 @@ public sealed class LibraryViewModel :
 {
     private readonly ILibraryStore _libraryStore;
     private readonly IGameMediaResolver _gameMediaResolver;
+    public ICanonicalCatalogStore? CanonicalCatalogStore { get; }
     private readonly UiPreferencesStore? _uiPreferencesStore;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly object _verifySteamGate = new();
@@ -111,7 +112,8 @@ public sealed class LibraryViewModel :
         ILibraryStore libraryStore,
         ISteamReferenceRuntime steamReferenceRuntime,
         SessionMonitor sessionMonitor,
-        IGameMediaResolver gameMediaResolver)
+        IGameMediaResolver gameMediaResolver,
+        ICanonicalCatalogStore? canonicalCatalogStore = null)
         : this(
             libraryStore,
             steamReferenceRuntime,
@@ -122,6 +124,8 @@ public sealed class LibraryViewModel :
 
         _gameMediaResolver =
             gameMediaResolver;
+
+        CanonicalCatalogStore = canonicalCatalogStore;
     }
 
     public LibraryViewModel(
@@ -144,7 +148,8 @@ public sealed class LibraryViewModel :
         ISteamReferenceRuntime steamReferenceRuntime,
         SessionMonitor sessionMonitor,
         UiPreferencesStore uiPreferencesStore,
-        IGameMediaResolver gameMediaResolver)
+        IGameMediaResolver gameMediaResolver,
+        ICanonicalCatalogStore? canonicalCatalogStore = null)
         : this(
             libraryStore,
             steamReferenceRuntime,
@@ -1050,7 +1055,8 @@ public sealed class LibraryViewModel :
                             installation.InstalledSizeBytes,
                             steamState,
                             activeGameIds.Contains(
-                                game.Id));
+                                game.Id),
+                            game.CanonicalContentId);
 
                     ApplyCachedCover(
                         item,

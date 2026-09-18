@@ -739,7 +739,8 @@ public partial class MainWindow : Window
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
                         activity,
-                        CreateHeroPath(libraryViewModel, game))
+                        CreateHeroPath(libraryViewModel, game),
+                        libraryViewModel.CanonicalCatalogStore)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -747,7 +748,8 @@ public partial class MainWindow : Window
                         CreateHeroPath(libraryViewModel, game),
                         _sessionMonitor,
                         () => activity?.LoadSessionSummaryAsync(CancellationToken.None)
-                            ?? Task.CompletedTask);
+                            ?? Task.CompletedTask,
+                        libraryViewModel.CanonicalCatalogStore);
 
                 MainContent.Content =
                     new GameDetailView(
