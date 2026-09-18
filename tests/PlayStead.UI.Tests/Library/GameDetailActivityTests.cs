@@ -29,17 +29,7 @@ public sealed class GameDetailActivityTests
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "Activity.LastActivityLabel",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
             "Activity.LastSessionDateLabel",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "Activity.LastSessionDurationLabel",
             xaml,
             StringComparison.Ordinal);
 

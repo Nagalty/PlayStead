@@ -183,145 +183,69 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
+                <Border x:Name="GameActivity"
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        Margin="0,0,9,0"
+                        Style="{DynamicResource PlayStead.Surface.Card}"
+                        Visibility="{Binding Activity.HasSessionHistory,
+                                             Converter={StaticResource BooleanToVisibilityConverter},
+                                             FallbackValue=Collapsed}">
+                    <StackPanel>
+                        <controls:SectionHeader Title="Ton jeu"/>
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="Tes stats et ta dernière session."
+                                   Style="{DynamicResource PlayStead.Text.BodySecondary}"/>
+                        <UniformGrid Margin="0,12,0,0" Columns="3">
+                            <Border Margin="0,0,6,0" Style="{DynamicResource PlayStead.Surface.Metric}">
+                                <StackPanel>
+                                    <TextBlock Text="Temps de jeu" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                    <TextBlock Margin="0,4,0,0" Text="{Binding Activity.TotalPlayTimeLabel}" Style="{DynamicResource PlayStead.Text.Body}"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Margin="3,0,3,0" Style="{DynamicResource PlayStead.Surface.Metric}">
+                                <StackPanel>
+                                    <TextBlock Text="Dernière session" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                    <TextBlock Margin="0,4,0,0" Text="{Binding Activity.LastSessionDateLabel}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Margin="6,0,0,0" Style="{DynamicResource PlayStead.Surface.Metric}">
+                                <StackPanel>
+                                    <TextBlock Text="Sessions" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                    <TextBlock Margin="0,4,0,0" Text="{Binding Activity.SessionCountLabel}" Style="{DynamicResource PlayStead.Text.Body}"/>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
+
                 <StackPanel x:Name="InstallationInformation"
-                            Grid.Column="1">
-                <Border x:Name="InstallationPanel"
-                        Margin="0,0,0,9"
-                        Style="{DynamicResource PlayStead.Surface.Card}">
-                    <StackPanel>
-                        <controls:SectionHeader Title="Source / plateforme"/>
-
-                        <controls:StatusBadge Margin="0,10,0,0"
-                                              Text="{Binding ProviderLabel}"/>
-
-                        <TextBlock x:Name="InstallationPathRow"
-                                   Margin="0,10,0,0"
-                                   Text="{Binding InstallPath}"
-                                   Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
-                                   FontSize="14"
-                                   Visibility="{Binding HasInstallPath,
-                                                Converter={StaticResource BooleanToVisibilityConverter}}"
-                                   TextWrapping="Wrap"/>
-
-                        <TextBlock x:Name="InstalledSizeRow"
-                                   Margin="0,8,0,0"
-                                   Text="{Binding InstalledSizeLabel}"
-                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
-                                   FontSize="13"
-                                   Visibility="{Binding HasInstalledSize,
-                                                Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    </StackPanel>
-                </Border>
-
-                <Border x:Name="LocalStatusPanel"
-                        Grid.Row="1"
-                        Margin="0,9,0,0"
-                        Padding="{DynamicResource PlayStead.Spacing.3}"
-                        Background="{DynamicResource PlayStead.Brush.Surface}"
-                        BorderBrush="{DynamicResource PlayStead.Brush.Border}"
-                        BorderThickness="1"
-                        CornerRadius="{DynamicResource PlayStead.Radius.Medium}">
-                    <StackPanel>
-                        <controls:SectionHeader Title="État local"/>
-
-                        <controls:StatusBadge x:Name="SteamStatusRow"
-                                              Margin="0,10,0,0"
-                                              Text="{Binding SteamStatusLabel}"
-                                              Visibility="{Binding HasSteamStatus,
-                                                           Converter={StaticResource BooleanToVisibilityConverter}}"/>
-
-                        <controls:StatusBadge Margin="0,8,0,0"
-                                   Text="{Binding SessionStatusLabel}"
-                                   Visibility="{Binding Game.IsSessionActive,
-                                                Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    </StackPanel>
-                </Border>
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            Margin="9,0,0,0">
+                    <Border x:Name="InstallationPanel"
+                            Style="{DynamicResource PlayStead.Surface.Card}">
+                        <StackPanel>
+                            <controls:SectionHeader Title="Installation"/>
+                            <controls:StatusBadge Margin="0,10,0,0" Text="{Binding ProviderLabel}"/>
+                            <Grid Margin="0,12,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Text="Taille installée" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasInstalledSize, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <TextBlock Grid.Row="0" HorizontalAlignment="Right" Text="{Binding InstalledSizeLabel}" Style="{DynamicResource PlayStead.Text.Body}" Visibility="{Binding HasInstalledSize, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <TextBlock Grid.Row="1" Margin="0,8,0,0" Text="Disque" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasInstallDrive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <TextBlock Grid.Row="1" Margin="0,8,0,0" HorizontalAlignment="Right" Text="{Binding InstallDriveLabel}" Style="{DynamicResource PlayStead.Text.Body}" Visibility="{Binding HasInstallDrive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <TextBlock Grid.Row="2" Margin="0,8,0,0" Text="Chemin d’installation" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasInstallPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <TextBlock Grid.Row="2" Margin="0,8,0,0" HorizontalAlignment="Right" Text="{Binding InstallPath}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap" Visibility="{Binding HasInstallPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
-
-            <Border x:Name="GameActivity"
-                    Grid.Row="0"
-                    Grid.Column="0"
-                    Margin="0,0,9,0"
-                    Padding="{DynamicResource PlayStead.Spacing.3}"
-                    Background="{DynamicResource PlayStead.Brush.SurfaceSubtle}"
-                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
-                    BorderThickness="1"
-                    CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
-                    Visibility="{Binding Activity.HasSessionHistory,
-                                         Converter={StaticResource BooleanToVisibilityConverter},
-                                         FallbackValue=Collapsed}">
-                <StackPanel>
-                    <controls:SectionHeader Title="Ton jeu / Activité"/>
-
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Dernière activité"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
-                                       FontSize="12"/>
-                            <TextBlock Margin="0,4,12,0"
-                                       Text="{Binding Activity.LastActivityLabel}"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
-                                       FontSize="14"
-                                       TextWrapping="Wrap"/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Temps total"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
-                                       FontSize="12"/>
-                            <TextBlock Margin="0,4,12,0"
-                                       Text="{Binding Activity.TotalPlayTimeLabel}"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
-                                       FontSize="14"/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Sessions"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
-                                       FontSize="12"/>
-                            <TextBlock Margin="0,4,0,0"
-                                       Text="{Binding Activity.SessionCountLabel}"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
-                                       FontSize="14"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <TextBlock Margin="0,12,0,0"
-                               Text="{Binding Activity.LastSessionDateLabel}"
-                               Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                               FontSize="13"/>
-
-                    <TextBlock Margin="0,4,0,0"
-                               Text="{Binding Activity.LastSessionDurationLabel}"
-                               Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
-                               FontSize="13"/>
-                </StackPanel>
-            </Border>
 
             </Grid>
-
-            <Border Margin="0,18,0,0"
-                    Padding="{DynamicResource PlayStead.Spacing.3}"
-                    Background="{DynamicResource PlayStead.Brush.SurfaceSubtle}"
-                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
-                    BorderThickness="1"
-                    CornerRadius="{DynamicResource PlayStead.Radius.Medium}">
-                <StackPanel>
-                    <controls:SectionHeader Title="Données disponibles"/>
-
-                    <TextBlock Margin="0,10,0,0"
-                               Text="Cette fiche affiche uniquement les métadonnées locales actuellement connues par PlayStead."
-                               Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
-                               FontSize="13"
-                               TextWrapping="Wrap"/>
-                </StackPanel>
-            </Border>
             </StackPanel>
         </Grid>
     </ScrollViewer>

@@ -9,81 +9,27 @@ public sealed class GameDetailInstallationTests
     [Fact]
     public void Installation_module_exposes_real_local_fields()
     {
-        var item =
-            new LibraryItemViewModel(
-                GameId.New(),
-                "Game",
-                ProviderKind.Steam,
-                "Steam",
-                @"C:\Games\Game",
-                42_000_000_000,
-                SteamUpdateState.UpToDate,
-                IsSessionActive: true);
-
-        var viewModel =
-            new GameDetailViewModel(item);
-
+        var item = new LibraryItemViewModel(GameId.New(), "Game", ProviderKind.Steam, "Steam", @"C:\Games\Game", 42_000_000_000, SteamUpdateState.UpToDate, IsSessionActive: true);
+        var viewModel = new GameDetailViewModel(item);
         Assert.Equal("Steam", viewModel.ProviderLabel);
         Assert.Equal(@"C:\Games\Game", viewModel.InstallPath);
+        Assert.Equal("C:", viewModel.InstallDriveLabel);
         Assert.Equal("42,0 Go", viewModel.InstalledSizeLabel);
         Assert.Equal("À jour", viewModel.SteamStatusLabel);
         Assert.Equal("En cours", viewModel.SessionStatusLabel);
     }
-
     [Fact]
-    public void Installation_view_hides_absent_path_size_and_status_independently()
+    public void Installation_view_exposes_authoritative_local_fields()
     {
-        var xaml =
-            File.ReadAllText(
-                FindUiFile(
-                    Path.Combine(
-                        "Library",
-                        "GameDetailView.xaml")));
-
-        Assert.Contains(
-            "x:Name=\"InstallationPanel\"",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "x:Name=\"InstallationPathRow\"",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "HasInstallPath",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "x:Name=\"InstalledSizeRow\"",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "HasInstalledSize",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "x:Name=\"LocalStatusPanel\"",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "x:Name=\"SteamStatusRow\"",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "HasSteamStatus",
-            xaml,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "BooleanToVisibilityConverter",
-            xaml,
-            StringComparison.Ordinal);
+        var xaml = File.ReadAllText(FindUiFile(Path.Combine("Library", "GameDetailView.xaml")));
+        Assert.Contains("x:Name=\"InstallationPanel\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Installation\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("InstalledSizeLabel", xaml, StringComparison.Ordinal);
+        Assert.Contains("InstallDriveLabel", xaml, StringComparison.Ordinal);
+        Assert.Contains("InstallPath", xaml, StringComparison.Ordinal);
+        Assert.Contains("HasInstallPath", xaml, StringComparison.Ordinal);
+        Assert.Contains("HasInstalledSize", xaml, StringComparison.Ordinal);
+        Assert.Contains("BooleanToVisibilityConverter", xaml, StringComparison.Ordinal);
     }
 
     [Fact]

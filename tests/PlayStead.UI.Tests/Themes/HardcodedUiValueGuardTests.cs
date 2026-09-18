@@ -6,7 +6,7 @@ namespace PlayStead.UI.Tests.Themes;
 public sealed partial class HardcodedUiValueGuardTests
 {
     private const int ExpectedHexColorCount = 48;
-    private const int ExpectedFontSizeCount = 80;
+    private const int ExpectedFontSizeCount = 69;
     private const int ExpectedFontWeightCount = 44;
     private const int ExpectedCornerRadiusCount = 22;
     private const int ExpectedSpacingCount = 161;

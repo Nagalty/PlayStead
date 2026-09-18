@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.IO;
 using PlayStead.Core.Library;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Launching;
@@ -61,6 +62,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         InstallPath =
             game.InstallPath;
 
+        InstallDriveLabel =
+            GetDriveLabel(game.InstallPath);
+
         InstalledSizeLabel =
             game.InstalledSizeLabel;
 
@@ -120,6 +124,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public bool HasInstalledSize =>
         Game.InstalledSizeBytes.HasValue;
 
+    public bool HasInstallDrive =>
+        !string.IsNullOrWhiteSpace(InstallDriveLabel);
+
     public bool HasSteamStatus =>
         Game.HasSteamStatus;
 
@@ -137,9 +144,18 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
 
     public string InstallPath { get; }
 
+    public string InstallDriveLabel { get; }
+
     public string InstalledSizeLabel { get; }
 
     public string SteamStatusLabel { get; }
+
+    private static string GetDriveLabel(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+        var root = Path.GetPathRoot(path);
+        return string.IsNullOrWhiteSpace(root) ? string.Empty : root.TrimEnd('\\');
+    }
 
     public string? SessionStatusLabel => Game.SessionStatusLabel;
 

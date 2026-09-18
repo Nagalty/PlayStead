@@ -33,16 +33,6 @@ public sealed class GameDetailViewContractTests
             FindBinding(
                 xaml,
                 "InstalledSizeLabel"));
-
-        Assert.NotNull(
-            FindBinding(
-                xaml,
-                "SteamStatusLabel"));
-
-        Assert.NotNull(
-            FindBinding(
-                xaml,
-                "SessionStatusLabel"));
     }
 
     [Fact]
