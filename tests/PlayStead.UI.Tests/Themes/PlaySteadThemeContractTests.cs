@@ -89,6 +89,37 @@ public sealed class PlaySteadThemeContractTests
         });
     }
 
+    [Fact]
+    public void Representative_controls_consume_semantic_typography_roles()
+    {
+        var sectionHeader = File.ReadAllText(FindUiFile("Controls/SectionHeader.xaml"));
+        var kpiCard = File.ReadAllText(FindUiFile("Controls/KpiCard.xaml"));
+        var emptyState = File.ReadAllText(FindUiFile("Controls/EmptyState.xaml"));
+
+        Assert.Contains("Style=\"{DynamicResource PlayStead.Text.SectionTitle}\"", sectionHeader, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{DynamicResource PlayStead.Text.Caption}\"", kpiCard, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{DynamicResource PlayStead.Text.Display}\"", kpiCard, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{DynamicResource PlayStead.Text.Body}\"", emptyState, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("FontSize=", sectionHeader, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontWeight=", sectionHeader, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontFamily=", sectionHeader, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontSize=", kpiCard, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontWeight=", kpiCard, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontFamily=", kpiCard, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontSize=", emptyState, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontWeight=", emptyState, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontFamily=", emptyState, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Game_detail_hero_title_contract_remains_30_bold()
+    {
+        var gameDetail = File.ReadAllText(FindUiFile("Library/GameDetailView.xaml"));
+        Assert.Contains("FontSize=\"30\"", gameDetail, StringComparison.Ordinal);
+        Assert.Contains("FontWeight=\"Bold\"", gameDetail, StringComparison.Ordinal);
+    }
+
     private static string FindUiFile(string relativePath)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -95,8 +95,10 @@
     <Duration x:Key="PlayStead.Duration.Normal">0:0:0.180</Duration>
 
     <!-- Typography -->
+    <FontFamily x:Key="PlayStead.Font.Display">Geist Sans, Segoe UI Variable, Segoe UI</FontFamily>
     <FontFamily x:Key="PlayStead.Font.Sans">Geist Sans, Segoe UI Variable, Segoe UI</FontFamily>
     <FontFamily x:Key="PlayStead.Font.Body">Geist Sans, Segoe UI Variable, Segoe UI</FontFamily>
+    <FontFamily x:Key="PlayStead.Font.Mono">Cascadia Mono, Consolas</FontFamily>
 
     <!-- Audited typography primitives -->
     <sys:Double x:Key="PlayStead.FontSize.11">11</sys:Double>

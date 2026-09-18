@@ -35,6 +35,62 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Semantic text roles. Pages choose a role; they do not redefine its scale. -->
+    <Style x:Key="PlayStead.Text.Display" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Display}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.30}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+    </Style>
+    <Style x:Key="PlayStead.Text.PageTitle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Sans}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.26}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+    </Style>
+    <Style x:Key="PlayStead.Text.SectionTitle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Sans}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.17}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+    </Style>
+    <Style x:Key="PlayStead.Text.CardTitle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Sans}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.15}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+    </Style>
+    <Style x:Key="PlayStead.Text.Body" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Body}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.14}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+    </Style>
+    <Style x:Key="PlayStead.Text.BodySecondary" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Body}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.13}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextSecondary}"/>
+    </Style>
+    <Style x:Key="PlayStead.Text.Caption" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Body}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.12}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextMuted}"/>
+    </Style>
+    <Style x:Key="PlayStead.Text.ButtonLabel" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Sans}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.14}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+    </Style>
+    <Style x:Key="PlayStead.Text.Technical" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Mono}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.13}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextSecondary}"/>
+    </Style>
+
     <ControlTemplate x:Key="PlayStead.ButtonTemplate" TargetType="ButtonBase">
         <Border Background="{TemplateBinding Background}"
                 BorderBrush="{TemplateBinding BorderBrush}"

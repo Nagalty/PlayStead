@@ -8,9 +8,7 @@
             BorderThickness="1"
             CornerRadius="{DynamicResource PlayStead.Radius.Medium}">
         <TextBlock Text="{Binding Message, ElementName=Root}"
-                   Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                   FontFamily="{DynamicResource PlayStead.Font.Body}"
-                   FontSize="14"
+                   Style="{DynamicResource PlayStead.Text.Body}"
                    TextWrapping="Wrap"/>
     </Border>
 </UserControl>

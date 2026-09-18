@@ -9,7 +9,6 @@ src/PlayStead.UI/App.xaml|Spacing|2,1|1
 src/PlayStead.UI/Attention/AttentionView.xaml|FontSize|26|1
 src/PlayStead.UI/Attention/AttentionView.xaml|FontWeight|SemiBold|1
 src/PlayStead.UI/Attention/AttentionView.xaml|Spacing|0,24,0,0|1
-src/PlayStead.UI/Controls/EmptyState.xaml|FontSize|14|1
 src/PlayStead.UI/Controls/GameArtwork.xaml|CornerRadius|2|1
 src/PlayStead.UI/Controls/GameArtwork.xaml|CornerRadius|6|1
 src/PlayStead.UI/Controls/GameArtwork.xaml|FontSize|11|1
@@ -35,14 +34,9 @@ src/PlayStead.UI/Controls/GameCard.xaml|Spacing|14|1
 src/PlayStead.UI/Controls/GameCard.xaml|Spacing|8,0,0,0|1
 src/PlayStead.UI/Controls/GameCard.xaml|Spacing|8,3|1
 src/PlayStead.UI/Controls/GameCard.xaml|Spacing|8,8,8,0|1
-src/PlayStead.UI/Controls/KpiCard.xaml|FontSize|12|1
-src/PlayStead.UI/Controls/KpiCard.xaml|FontSize|20|1
-src/PlayStead.UI/Controls/KpiCard.xaml|FontWeight|SemiBold|1
 src/PlayStead.UI/Controls/KpiCard.xaml|Spacing|0,5,0,0|1
 src/PlayStead.UI/Controls/PlaySplitButton.xaml|LocalButtonAppearance|FundamentalAppearance|1
 src/PlayStead.UI/Controls/PlaySplitButton.xaml|Spacing|10,10|1
-src/PlayStead.UI/Controls/SectionHeader.xaml|FontSize|17|1
-src/PlayStead.UI/Controls/SectionHeader.xaml|FontWeight|SemiBold|1
 src/PlayStead.UI/Controls/StatusBadge.xaml|FontSize|12|1
 src/PlayStead.UI/Controls/StatusBadge.xaml|FontWeight|SemiBold|1
 src/PlayStead.UI/Home/HomeView.xaml|FontSize|14|1
