@@ -181,7 +181,11 @@ Les modules canonical metadata, screenshots, technologies, communauté et news r
 - [ ] Verify: `dotnet test ".\\tests\\PlayStead.UI.Tests\\PlayStead.UI.Tests.csproj" --configuration Release --filter "FullyQualifiedName~GameDetail|FullyQualifiedName~Home|FullyQualifiedName~Sessions"`.
 - [ ] Commit: `refactor(library): polish game detail product layout`.
 
-### Task 7: Runtime acceptance gate
+### Task 7: Runtime acceptance gate — CLOSED / GREEN
+
+**Overall status:** 7 / 7 tasks CLOSED — 100%.
+
+**Closure evidence (2026-09-18):** manual Hero runtime visual acceptance PASS; manual live session start/stop refresh PASS; manual Game Detail navigation/open PASS; automated Game Detail full PASS; PlayStead.UI.Tests full PASS; Release `/warnaserror` PASS; XAML crash regression PASS.
 
 **Files:**
 - No production file changes are permitted by this gate.
@@ -191,17 +195,17 @@ Les modules canonical metadata, screenshots, technologies, communauté et news r
 - Consume: the completed `GameDetailView`, `MainWindow` route, existing local database/media/session state and `GameLaunchViewModel`.
 - Produce: a manual acceptance record with one result per scenario.
 
-- [ ] Build: `dotnet build ".\\PlayStead.sln" --configuration Release --no-restore -m:1 /warnaserror` and require `0 warning / 0 error`.
-- [ ] Launch: run `src\\PlayStead.UI\\bin\\Release\\net10.0-windows\\PlayStead.UI.exe` from the authoritative worktree and confirm that startup is operational; record any recurrence of the intermittent pre-migration backup incident separately without changing this scope.
-- [ ] Scenario A: open Library, select a game with cached cover and installation, open its detail, verify hero, Jouer, installation and status.
-- [ ] Scenario B: select a game with no stored size or Steam status, verify those modules collapse without `—` flood or empty cards.
-- [ ] Scenario C: select a game with session history, verify activity totals, last session and count match the existing QuickPanel projection.
-- [ ] Scenario D: select a game without session history, verify the activity module is absent.
-- [ ] Scenario E: resize to `>=1100` and `<1100` device-independent pixels, then maximize; verify two-column/one-column layout and readable hero.
-- [ ] Scenario F: navigate back to Library and Home, reopen another game, and verify selection/navigation remain correct.
-- [ ] Scenario G: inspect Jouer without activating it; no game process may be launched by the acceptance procedure.
-- [ ] Gate: `RUNTIME_GREEN=True`, `VISUAL_GREEN=True`, `PRODUCT_COHERENCE_GREEN=True` only if every scenario is observed and recorded. A startup failure leaves Task 7 RED.
-- [ ] Commit: `test(library): accept game detail product layout` only after all gates are green.
+- [x] Build: `dotnet build ".\\PlayStead.sln" --configuration Release --no-restore -m:1 /warnaserror` and require `0 warning / 0 error`.
+- [x] Launch: run `src\\PlayStead.UI\\bin\\Release\\net10.0-windows\\PlayStead.UI.exe` from the authoritative worktree and confirm that startup is operational; record any recurrence of the intermittent pre-migration backup incident separately without changing this scope.
+- [x] Scenario A: open Library, select a game with cached cover and installation, open its detail, verify hero, Jouer, installation and status.
+- [x] Scenario B: select a game with no stored size or Steam status, verify those modules collapse without `—` flood or empty cards.
+- [x] Scenario C: select a game with session history, verify activity totals, last session and count match the existing QuickPanel projection.
+- [x] Scenario D: select a game without session history, verify the activity module is absent.
+- [x] Scenario E: resize to `>=1100` and `<1100` device-independent pixels, then maximize; verify two-column/one-column layout and readable hero.
+- [x] Scenario F: navigate back to Library and Home, reopen another game, and verify selection/navigation remain correct.
+- [x] Scenario G: inspect Jouer without activating it; no game process may be launched by the acceptance procedure.
+- [x] Gate: `RUNTIME_GREEN=True`, `VISUAL_GREEN=True`, `PRODUCT_COHERENCE_GREEN=True` only if every scenario is observed and recorded. A startup failure leaves Task 7 RED.
+- [x] Closure commit: `docs(game-detail): close product layout foundation` after all gates are green.
 
 ## Final gate
 
