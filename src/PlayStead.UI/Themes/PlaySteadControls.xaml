@@ -35,6 +35,9 @@
         </Style.Triggers>
     </Style>
 
+    <StreamGeometry x:Key="PlayStead.Icon.Play">M 1,0 L 11,6 1,12 Z</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.External">M 4,3 H 11 V 10 M 11,3 L 4,10 M 8,10 H 3 V 5</StreamGeometry>
+
     <!-- Semantic text roles. Pages choose a role; they do not redefine its scale. -->
     <Style x:Key="PlayStead.Text.Display" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Display}"/>
@@ -84,6 +87,9 @@
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
     </Style>
+    <Style x:Key="PlayStead.Text.PrimaryButtonLabel" TargetType="TextBlock" BasedOn="{StaticResource PlayStead.Text.ButtonLabel}">
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.16}"/>
+    </Style>
     <Style x:Key="PlayStead.Text.Technical" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Mono}"/>
         <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.13}"/>
@@ -101,18 +107,140 @@
                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                               RecognizesAccessKey="True"/>
         </Border>
-        <ControlTemplate.Triggers>
-            <Trigger Property="IsPressed" Value="True">
-                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Background}"/>
-            </Trigger>
-        </ControlTemplate.Triggers>
     </ControlTemplate>
 
-    <Style TargetType="Button" BasedOn="{StaticResource PlayStead.ControlBase}">
+    <Style x:Key="PlayStead.ButtonBase"
+           TargetType="Button"
+           BasedOn="{StaticResource PlayStead.ControlBase}">
+        <Setter Property="MinHeight" Value="{DynamicResource PlayStead.Control.Height}"/>
+        <Setter Property="Padding" Value="{DynamicResource PlayStead.Control.Padding}"/>
+        <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
+        <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Sans}"/>
+        <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.14}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FocusVisualStyle" Value="{StaticResource PlayStead.FocusVisual}"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template" Value="{StaticResource PlayStead.ButtonTemplate}"/>
     </Style>
+
+    <Style x:Key="PlayStead.Button.Primary"
+           TargetType="Button"
+           BasedOn="{StaticResource PlayStead.ButtonBase}">
+        <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.Background}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentHover}"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.AccentHover}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentHover}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.AccentPressed}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentPressed}"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+                <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Emphasis}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+                <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
+                <Setter Property="Opacity" Value="0.72"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="PlayStead.Button.Secondary"
+           TargetType="Button"
+           BasedOn="{StaticResource PlayStead.ButtonBase}">
+        <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceHover}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Accent}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentPressed}"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Accent}"/>
+                <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Emphasis}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Surface}"/>
+                <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextMuted}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}"/>
+                <Setter Property="Opacity" Value="0.65"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="PlayStead.Button.Ghost"
+           TargetType="Button"
+           BasedOn="{StaticResource PlayStead.ButtonBase}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceHover}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentPressed}"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Accent}"/>
+                <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Emphasis}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextMuted}"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="Opacity" Value="0.65"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="PlayStead.Button.Icon"
+           TargetType="Button"
+           BasedOn="{StaticResource PlayStead.ButtonBase}">
+        <Setter Property="Width" Value="{DynamicResource PlayStead.Control.IconSize}"/>
+        <Setter Property="Height" Value="{DynamicResource PlayStead.Control.IconSize}"/>
+        <Setter Property="Padding" Value="{DynamicResource PlayStead.Control.IconPadding}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.IconMuted}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceHover}"/>
+                <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.IconPrimary}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentPressed}"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Accent}"/>
+                <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Emphasis}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.IconMuted}"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="Opacity" Value="0.55"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="Button" BasedOn="{StaticResource PlayStead.Button.Secondary}"/>
 
     <Style TargetType="ToggleButton" BasedOn="{StaticResource PlayStead.ControlBase}">
         <Setter Property="HorizontalContentAlignment" Value="Center"/>

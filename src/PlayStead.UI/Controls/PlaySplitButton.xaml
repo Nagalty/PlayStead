@@ -17,37 +17,43 @@
     </UserControl.Resources>
     <StackPanel Orientation="Horizontal">
         <Button Content="Jouer"
+                Style="{DynamicResource PlayStead.Button.Primary}"
                 Click="Play_OnClick"
                 IsEnabled="{Binding CanPlay, FallbackValue=False}"
                 MinWidth="{Binding PrimaryButtonMinWidth, ElementName=Root}"
-                Padding="{Binding PrimaryButtonPadding, ElementName=Root}"
-                Background="{DynamicResource PlayStead.Brush.AccentMuted}"
-                Foreground="{DynamicResource PlayStead.Brush.TextPrimary}">
+                Padding="{Binding PrimaryButtonPadding, ElementName=Root}">
             <Button.ContentTemplate>
                 <DataTemplate>
-                    <TextBlock Text="{Binding PlayLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Path Width="18"
+                              Height="18"
+                              Margin="{DynamicResource PlayStead.Gap.Inline.ButtonIcon}"
+                              Data="{DynamicResource PlayStead.Icon.Play}"
+                              Fill="{DynamicResource PlayStead.Brush.TextPrimary}"
+                              Stretch="Uniform">
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSessionActive, ElementName=Root}"
+                                                     Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                        <TextBlock Text="{Binding PlayLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                   Style="{DynamicResource PlayStead.Text.PrimaryButtonLabel}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
                 </DataTemplate>
             </Button.ContentTemplate>
-            <Button.Style>
-                <Style TargetType="Button">
-                    <Setter Property="IsEnabled"
-                            Value="{Binding CanPlay, FallbackValue=False}"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsSessionActive, ElementName=Root}"
-                                     Value="True">
-                            <Setter Property="IsEnabled" Value="False"/>
-                        </DataTrigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
-                            <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
-                            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
-                            <Setter Property="Opacity" Value="0.72"/>
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </Button.Style>
         </Button>
-        <Button Content="▾" Margin="{DynamicResource PlayStead.Gap.Inline.XSmall}" Padding="10,10"
+        <Button Content="▾"
+                Style="{DynamicResource PlayStead.Button.Icon}"
+                Margin="{DynamicResource PlayStead.Gap.Inline.XSmall}"
                 ToolTip="Choisir une installation"
                 AutomationProperties.Name="Choisir une installation"
                 Visibility="{Binding HasMultipleLaunchOptions, FallbackValue=Collapsed, Converter={StaticResource BooleanToVisibilityConverter}}"

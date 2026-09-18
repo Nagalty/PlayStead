@@ -74,6 +74,11 @@ public sealed class KeyboardNavigationContractTests
                 library,
                 "CloseQuickPanelButton"));
 
+        AssertIconOnlyActionIsAccessible(
+            FindRequiredByName(
+                library,
+                "ClearSearchButton"));
+
         var splitButton =
             XDocument.Load(
                 FindUiFile(

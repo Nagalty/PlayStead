@@ -47,4 +47,16 @@ public sealed class GameLaunchService
 
         return true;
     }
+
+    public bool CanOpenSteam(GameInstallation installation) =>
+        SteamLaunchUriFactory.CreateStoreOrNull(installation) is not null;
+
+    public bool TryOpenSteam(GameInstallation installation)
+    {
+        ArgumentNullException.ThrowIfNull(installation);
+        var uri = SteamLaunchUriFactory.CreateStoreOrNull(installation);
+        if (uri is null) return false;
+        _externalUriLauncher.Open(uri);
+        return true;
+    }
 }

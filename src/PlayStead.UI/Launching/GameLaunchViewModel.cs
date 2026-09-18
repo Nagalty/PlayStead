@@ -1,4 +1,6 @@
 using PlayStead.Core.Library;
+using System.Windows.Input;
+using CommunityToolkit.Mvvm.Input;
 
 namespace PlayStead.UI.Launching;
 
@@ -15,9 +17,10 @@ public sealed class GameLaunchViewModel
         ArgumentNullException.ThrowIfNull(launchService);
 
         _launchService = launchService;
+        var allInstallations = installations.ToArray();
 
         LaunchOptions =
-            installations
+            allInstallations
                 .Where(
                     installation =>
                         installation.GameId == gameId &&
@@ -28,6 +31,11 @@ public sealed class GameLaunchViewModel
             GameLaunchInstallationSelector.SelectDefault(
                 gameId,
                 LaunchOptions);
+
+        SteamInstallation = allInstallations
+            .Where(installation => installation.GameId == gameId)
+            .FirstOrDefault(_launchService.CanOpenSteam);
+        OpenProviderCommand = new RelayCommand(() => TryOpenProvider(), () => CanOpenProvider);
     }
 
     public IReadOnlyList<GameInstallation> LaunchOptions { get; }
@@ -37,6 +45,18 @@ public sealed class GameLaunchViewModel
     public bool CanPlay => DefaultInstallation is not null;
 
     public bool HasMultipleLaunchOptions => LaunchOptions.Count > 1;
+
+    public GameInstallation? SteamInstallation { get; }
+
+    public bool CanOpenSteam => SteamInstallation is not null;
+
+    public bool CanOpenProvider => CanOpenSteam;
+
+    public string ProviderDisplayName => CanOpenSteam ? "Steam" : string.Empty;
+
+    public ICommand OpenProviderCommand { get; }
+
+    public ICommand OpenSteamCommand => OpenProviderCommand;
 
     public bool TryPlayDefault()
     {
@@ -49,4 +69,10 @@ public sealed class GameLaunchViewModel
         return LaunchOptions.Contains(installation) &&
             _launchService.TryLaunch(installation);
     }
+
+    public bool TryOpenSteam() =>
+        SteamInstallation is not null &&
+        _launchService.TryOpenSteam(SteamInstallation);
+
+    public bool TryOpenProvider() => TryOpenSteam();
 }

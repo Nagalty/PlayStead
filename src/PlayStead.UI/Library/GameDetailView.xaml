@@ -138,15 +138,34 @@
                                        Visibility="{Binding Game.IsSessionActive,
                                                     Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                        <controls:PlaySplitButton Margin="0,22,0,0"
-                                                  PrimaryButtonMinWidth="150"
-                                                  PrimaryButtonPadding="20,14"
-                                                  IsSessionActive="{Binding DataContext.Game.IsSessionActive, ElementName=GameDetailRoot}"
-                                                  PlayLabel="{Binding DataContext.SessionStatusLabel,
-                                                              ElementName=GameDetailRoot,
-                                                              TargetNullValue=Jouer,
-                                                              FallbackValue=Jouer}"
-                                                  DataContext="{Binding Launch}"/>
+                        <WrapPanel x:Name="GameDetailCtaRow"
+                                   Margin="0,22,0,0"
+                                   Orientation="Horizontal">
+                            <controls:PlaySplitButton PrimaryButtonMinWidth="150"
+                                                      PrimaryButtonPadding="20,14"
+                                                      IsSessionActive="{Binding DataContext.Game.IsSessionActive, ElementName=GameDetailRoot}"
+                                                      PlayLabel="{Binding DataContext.SessionStatusLabel,
+                                                                  ElementName=GameDetailRoot,
+                                                                  TargetNullValue=Jouer,
+                                                                  FallbackValue=Jouer}"
+                                                      DataContext="{Binding Launch}"/>
+                            <Button Style="{DynamicResource PlayStead.Button.Secondary}"
+                                    Command="{Binding DataContext.Launch.OpenProviderCommand, ElementName=GameDetailRoot}"
+                                    Visibility="{Binding DataContext.Launch.CanOpenProvider, ElementName=GameDetailRoot, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}"
+                                    AutomationProperties.Name="{Binding DataContext.Launch.ProviderDisplayName, ElementName=GameDetailRoot}"
+                                    Margin="{DynamicResource PlayStead.Gap.Inline.Cta}"
+                                    Padding="20,14">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Width="18" Height="18"
+                                          Margin="{DynamicResource PlayStead.Gap.Inline.ButtonIcon}"
+                                          Data="{DynamicResource PlayStead.Icon.External}"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.5" Stretch="Uniform" Opacity="0.82"/>
+                                    <TextBlock Text="{Binding DataContext.Launch.ProviderDisplayName, ElementName=GameDetailRoot, StringFormat=Ouvrir {0}}"
+                                               Style="{DynamicResource PlayStead.Text.PrimaryButtonLabel}"/>
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
                     </StackPanel>
                 </Grid>
             </Border>

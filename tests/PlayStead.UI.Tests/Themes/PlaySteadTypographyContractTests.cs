@@ -4,6 +4,9 @@ namespace PlayStead.UI.Tests.Themes;
 
 public sealed class PlaySteadTypographyContractTests
 {
+    private const string EmbeddedGeist =
+        "/PlayStead.UI;component/Assets/Fonts/Geist/#Geist, Segoe UI Variable, Segoe UI";
+
     private static readonly XNamespace Xaml =
         "http://schemas.microsoft.com/winfx/2006/xaml";
 
@@ -17,10 +20,10 @@ public sealed class PlaySteadTypographyContractTests
     public void Authoritative_font_families_include_display_body_and_mono_roles()
     {
         Assert.Equal(
-            "Geist Sans, Segoe UI Variable, Segoe UI",
+            EmbeddedGeist,
             TokenValue("PlayStead.Font.Display"));
         Assert.Equal(
-            "Geist Sans, Segoe UI Variable, Segoe UI",
+            EmbeddedGeist,
             TokenValue("PlayStead.Font.Body"));
         Assert.Equal(
             "Cascadia Mono, Consolas",
@@ -69,8 +72,8 @@ public sealed class PlaySteadTypographyContractTests
             .Where(key => key.StartsWith("PlayStead.Text.", StringComparison.Ordinal))
             .ToArray();
 
-        Assert.Equal(9, keys.Length);
-        Assert.Equal(9, keys.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(10, keys.Length);
+        Assert.Equal(10, keys.Distinct(StringComparer.Ordinal).Count());
     }
 
     private static string TokenValue(string key) =>

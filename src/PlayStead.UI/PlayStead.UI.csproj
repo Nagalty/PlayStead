@@ -12,6 +12,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Assets\Fonts\Geist\Geist-Regular.ttf" />
+    <None Remove="Assets\Fonts\Geist\Geist-SemiBold.ttf" />
+    <None Remove="Assets\Fonts\Geist\Geist-Bold.ttf" />
+    <Resource Include="Assets\Fonts\Geist\Geist-Regular.ttf" />
+    <Resource Include="Assets\Fonts\Geist\Geist-SemiBold.ttf" />
+    <Resource Include="Assets\Fonts\Geist\Geist-Bold.ttf" />
+    <None Update="Assets\Fonts\Geist\OFL.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\PlayStead.Core\PlayStead.Core.csproj" />
     <ProjectReference Include="..\PlayStead.Data\PlayStead.Data.csproj" />
     <ProjectReference Include="..\PlayStead.Platform\PlayStead.Platform.csproj" />

@@ -21,6 +21,7 @@
                               Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
                               IsChecked="{Binding ReduceMotion, Mode=TwoWay}"/>
                     <Button x:Name="SaveSettingsButton"
+                            Style="{DynamicResource PlayStead.Button.Primary}"
                             Content="Enregistrer"
                             Command="{Binding SaveCommand}"
                             HorizontalAlignment="Left" Margin="0,16,0,0"/>

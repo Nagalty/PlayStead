@@ -10,7 +10,8 @@
         MinHeight="640"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource PlayStead.Brush.Background}"
-        Foreground="{DynamicResource PlayStead.Brush.TextPrimary}">
+        Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+        FontFamily="{DynamicResource PlayStead.Font.Sans}">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />

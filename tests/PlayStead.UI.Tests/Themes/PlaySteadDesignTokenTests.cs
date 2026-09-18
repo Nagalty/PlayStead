@@ -48,7 +48,7 @@ public sealed class PlaySteadDesignTokenTests
     public void Sans_and_body_fonts_use_the_authoritative_fallback_chain()
     {
         const string expected =
-            "Geist Sans, Segoe UI Variable, Segoe UI";
+            "/PlayStead.UI;component/Assets/Fonts/Geist/#Geist, Segoe UI Variable, Segoe UI";
 
         Assert.Equal(expected, TokenValue("PlayStead.Font.Sans"));
         Assert.Equal(expected, TokenValue("PlayStead.Font.Body"));
@@ -92,8 +92,12 @@ public sealed class PlaySteadDesignTokenTests
             FindUiFile("Themes/PlaySteadControls.xaml"));
 
         Assert.Contains(
-            "Background=\"{DynamicResource PlayStead.Brush.AccentMuted}\"",
+            "Style=\"{DynamicResource PlayStead.Button.Primary}\"",
             splitButton,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Value=\"{DynamicResource PlayStead.Brush.Accent}\"",
+            controls,
             StringComparison.Ordinal);
         Assert.Contains(
             "Margin=\"{DynamicResource PlayStead.Gap.Inline.XSmall}\"",
