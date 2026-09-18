@@ -62,7 +62,7 @@
                     <Border Width="176"
                             Height="264"
                             Margin="24,24,0,24"
-                            CornerRadius="9"
+                            CornerRadius="12"
                             ClipToBounds="True"
                             Background="Transparent"
                             HorizontalAlignment="Left"
@@ -74,7 +74,13 @@
                                               Width="176"
                                               Height="264"
                                               HorizontalAlignment="Left"
-                                              VerticalAlignment="Center"/>
+                                              VerticalAlignment="Center">
+                            <controls:GameArtwork.Clip>
+                                <RectangleGeometry Rect="0,0,176,264"
+                                                    RadiusX="12"
+                                                    RadiusY="12"/>
+                            </controls:GameArtwork.Clip>
+                        </controls:GameArtwork>
                     </Border>
 
                     <StackPanel x:Name="HeroContent"

@@ -36,11 +36,17 @@ public sealed class GameDetailHeroMicroPolishTests
 
         Assert.Equal("176", (string?)wrapper.Attribute("Width"));
         Assert.Equal("264", (string?)wrapper.Attribute("Height"));
-        Assert.Equal("9", (string?)wrapper.Attribute("CornerRadius"));
+        Assert.Equal("12", (string?)wrapper.Attribute("CornerRadius"));
         Assert.Equal("True", (string?)wrapper.Attribute("ClipToBounds"));
         Assert.Null(wrapper.Attribute("BorderBrush"));
         Assert.Equal("{Binding CoverPath}", (string?)artwork.Attribute("SourcePath"));
 
         Assert.Equal("24,24,0,24", (string?)wrapper.Attribute("Margin"));
+
+        var geometry = artwork.Descendants().Single(element =>
+            element.Name.LocalName == "RectangleGeometry");
+        Assert.Equal("0,0,176,264", (string?)geometry.Attribute("Rect"));
+        Assert.Equal("12", (string?)geometry.Attribute("RadiusX"));
+        Assert.Equal("12", (string?)geometry.Attribute("RadiusY"));
     }
 }
