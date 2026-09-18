@@ -48,6 +48,103 @@ public sealed class SteamLocalMediaLocatorTests : IDisposable
         Assert.Null(locator.TryLocate(_root, "1874880", assetType));
     }
 
+    [Theory]
+    [InlineData(GameMediaAssetType.Cover, "library_600x900.jpg")]
+    [InlineData(GameMediaAssetType.Header, "library_header.jpg")]
+    [InlineData(GameMediaAssetType.Hero, "library_hero.jpg")]
+    [InlineData(GameMediaAssetType.Logo, "logo.png")]
+    public void TryLocate_returns_asset_from_direct_hash_directory(
+        GameMediaAssetType assetType,
+        string filename)
+    {
+        var expected = CreateNestedAsset(
+            "2116120",
+            "5c3871f559599645d024432ff4e791a234c53976",
+            filename);
+        var locator = new SteamLocalMediaLocator();
+
+        Assert.Equal(
+            expected,
+            locator.TryLocate(_root, "2116120", assetType));
+    }
+
+    [Fact]
+    public void TryLocate_preserves_direct_then_flat_legacy_then_sorted_hash_priority()
+    {
+        var direct = CreateLocalAsset("1874880", "library_hero.jpg");
+        var legacy = CreateLegacyAsset("1874880", "library_hero.jpg");
+        var nestedLater = CreateNestedAsset(
+            "1874880",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "library_hero.jpg");
+        var nestedFirst = CreateNestedAsset(
+            "1874880",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "library_hero.jpg");
+        var locator = new SteamLocalMediaLocator();
+
+        Assert.Equal(direct, locator.TryLocate(_root, "1874880", GameMediaAssetType.Hero));
+
+        File.Delete(direct);
+        Assert.Equal(legacy, locator.TryLocate(_root, "1874880", GameMediaAssetType.Hero));
+
+        File.Delete(legacy);
+        Assert.Equal(nestedFirst, locator.TryLocate(_root, "1874880", GameMediaAssetType.Hero));
+        Assert.NotEqual(nestedLater, nestedFirst);
+    }
+
+    [Fact]
+    public void TryLocate_never_uses_another_AppId_or_unrelated_nested_file()
+    {
+        CreateNestedAsset(
+            "2116120",
+            "5c3871f559599645d024432ff4e791a234c53976",
+            "library_hero.jpg");
+        CreateNestedAsset(
+            "1203620",
+            "18580ba964928c55f96c4d46809d4fa3aa7698d1",
+            "custom_hero.jpg");
+        var locator = new SteamLocalMediaLocator();
+
+        Assert.Null(locator.TryLocate(_root, "1203620", GameMediaAssetType.Hero));
+    }
+
+    [Fact]
+    public void TryLocate_rejects_path_traversal_even_when_target_exists()
+    {
+        var escapedDirectory = Path.Combine(_root, "appcache", "2116120");
+        Directory.CreateDirectory(escapedDirectory);
+        File.WriteAllBytes(
+            Path.Combine(escapedDirectory, "library_hero.jpg"),
+            [1]);
+        var locator = new SteamLocalMediaLocator();
+
+        Assert.Null(locator.TryLocate(
+            _root,
+            "../2116120",
+            GameMediaAssetType.Hero));
+    }
+
+    [Fact]
+    public void TryLocate_rejects_non_numeric_AppId()
+    {
+        var locator = new SteamLocalMediaLocator();
+
+        Assert.Null(locator.TryLocate(
+            _root,
+            "not-an-app-id",
+            GameMediaAssetType.Hero));
+    }
+
+    [Fact]
+    public void TryLocate_ignores_non_hash_nested_directories()
+    {
+        CreateNestedAsset("2116120", "not-a-steam-hash", "library_hero.jpg");
+        var locator = new SteamLocalMediaLocator();
+
+        Assert.Null(locator.TryLocate(_root, "2116120", GameMediaAssetType.Hero));
+    }
+
     [Fact]
     public void Locator_exposes_Task3_cover_lookup_contract()
     {
@@ -70,6 +167,32 @@ public sealed class SteamLocalMediaLocatorTests : IDisposable
         Directory.CreateDirectory(directory);
         var path = Path.GetFullPath(Path.Combine(directory, filename));
         // The locator checks file existence, not image decoding.
+        File.WriteAllBytes(path, [1]);
+        return path;
+    }
+
+    private string CreateLegacyAsset(string appId, string filename)
+    {
+        var directory = Path.Combine(_root, "appcache", "librarycache");
+        Directory.CreateDirectory(directory);
+        var path = Path.GetFullPath(Path.Combine(directory, $"{appId}_{filename}"));
+        File.WriteAllBytes(path, [1]);
+        return path;
+    }
+
+    private string CreateNestedAsset(
+        string appId,
+        string hash,
+        string filename)
+    {
+        var directory = Path.Combine(
+            _root,
+            "appcache",
+            "librarycache",
+            appId,
+            hash);
+        Directory.CreateDirectory(directory);
+        var path = Path.GetFullPath(Path.Combine(directory, filename));
         File.WriteAllBytes(path, [1]);
         return path;
     }
