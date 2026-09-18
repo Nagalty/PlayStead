@@ -51,63 +51,7 @@ public partial class LibraryView :
 
     public void FocusSearch()
     {
-        LibrarySearchBox.Focus();
-        LibrarySearchBox.SelectAll();
-    }
-
-    private void LibrarySearchBox_OnTextChanged(
-        object sender,
-        TextChangedEventArgs e)
-    {
-        if (DataContext is not
-            LibraryViewModel viewModel)
-        {
-            return;
-        }
-
-        viewModel.SetSearchQuery(
-            LibrarySearchBox.Text);
-
-        UpdateSearchPlaceholder();
-    }
-
-    private void LibrarySearchBox_OnGotKeyboardFocus(
-        object sender,
-        System.Windows.Input.KeyboardFocusChangedEventArgs e)
-    {
-        LibrarySearchPlaceholder.Visibility =
-            Visibility.Collapsed;
-    }
-
-    private void LibrarySearchBox_OnLostKeyboardFocus(
-        object sender,
-        System.Windows.Input.KeyboardFocusChangedEventArgs e)
-    {
-        UpdateSearchPlaceholder();
-    }
-
-    private void UpdateSearchPlaceholder()
-    {
-        LibrarySearchPlaceholder.Visibility =
-            LibrarySearchBox.IsKeyboardFocusWithin ||
-            !string.IsNullOrEmpty(LibrarySearchBox.Text)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-    }
-
-    private void ClearSearchButton_OnClick(
-        object sender,
-        RoutedEventArgs e)
-    {
-        if (DataContext is not
-            LibraryViewModel viewModel)
-        {
-            return;
-        }
-
-        viewModel.ClearSearch();
-        LibrarySearchBox.Clear();
-        FocusSearch();
+        // Search is owned by the Shell global search field.
     }
 
     private void GameCard_OnSelectionRequested(

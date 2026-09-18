@@ -30,9 +30,9 @@
             <Grid Margin="28,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="40" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <TextBlock x:Name="PlaySteadWordmark"
@@ -44,51 +44,83 @@
                            Foreground="{DynamicResource PlayStead.Brush.TextPrimary}" />
 
                 <StackPanel x:Name="PrimaryNavigation"
-                            Grid.Column="2"
+                            Grid.Column="1"
+                            Margin="28,0,20,0"
                             Orientation="Horizontal"
                             VerticalAlignment="Stretch">
                     <Button x:Name="HomeNavButton"
                             Command="{Binding NavigateHomeCommand}"
-                            Margin="0,0,8,0"
-                            Padding="14,0"
-                            VerticalAlignment="Stretch">
-                        <TextBlock Text="Accueil" />
+                            Style="{DynamicResource PlayStead.Button.Navigation}"
+                            Tag="{Binding IsHomeActive}"
+                            AutomationProperties.Name="Accueil">
+                        <StackPanel Orientation="Horizontal"><Path Width="17" Height="17" Data="{DynamicResource PlayStead.Icon.Home}" Style="{DynamicResource PlayStead.Icon.Navigation}" Stretch="Uniform"/><TextBlock Margin="8,0,0,0" Text="Accueil" Style="{DynamicResource PlayStead.Text.ButtonLabel}"/></StackPanel>
                     </Button>
 
                     <Button x:Name="LibraryNavButton"
                             Command="{Binding NavigateLibraryCommand}"
-                            Margin="0,0,8,0"
-                            Padding="14,0"
-                            VerticalAlignment="Stretch">
-                        <TextBlock Text="Bibliothèque" />
+                            Style="{DynamicResource PlayStead.Button.Navigation}"
+                            Tag="{Binding IsLibraryActive}"
+                            AutomationProperties.Name="Bibliothèque">
+                        <StackPanel Orientation="Horizontal"><Path Width="17" Height="17" Data="{DynamicResource PlayStead.Icon.Library}" Style="{DynamicResource PlayStead.Icon.Navigation}" Stretch="Uniform"/><TextBlock Margin="8,0,0,0" Text="Bibliothèque" Style="{DynamicResource PlayStead.Text.ButtonLabel}"/></StackPanel>
                     </Button>
 
                     <Button x:Name="AttentionNavButton"
                             Command="{Binding NavigateAttentionCommand}"
-                            Margin="0,0,8,0"
-                            Padding="14,0"
-                            VerticalAlignment="Stretch">
-                        <TextBlock Text="À signaler" />
+                            Style="{DynamicResource PlayStead.Button.Navigation}"
+                            Tag="{Binding IsAttentionActive}"
+                            AutomationProperties.Name="À signaler">
+                        <StackPanel Orientation="Horizontal"><Path Width="17" Height="17" Data="{DynamicResource PlayStead.Icon.Report}" Style="{DynamicResource PlayStead.Icon.Navigation}" Stretch="Uniform"/><TextBlock Margin="8,0,0,0" Text="À signaler" Style="{DynamicResource PlayStead.Text.ButtonLabel}"/></StackPanel>
                     </Button>
 
+                </StackPanel>
+
+                <Border Grid.Column="2" MinWidth="220" MaxWidth="520"
+                        HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                        Margin="0,0,24,0" Padding="8,0"
+                        Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                        BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                        BorderThickness="1" CornerRadius="{DynamicResource PlayStead.Radius.Small}">
+                    <Grid>
+                        <Path Width="18" Height="18" Margin="0,0,8,0" Panel.ZIndex="2" HorizontalAlignment="Left"
+                              Data="{DynamicResource PlayStead.Icon.Search}"
+                              Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                        <TextBox x:Name="ShellSearchBox" DataContext="{Binding ElementName=PrimaryNavigation, Path=DataContext}"
+                                 Margin="24,0,0,0" BorderThickness="0" Background="Transparent"
+                                 Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                 Panel.ZIndex="1" KeyDown="ShellSearchBox_OnKeyDown" TextChanged="ShellSearchBox_OnTextChanged"
+                                 GotKeyboardFocus="ShellSearchBox_OnKeyboardFocusChanged" LostKeyboardFocus="ShellSearchBox_OnKeyboardFocusChanged"
+                                 ToolTip="Rechercher un jeu..." AutomationProperties.Name="Rechercher un jeu..." />
+                        <TextBlock x:Name="ShellSearchPlaceholder" Margin="24,0,0,0" Panel.ZIndex="2"
+                                   Text="Rechercher un jeu..." IsHitTestVisible="False"
+                                   Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <StackPanel x:Name="UtilityNavigation"
+                            Grid.Column="3"
+                            DataContext="{Binding ElementName=PrimaryNavigation, Path=DataContext}"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
                     <Button x:Name="SettingsNavButton"
                             Command="{Binding NavigateSettingsCommand}"
-                            Padding="14,0"
-                            VerticalAlignment="Stretch">
-                        <TextBlock Text="Paramètres" />
+                            Style="{DynamicResource PlayStead.Button.Icon}"
+                            ToolTip="Paramètres"
+                            AutomationProperties.Name="Paramètres">
+                        <Path Width="16" Height="16" Data="{DynamicResource PlayStead.Icon.Settings}" Stroke="{DynamicResource PlayStead.Brush.IconPrimary}" StrokeThickness="1.5" Stretch="Uniform"/>
                     </Button>
-
                     <Button x:Name="NotificationBellButton"
                             Command="{Binding TogglePanelCommand}"
-                            Padding="14,0"
-                            VerticalAlignment="Stretch">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Notifications" />
+                            Style="{DynamicResource PlayStead.Button.Icon}"
+                            ToolTip="Notifications"
+                            AutomationProperties.Name="Notifications">
+                        <Grid>
+                            <Path Width="16" Height="16" Data="{DynamicResource PlayStead.Icon.Bell}" Stroke="{DynamicResource PlayStead.Brush.IconPrimary}" StrokeThickness="1.5" Stretch="Uniform"/>
                             <TextBlock x:Name="NotificationBadge"
                                        Text="{Binding ActiveCount}"
                                        Visibility="{Binding IsBadgeVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                        Margin="6,0,0,0" />
-                        </StackPanel>
+                        </Grid>
                     </Button>
                 </StackPanel>
             </Grid>

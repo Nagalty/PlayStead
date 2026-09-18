@@ -5,20 +5,16 @@ namespace PlayStead.UI.Tests.Library;
 public sealed class LibrarySearchTypingContractTests
 {
     [Fact]
-    public void Search_box_filters_on_each_text_change_without_submit_action()
+    public void Library_view_does_not_declare_a_local_search_box()
     {
         var xamlPath = FindUiFile(Path.Combine("Library", "LibraryView.xaml"));
         var xaml = XDocument.Load(xamlPath);
 
-        var searchBox =
-            xaml.Descendants().Single(element =>
-                element.Attributes().Any(attribute =>
-                    attribute.Name.LocalName == "Name" &&
-                    attribute.Value == "LibrarySearchBox"));
-
-        Assert.Equal(
-            "LibrarySearchBox_OnTextChanged",
-            searchBox.Attribute("TextChanged")?.Value);
+        Assert.DoesNotContain(
+            xaml.Descendants("TextBox"),
+            element => element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Name" &&
+                attribute.Value == "LibrarySearchBox"));
     }
 
     private static string FindUiFile(string relativePath)

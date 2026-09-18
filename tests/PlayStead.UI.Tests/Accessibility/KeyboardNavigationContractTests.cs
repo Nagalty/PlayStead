@@ -45,8 +45,8 @@ public sealed class KeyboardNavigationContractTests
 
         var searchBox =
             FindRequiredByName(
-                library,
-                "LibrarySearchBox");
+                shell,
+                "ShellSearchBox");
 
         Assert.NotEqual(
             "False",
@@ -73,11 +73,6 @@ public sealed class KeyboardNavigationContractTests
             FindRequiredByName(
                 library,
                 "CloseQuickPanelButton"));
-
-        AssertIconOnlyActionIsAccessible(
-            FindRequiredByName(
-                library,
-                "ClearSearchButton"));
 
         var splitButton =
             XDocument.Load(

@@ -2,7 +2,9 @@ using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Automation;
 using System.Windows.Threading;
+using System.Windows.Media;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Shell;
 
@@ -10,6 +12,28 @@ namespace PlayStead.UI.Tests.Navigation;
 
 public sealed class Task02ShellNavigationTests
 {
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match) yield return match;
+            foreach (var descendant in FindVisualChildren<T>(child)) yield return descendant;
+        }
+    }
+
+    private static IEnumerable<string> FindLogicalText(DependencyObject root)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is TextBlock text) yield return text.Text;
+            if (child is DependencyObject dependencyObject)
+            {
+                foreach (var value in FindLogicalText(dependencyObject)) yield return value;
+            }
+        }
+    }
     [Fact]
     public void MainWindow_exposes_the_authoritative_horizontal_primary_navigation()
     {
@@ -48,25 +72,16 @@ public sealed class Task02ShellNavigationTests
                     "PlayStead",
                     wordmark.Text);
 
-                Assert.Equal(
+                Assert.Contains(
                     "Accueil",
-                    Assert.IsType<TextBlock>(
-                        home.Content).Text);
-
-                Assert.Equal(
+                    FindLogicalText(home));
+                Assert.Contains(
                     "Bibliothèque",
-                    Assert.IsType<TextBlock>(
-                        library.Content).Text);
-
-                Assert.Equal(
+                    FindLogicalText(library));
+                Assert.Contains(
                     "À signaler",
-                    Assert.IsType<TextBlock>(
-                        attention.Content).Text);
-
-                Assert.Equal(
-                    "Paramètres",
-                    Assert.IsType<TextBlock>(
-                        settings.Content).Text);
+                    FindLogicalText(attention));
+                Assert.Equal("Paramètres", settings.GetValue(AutomationProperties.NameProperty));
 
                 Assert.Null(
                     window.FindName(

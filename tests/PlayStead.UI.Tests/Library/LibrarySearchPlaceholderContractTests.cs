@@ -5,7 +5,7 @@ namespace PlayStead.UI.Tests.Library;
 public sealed class LibrarySearchPlaceholderContractTests
 {
     [Fact]
-    public void Search_box_declares_Rechercher_un_jeu_placeholder_and_focus_wiring()
+    public void Library_view_does_not_declare_a_duplicate_search_placeholder()
     {
         var xaml =
             XDocument.Load(
@@ -14,35 +14,9 @@ public sealed class LibrarySearchPlaceholderContractTests
                         "Library",
                         "LibraryView.xaml")));
 
-        var searchBox =
-            FindRequiredByName(
-                xaml,
-                "LibrarySearchBox");
-
-        Assert.Equal(
-            "LibrarySearchBox_OnGotKeyboardFocus",
-            searchBox.Attribute(
-                "GotKeyboardFocus")?.Value);
-
-        Assert.Equal(
-            "LibrarySearchBox_OnLostKeyboardFocus",
-            searchBox.Attribute(
-                "LostKeyboardFocus")?.Value);
-
-        var placeholder =
-            FindRequiredByName(
-                xaml,
-                "LibrarySearchPlaceholder");
-
-        Assert.Equal(
-            "Rechercher un jeu",
-            placeholder.Attribute(
-                "Text")?.Value);
-
-        Assert.Equal(
-            "False",
-            placeholder.Attribute(
-                "IsHitTestVisible")?.Value);
+        Assert.DoesNotContain("LibrarySearchBox", xaml.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("LibrarySearchPlaceholder", xaml.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Rechercher un jeu", xaml.ToString(), StringComparison.Ordinal);
     }
 
     private static XElement FindRequiredByName(

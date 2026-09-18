@@ -1,5 +1,7 @@
 using System.Runtime.ExceptionServices;
 using System.Threading;
+using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 
 namespace PlayStead.UI.Tests;
@@ -45,25 +47,10 @@ public sealed class MainWindowShellTests
                     "PlayStead",
                     wordmark.Text);
 
-                Assert.Equal(
-                    "Accueil",
-                    Assert.IsType<TextBlock>(
-                        home.Content).Text);
-
-                Assert.Equal(
-                    "Bibliothèque",
-                    Assert.IsType<TextBlock>(
-                        library.Content).Text);
-
-                Assert.Equal(
-                    "À signaler",
-                    Assert.IsType<TextBlock>(
-                        attention.Content).Text);
-
-                Assert.Equal(
-                    "Paramètres",
-                    Assert.IsType<TextBlock>(
-                        settings.Content).Text);
+                Assert.Equal("Accueil", FindText(home));
+                Assert.Equal("Bibliothèque", FindText(library));
+                Assert.Equal("À signaler", FindText(attention));
+                Assert.Equal("Paramètres", settings.GetValue(AutomationProperties.NameProperty));
 
                 Assert.Null(
                     window.FindName(
@@ -76,6 +63,17 @@ public sealed class MainWindowShellTests
                 window.Close();
             }
         });
+    }
+
+    private static string FindText(DependencyObject root)
+    {
+        if (root is TextBlock textBlock) return textBlock.Text;
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            var text = FindText(child);
+            if (!string.IsNullOrEmpty(text)) return text;
+        }
+        return string.Empty;
     }
 
     private static T RunSta<T>(

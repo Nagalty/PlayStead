@@ -11,6 +11,7 @@ public sealed class ShellViewModel :
 {
     private readonly NavigationService _navigation;
     private readonly RelayCommand _goBackCommand;
+    private string _searchQuery = string.Empty;
 
     public ShellViewModel(
         NavigationService navigation)
@@ -49,12 +50,36 @@ public sealed class ShellViewModel :
         GoBackCommand =
             _goBackCommand;
 
+        SearchCommand =
+            new RelayCommand(
+                ExecuteSearch,
+                () => !string.IsNullOrWhiteSpace(SearchQuery));
+
         _navigation.Changed +=
             Navigation_OnChanged;
     }
 
     public event PropertyChangedEventHandler?
         PropertyChanged;
+
+    public event EventHandler<string>? SearchRequested;
+
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set => SetSearchQuery(value);
+    }
+
+    public ICommand SearchCommand { get; }
+
+    public void SetSearchQuery(string query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (_searchQuery == query) return;
+        _searchQuery = query;
+        OnPropertyChanged(nameof(SearchQuery));
+        ((RelayCommand)SearchCommand).NotifyCanExecuteChanged();
+    }
 
     public AppRoute CurrentRoute =>
         _navigation.CurrentRoute;
@@ -110,6 +135,14 @@ public sealed class ShellViewModel :
     private void ExecuteGoBack()
     {
         _navigation.GoBack();
+    }
+
+    private void ExecuteSearch()
+    {
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            SearchRequested?.Invoke(this, SearchQuery);
+        }
     }
 
     private void Navigation_OnChanged(

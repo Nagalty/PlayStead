@@ -60,6 +60,7 @@ public partial class MainWindow : Window
             navigationService);
 
         InitializeComponent();
+        SourceInitialized += (_, _) => WindowThemeHelper.ApplyDarkTitleBar(this);
 
         _libraryView =
             MainContent.Content as LibraryView
@@ -79,6 +80,9 @@ public partial class MainWindow : Window
 
         PrimaryNavigation.DataContext =
             _shellViewModel;
+
+        _shellViewModel.SearchRequested +=
+            ShellViewModel_OnSearchRequested;
 
         _navigationService.Changed +=
             NavigationService_OnChanged;
@@ -324,6 +328,55 @@ public partial class MainWindow : Window
 
         UpdateQuickPanel();
         ApplyCurrentRoute();
+    }
+
+    private void ShellSearchBox_OnKeyDown(
+        object sender,
+        KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter &&
+            PrimaryNavigation.DataContext is ShellViewModel shell)
+        {
+            shell.SearchCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void ShellSearchBox_OnKeyboardFocusChanged(
+        object sender,
+        RoutedEventArgs e)
+    {
+        ShellSearchPlaceholder.Visibility =
+            string.IsNullOrEmpty(ShellSearchBox.Text) &&
+            !ShellSearchBox.IsKeyboardFocusWithin
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+    }
+
+    private void ShellSearchBox_OnTextChanged(
+        object sender,
+        System.Windows.Controls.TextChangedEventArgs e)
+    {
+        ShellSearchPlaceholder.Visibility =
+            string.IsNullOrEmpty(ShellSearchBox.Text) &&
+            !ShellSearchBox.IsKeyboardFocusWithin
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+    }
+
+    private void ShellViewModel_OnSearchRequested(
+        object? sender,
+        string query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return;
+
+        _navigationService.Navigate(
+            new NavigationRequest(AppRoute.Library));
+
+        if (DataContext is LibraryViewModel library)
+        {
+            library.SetSearchQuery(query);
+        }
     }
 
     public MainWindow(
@@ -810,7 +863,8 @@ public partial class MainWindow : Window
                 new NavigationRequest(
                     AppRoute.Library));
 
-            _libraryView.FocusSearch();
+            ShellSearchBox.Focus();
+            ShellSearchBox.SelectAll();
 
             e.Handled =
                 true;

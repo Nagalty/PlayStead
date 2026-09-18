@@ -9,34 +9,6 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
-        <Style x:Key="PremiumSearchChromeStyle"
-               TargetType="Border">
-            <Setter Property="Height"
-                    Value="40"/>
-            <Setter Property="Background"
-                    Value="{DynamicResource PlayStead.Brush.SurfaceRaised}"/>
-            <Setter Property="BorderBrush"
-                    Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
-            <Setter Property="BorderThickness"
-                    Value="1"/>
-            <Setter Property="CornerRadius"
-                    Value="8"/>
-            <Style.Triggers>
-                <Trigger Property="IsKeyboardFocusWithin"
-                         Value="True">
-                    <Setter Property="Background"
-                            Value="{DynamicResource PlayStead.Brush.SurfaceHover}"/>
-                    <Setter Property="BorderBrush"
-                            Value="{DynamicResource PlayStead.Brush.Copper}"/>
-                </Trigger>
-                <Trigger Property="IsMouseOver"
-                         Value="True">
-                    <Setter Property="BorderBrush"
-                            Value="{DynamicResource PlayStead.Brush.BorderStrong}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
     </UserControl.Resources>
 
     <Grid Margin="28">
@@ -49,7 +21,6 @@
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="340"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
@@ -61,73 +32,7 @@
                        FontWeight="SemiBold"
                        VerticalAlignment="Center"/>
 
-            <Grid Grid.Column="1"
-                  Margin="24,0,24,0"
-                  VerticalAlignment="Center">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0"
-                        Style="{StaticResource PremiumSearchChromeStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="38"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.Column="0"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontFamily="Segoe MDL2 Assets"
-                                   FontSize="15"
-                                   Foreground="{DynamicResource PlayStead.Brush.IconAccent}"
-                                   Text="&#xE721;"
-                                   IsHitTestVisible="False"/>
-
-                        <Grid Grid.Column="1">
-                            <TextBox x:Name="LibrarySearchBox"
-                                     Height="38"
-                                     Padding="0,0,10,0"
-                                     VerticalContentAlignment="Center"
-                                     Background="Transparent"
-                                     Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
-                                     BorderThickness="0"
-                                     FontSize="13"
-                                     TextChanged="LibrarySearchBox_OnTextChanged"
-                                     GotKeyboardFocus="LibrarySearchBox_OnGotKeyboardFocus"
-                                     LostKeyboardFocus="LibrarySearchBox_OnLostKeyboardFocus"
-                                     ToolTip="Rechercher dans la bibliothèque (Ctrl+K)"/>
-
-                            <TextBlock x:Name="LibrarySearchPlaceholder"
-                                       Margin="1,0,0,0"
-                                       VerticalAlignment="Center"
-                                       Text="Rechercher un jeu"
-                                       Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
-                                       FontSize="13"
-                                       IsHitTestVisible="False"/>
-                        </Grid>
-                    </Grid>
-                </Border>
-
-                <Button x:Name="ClearSearchButton"
-                        Grid.Column="1"
-                        Margin="8,0,0,0"
-                        Click="ClearSearchButton_OnClick"
-                        Visibility="{Binding IsSearchActive, Converter={StaticResource BooleanToVisibilityConverter}}"
-                        Style="{DynamicResource PlayStead.Button.Icon}"
-                        ToolTip="Effacer la recherche"
-                        AutomationProperties.Name="Effacer la recherche">
-                    <TextBlock FontFamily="Segoe MDL2 Assets"
-                               FontSize="13"
-                               Foreground="{DynamicResource PlayStead.Brush.IconMuted}"
-                               Text="&#xE711;"
-                               VerticalAlignment="Center"/>
-                </Button>
-            </Grid>
-
-            <StackPanel Grid.Column="2"
+            <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
 

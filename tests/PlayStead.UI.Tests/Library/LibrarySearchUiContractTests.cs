@@ -5,7 +5,7 @@ namespace PlayStead.UI.Tests.Library;
 public sealed class LibrarySearchUiContractTests
 {
     [Fact]
-    public void Library_view_declares_local_search_controls_and_filters_list_projection()
+    public void Library_view_has_no_local_search_control_and_filters_list_projection()
     {
         var xaml =
             XDocument.Load(
@@ -14,25 +14,14 @@ public sealed class LibrarySearchUiContractTests
                         "Library",
                         "LibraryView.xaml")));
 
-        var searchBox =
-            FindRequiredByName(
-                xaml,
-                "LibrarySearchBox");
-
-        Assert.Equal(
-            "LibrarySearchBox_OnTextChanged",
-            searchBox.Attribute(
-                "TextChanged")?.Value);
-
-        var clearButton =
-            FindRequiredByName(
-                xaml,
-                "ClearSearchButton");
-
-        Assert.Equal(
-            "ClearSearchButton_OnClick",
-            clearButton.Attribute(
-                "Click")?.Value);
+        Assert.DoesNotContain(
+            xaml.Descendants("TextBox"),
+            element => element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Name" &&
+                attribute.Value.Contains("Search", StringComparison.OrdinalIgnoreCase)));
+        Assert.DoesNotContain(
+            xaml.Descendants(),
+            element => element.Attribute("Text")?.Value.Contains("Rechercher un jeu", StringComparison.OrdinalIgnoreCase) == true);
 
         var gameList =
             FindRequiredByName(
@@ -56,34 +45,10 @@ public sealed class LibrarySearchUiContractTests
                         "LibraryView.xaml.cs")));
 
         Assert.Contains(
-            "LibrarySearchBox_OnTextChanged",
-            source,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "viewModel.SetSearchQuery(",
-            source,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "ClearSearchButton_OnClick",
-            source,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
-            "viewModel.ClearSearch()",
-            source,
-            StringComparison.Ordinal);
-
-        Assert.Contains(
             "public void FocusSearch()",
             source,
             StringComparison.Ordinal);
-
-        Assert.Contains(
-            "LibrarySearchBox.Focus()",
-            source,
-            StringComparison.Ordinal);
+        Assert.Contains("SearchQuery", File.ReadAllText(FindUiFile(Path.Combine("Library", "LibraryViewModel.cs"))), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -110,7 +75,7 @@ public sealed class LibrarySearchUiContractTests
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "_libraryView.FocusSearch()",
+            "ShellSearchBox.Focus()",
             source,
             StringComparison.Ordinal);
     }

@@ -115,7 +115,7 @@ public sealed class GeistGlobalFontCoverageTests
             .Where(occurrence => occurrence.Value.StartsWith("Segoe", StringComparison.Ordinal))
             .ToArray();
 
-        Assert.Equal(9, explicitSegoe.Length);
+        Assert.Equal(7, explicitSegoe.Length);
         Assert.All(explicitSegoe, occurrence =>
         {
             Assert.Equal("Segoe MDL2 Assets", occurrence.Value);
