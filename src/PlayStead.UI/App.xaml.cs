@@ -21,6 +21,7 @@ public partial class App : Application
 
     private readonly CancellationTokenSource _lifetime =
         new();
+    private readonly StartupTraceFileSink _startupTraceFileSink = new();
 
     private ApplicationStartupCoordinator? _startupCoordinator;
     private SingleInstanceGate? _singleInstanceGate;
@@ -33,6 +34,8 @@ public partial class App : Application
         StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        _startupTraceFileSink.TryInstall();
 
         try
         {
@@ -131,6 +134,7 @@ public partial class App : Application
             _singleInstanceGate = null;
 
             _lifetime.Dispose();
+            _startupTraceFileSink.Dispose();
 
             base.OnExit(e);
         }
@@ -190,6 +194,8 @@ public partial class App : Application
                     layout.EnsureDirectoriesExist(),
             BuildHostAsync:
                 BuildHostAsync,
+            EnsureMainWindowShownAsync:
+                EnsureMainWindowShownAsync,
             InitializeLocalStateAsync:
                 cancellationToken =>
                     GetRequiredService<LocalStartupPipeline>()
@@ -205,23 +211,24 @@ public partial class App : Application
                     await RunOnUiAsync(
                         async () =>
                         {
+                            System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN LibraryViewModel.RefreshAsync");
                             await GetRequiredService<LibraryViewModel>()
                                 .RefreshAsync(
                                     cancellationToken);
+                            System.Diagnostics.Trace.WriteLine("[STARTUP] END LibraryViewModel.RefreshAsync");
 
+                            System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN SessionViewModel.RefreshAsync");
                             await GetRequiredService<SessionViewModel>()
                                 .RefreshAsync(
                                     cancellationToken);
+                            System.Diagnostics.Trace.WriteLine("[STARTUP] END SessionViewModel.RefreshAsync");
 
                             var window =
                                 GetRequiredService<MainWindow>();
 
                             MainWindow = window;
 
-                            if (!window.IsVisible)
-                            {
-                                window.Show();
-                            }
+                            if (!window.IsVisible) window.Show();
                         },
                         cancellationToken);
                 },
@@ -286,6 +293,8 @@ public partial class App : Application
 
                     return Task.CompletedTask;
                 },
+            SignalStartupReady:
+                () => GetRequiredService<StartupProgressState>().Ready(),
             StopDiscoveryAsync:
                 cancellationToken =>
                     GetRequiredService<DiscoveryInventoryManager>()
@@ -308,15 +317,36 @@ public partial class App : Application
             PlaySteadHost.Build(
                 layout);
 
+        var window = GetRequiredService<MainWindow>();
+        window.StartupProgress.Begin();
+        MainWindow = window;
+        window.Show();
+
         _hostStarted =
             false;
 
         return Task.CompletedTask;
     }
 
+    private async Task EnsureMainWindowShownAsync(
+        CancellationToken cancellationToken)
+    {
+        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN EnsureMainWindowShownAsync");
+        cancellationToken.ThrowIfCancellationRequested();
+        var window = GetRequiredService<MainWindow>();
+        MainWindow = window;
+        if (!window.IsVisible)
+            window.Show();
+        await Dispatcher.InvokeAsync(() => { },
+            System.Windows.Threading.DispatcherPriority.Loaded,
+            cancellationToken);
+        System.Diagnostics.Trace.WriteLine("[STARTUP] END EnsureMainWindowShownAsync");
+    }
+
     private async Task StartHostAsync(
         CancellationToken cancellationToken)
     {
+        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN Host.StartAsync");
         var host =
             _host
             ?? throw new InvalidOperationException(
@@ -324,6 +354,7 @@ public partial class App : Application
 
         await host.StartAsync(
             cancellationToken);
+        System.Diagnostics.Trace.WriteLine("[STARTUP] END Host.StartAsync");
 
         _hostStarted =
             true;

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using PlayStead.Core.Library;
 using PlayStead.Data.Database;
 using PlayStead.Platform.Paths;
@@ -9,13 +11,43 @@ namespace PlayStead.UI.Tests.Bootstrap;
 public sealed class ApplicationStartupCoordinatorTests
 {
     [Fact]
+    public async Task Initial_refresh_forensic_trace_brackets_the_refresh_operation()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var listener = new TextWriterTraceListener(output);
+        var previousAutoFlush = Trace.AutoFlush;
+        Trace.Listeners.Add(listener);
+        Trace.AutoFlush = true;
+
+        try
+        {
+            var probe = new StartupProbe();
+            probe.ProgressState.Begin();
+            var sut = new ApplicationStartupCoordinator(probe.CreateOperations());
+
+            await sut.StartAsync([], CancellationToken.None);
+
+            listener.Flush();
+            var lines = output.ToString().Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
+            var begin = Array.FindIndex(lines, line => line.Contains(" Event=RefreshAndApply.Begin", StringComparison.Ordinal));
+            var end = Array.FindIndex(lines, line => line.Contains(" Event=RefreshAndApply.End", StringComparison.Ordinal));
+            Assert.True(begin >= 0, "The initial refresh BEGIN forensic marker was not emitted.");
+            Assert.True(end > begin, "The initial refresh END forensic marker must follow BEGIN.");
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+            Trace.AutoFlush = previousAutoFlush;
+        }
+    }
+
+    [Fact]
     public async Task Forwarded_stops_after_gate_without_touching_user_data_host_database_or_scan()
     {
         var probe = new StartupProbe
         {
             GateResult = SingleInstanceResult.Forwarded
         };
-
         var sut = new ApplicationStartupCoordinator(
             probe.CreateOperations());
 
@@ -57,11 +89,18 @@ public sealed class ApplicationStartupCoordinatorTests
                 IsHealthy: true,
                 Detail: "ok")
         };
+        probe.ProgressState.Begin();
 
         probe.RefreshBehavior = async cancellationToken =>
         {
             probe.Mark("scan");
             probe.RefreshStarted = true;
+            probe.ProgressState.Report(
+                StartupStage.EnrichingCatalog,
+                "Enrichissement du catalogue Steam",
+                28,
+                28);
+            probe.Mark("catalog-final");
 
             return await refreshCompletion.Task.WaitAsync(
                 cancellationToken);
@@ -74,8 +113,21 @@ public sealed class ApplicationStartupCoordinatorTests
             ["--activate"],
             CancellationToken.None);
 
-        var result = await startTask.WaitAsync(
+        await WaitForAsync(
+            () => probe.RefreshStarted,
             TimeSpan.FromSeconds(2));
+
+        Assert.False(startTask.IsCompleted);
+        Assert.Equal(0, probe.ReadySignalCount);
+        Assert.True(probe.ProgressState.IsBusy);
+        Assert.Equal(StartupStage.EnrichingCatalog, probe.ProgressState.Stage);
+
+        var initialRefresh = Assert.IsAssignableFrom<Task>(sut.BackgroundRefreshTask);
+        Assert.False(initialRefresh.IsCompleted);
+
+        refreshCompletion.SetResult(probe.FreshSnapshot);
+
+        var result = await startTask.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.Equal(
             ApplicationStartupCoordinator.StartResult.Started,
@@ -85,17 +137,19 @@ public sealed class ApplicationStartupCoordinatorTests
         Assert.True(probe.DatabaseInitialized);
         Assert.True(probe.HostStarted);
         Assert.True(probe.MainWindowShown);
+        Assert.Equal(1, probe.MainWindowInstanceCount);
 
         Assert.Same(
             probe.CachedSnapshot,
             probe.ShownSnapshot);
 
-        var backgroundRefresh =
-            Assert.IsAssignableFrom<Task>(
-                sut.BackgroundRefreshTask);
+        Assert.Same(initialRefresh, sut.BackgroundRefreshTask);
+        Assert.True(initialRefresh.IsCompletedSuccessfully);
+        Assert.Equal(1, probe.RefreshRunCount);
 
-        Assert.False(
-            backgroundRefresh.IsCompleted);
+        Assert.Equal(1, probe.ReadySignalCount);
+        Assert.Equal(StartupStage.Ready, probe.ProgressState.Stage);
+        Assert.False(probe.ProgressState.IsBusy);
 
         AssertAppearsBefore(
             probe.LogSnapshot(),
@@ -107,25 +161,51 @@ public sealed class ApplicationStartupCoordinatorTests
             "initialize",
             "start-host",
             "show-cache",
-            "scan");
-
-        Assert.DoesNotContain(
+            "scan",
+            "catalog-final",
             "apply-ui",
-            probe.LogSnapshot());
-
-        refreshCompletion.SetResult(
-            probe.FreshSnapshot);
-
-        await backgroundRefresh.WaitAsync(
-            TimeSpan.FromSeconds(2));
+            "ready");
 
         Assert.Same(
             probe.FreshSnapshot,
             probe.AppliedSnapshot);
 
-        Assert.Equal(
-            "apply-ui",
-            probe.LogSnapshot()[^1]);
+        Assert.Equal("ready", probe.LogSnapshot()[^1]);
+    }
+
+    [Fact]
+    public async Task Nonfatal_initial_refresh_failure_still_signals_ready_once()
+    {
+        var probe = new StartupProbe();
+        probe.ProgressState.Begin();
+        probe.RefreshBehavior = _ =>
+        {
+            probe.Mark("scan");
+            probe.ProgressState.Report(
+                StartupStage.EnrichingCatalog,
+                "Enrichissement du catalogue Steam",
+                1,
+                1);
+            probe.Mark("catalog-final");
+            return Task.FromException<LibrarySnapshot>(
+                new InvalidOperationException("refresh failed"));
+        };
+        var sut = new ApplicationStartupCoordinator(probe.CreateOperations());
+
+        var result = await sut.StartAsync([], CancellationToken.None);
+
+        Assert.Equal(ApplicationStartupCoordinator.StartResult.Started, result);
+        Assert.Equal(1, probe.RefreshRunCount);
+        Assert.Equal(1, probe.ReadySignalCount);
+        Assert.False(probe.ProgressState.IsBusy);
+        Assert.Equal(StartupStage.Ready, probe.ProgressState.Stage);
+        Assert.True(sut.BackgroundRefreshTask!.IsFaulted);
+        AssertAppearsBefore(
+            probe.LogSnapshot(),
+            "show-cache",
+            "scan",
+            "catalog-final",
+            "ready");
     }
 
     [Fact]
@@ -175,6 +255,67 @@ public sealed class ApplicationStartupCoordinatorTests
         Assert.False(probe.RefreshStarted);
         Assert.False(probe.InvocationBindingInstalled);
         Assert.False(probe.RescanBindingInstalled);
+        Assert.Equal(0, probe.ReadySignalCount);
+        Assert.Null(sut.BackgroundRefreshTask);
+    }
+
+    [Fact]
+    public async Task Cached_snapshot_failure_does_not_signal_ready()
+    {
+        var probe = new StartupProbe
+        {
+            ShowCachedBehavior = (_, _) =>
+                Task.FromException(new InvalidOperationException("presentation failed"))
+        };
+        probe.ProgressState.Begin();
+        var sut = new ApplicationStartupCoordinator(probe.CreateOperations());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.StartAsync([], CancellationToken.None));
+
+        Assert.Equal(0, probe.ReadySignalCount);
+        Assert.True(probe.ProgressState.IsBusy);
+        Assert.NotEqual(StartupStage.Ready, probe.ProgressState.Stage);
+        Assert.Null(sut.BackgroundRefreshTask);
+    }
+
+    [Fact]
+    public async Task Fatal_initialization_does_not_signal_ready()
+    {
+        var probe = new StartupProbe
+        {
+            InitializeBehavior = _ =>
+                Task.FromException<LocalStartupState>(new InvalidOperationException("initialization failed"))
+        };
+        probe.ProgressState.Begin();
+        var sut = new ApplicationStartupCoordinator(probe.CreateOperations());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.StartAsync([], CancellationToken.None));
+
+        Assert.Equal(0, probe.ReadySignalCount);
+        Assert.True(probe.ProgressState.IsBusy);
+        Assert.Null(sut.BackgroundRefreshTask);
+    }
+
+    [Fact]
+    public async Task Cancellation_before_cached_snapshot_presentation_does_not_signal_ready()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var probe = new StartupProbe
+        {
+            ShowCachedBehavior = (_, token) =>
+                Task.FromCanceled(token)
+        };
+        probe.ProgressState.Begin();
+        var sut = new ApplicationStartupCoordinator(probe.CreateOperations());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            sut.StartAsync([], cancellation.Token));
+
+        Assert.Equal(0, probe.ReadySignalCount);
+        Assert.True(probe.ProgressState.IsBusy);
         Assert.Null(sut.BackgroundRefreshTask);
     }
 
@@ -380,6 +521,18 @@ public sealed class ApplicationStartupCoordinatorTests
         }
     }
 
+    private static async Task WaitForAsync(
+        Func<bool> condition,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "Timed out waiting for the startup condition.");
+            await Task.Delay(10);
+        }
+    }
+
     private static string FindRepositoryFile(
         params string[] relativeParts)
     {
@@ -468,6 +621,12 @@ public sealed class ApplicationStartupCoordinatorTests
             set;
         }
 
+        public StartupProgressState ProgressState { get; } = new();
+        public int ReadySignalCount { get; private set; }
+        public int RefreshRunCount { get; private set; }
+        public Func<LibrarySnapshot, CancellationToken, Task>? ShowCachedBehavior { get; init; }
+        public Func<CancellationToken, Task<LocalStartupState>>? InitializeBehavior { get; init; }
+
         public bool LayoutCreated
         {
             get;
@@ -503,6 +662,8 @@ public sealed class ApplicationStartupCoordinatorTests
             get;
             private set;
         }
+
+        public int MainWindowInstanceCount { get; private set; }
 
         public bool RecoveryShown
         {
@@ -634,6 +795,9 @@ public sealed class ApplicationStartupCoordinatorTests
                         Mark("initialize");
                         DatabaseInitialized = true;
 
+                        if (InitializeBehavior is not null)
+                            return InitializeBehavior(cancellationToken);
+
                         return Task.FromResult(
                             new LocalStartupState(
                                 Health,
@@ -652,7 +816,11 @@ public sealed class ApplicationStartupCoordinatorTests
                     {
                         Mark("show-cache");
                         MainWindowShown = true;
+                        MainWindowInstanceCount++;
                         ShownSnapshot = snapshot;
+
+                        if (ShowCachedBehavior is not null)
+                            return ShowCachedBehavior(snapshot, cancellationToken);
 
                         return Task.CompletedTask;
                     },
@@ -717,6 +885,13 @@ public sealed class ApplicationStartupCoordinatorTests
                         Mark("release-gate");
 
                         return Task.CompletedTask;
+                    },
+                SignalStartupReady:
+                    () =>
+                    {
+                        Mark("ready");
+                        ReadySignalCount++;
+                        ProgressState.Ready();
                     });
         }
 
@@ -749,6 +924,8 @@ public sealed class ApplicationStartupCoordinatorTests
         private Task<LibrarySnapshot> RefreshAsync(
             CancellationToken cancellationToken)
         {
+            RefreshRunCount++;
+
             if (RefreshBehavior is not null)
             {
                 return RefreshBehavior(

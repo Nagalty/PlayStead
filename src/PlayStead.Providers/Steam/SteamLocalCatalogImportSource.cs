@@ -3,7 +3,14 @@ using PlayStead.Core.Persistence;
 
 namespace PlayStead.Providers.Steam;
 
-public sealed class SteamLocalCatalogImportSource
+public interface ISteamLocalCatalogImportSource
+{
+    IReadOnlyList<CanonicalCatalogImportItem> CreateItems(
+        LibrarySnapshot snapshot,
+        DateTimeOffset observedAtUtc);
+}
+
+public sealed class SteamLocalCatalogImportSource : ISteamLocalCatalogImportSource
 {
     private readonly WindowsSteamRootLocator _rootLocator;
     private readonly SteamLibraryFoldersReader _folders;
@@ -19,7 +26,7 @@ public sealed class SteamLocalCatalogImportSource
         if (root is null) return Array.Empty<CanonicalCatalogImportItem>();
         var appInfoPath = Path.Combine(root, "appcache", "appinfo.vdf");
         var byExternal = snapshot.Installations.Where(x => x.Provider == ProviderKind.Steam).ToDictionary(x => x.ExternalId, StringComparer.Ordinal);
-        var items = new List<CanonicalCatalogImportItem>();
+        var discovered = new List<(GameInstallation Local, DiscoveredInstallation Installation)>();
         foreach (var library in _folders.Read(root))
         {
             foreach (var manifest in Directory.EnumerateFiles(Path.Combine(library, "steamapps"), "appmanifest_*.acf"))
@@ -28,13 +35,33 @@ public sealed class SteamLocalCatalogImportSource
                 {
                     var installation = _manifests.Read(manifest, library, observedAtUtc);
                     if (!byExternal.TryGetValue(installation.ExternalId, out var local)) continue;
-                    var app = uint.TryParse(installation.ExternalId, out var id) ? _appInfo.Find(appInfoPath, id, installation.Title) : null;
-                    items.Add(new CanonicalCatalogImportItem(local.GameId, installation.ExternalId, installation.Title, app?.Developer, app?.Publisher, observedAtUtc));
+                    discovered.Add((local, installation));
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
                 { }
             }
         }
+
+        var requestedIds = discovered
+            .Select(item => uint.TryParse(item.Installation.ExternalId, out var id) ? id : (uint?)null)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value);
+        var appInfo = _appInfo.FindMany(appInfoPath, requestedIds);
+        var items = new List<CanonicalCatalogImportItem>(discovered.Count);
+        foreach (var item in discovered)
+        {
+            SteamAppInfoEntry? app = null;
+            if (uint.TryParse(item.Installation.ExternalId, out var id))
+                appInfo.TryGetValue(id, out app);
+            items.Add(new CanonicalCatalogImportItem(
+                item.Local.GameId,
+                item.Installation.ExternalId,
+                item.Installation.Title,
+                app?.Developer,
+                app?.Publisher,
+                observedAtUtc));
+        }
+
         return items;
     }
 }

@@ -65,9 +65,14 @@ public sealed class ApplicationStartupCoordinator
 
         _hostBuilt = true;
 
+        if (_operations.EnsureMainWindowShownAsync is { } showWindow)
+            await showWindow(cancellationToken);
+
+        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN InitializeLocalStateAsync");
         var localState =
             await _operations.InitializeLocalStateAsync(
                 cancellationToken);
+        System.Diagnostics.Trace.WriteLine("[STARTUP] END InitializeLocalStateAsync");
 
         if (!localState.Health.IsHealthy)
         {
@@ -78,12 +83,16 @@ public sealed class ApplicationStartupCoordinator
             return StartResult.DatabaseUnhealthy;
         }
 
+        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN StartHostAsync");
         await _operations.StartHostAsync(
             cancellationToken);
+        System.Diagnostics.Trace.WriteLine("[STARTUP] END StartHostAsync");
 
+        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN ShowCachedSnapshotAsync");
         await _operations.ShowCachedSnapshotAsync(
             localState.Snapshot,
             cancellationToken);
+        System.Diagnostics.Trace.WriteLine("[STARTUP] END ShowCachedSnapshotAsync");
 
         _operations.BindInvocationReceived(
             HandleInvocationAsync);
@@ -94,6 +103,24 @@ public sealed class ApplicationStartupCoordinator
         BackgroundRefreshTask =
             RefreshAndApplyAsync(
                 cancellationToken);
+
+        try
+        {
+            await BackgroundRefreshTask;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception error)
+        {
+            System.Diagnostics.Trace.TraceWarning(
+                "Initial refresh failed; cached startup snapshot remains available. {0}",
+                error);
+        }
+
+        _operations.SignalStartupReady?.Invoke();
+        System.Diagnostics.Trace.WriteLine("[STARTUP] READY");
 
         return StartResult.Started;
     }
@@ -203,6 +230,7 @@ public sealed class ApplicationStartupCoordinator
         TaskCompletionSource completion,
         CancellationToken cancellationToken)
     {
+        StartupForensicTrace.Write("RefreshAndApply.Begin");
         try
         {
             var snapshot = await _operations.RefreshAsync(cancellationToken);
@@ -219,6 +247,7 @@ public sealed class ApplicationStartupCoordinator
         }
         finally
         {
+            StartupForensicTrace.Write("RefreshAndApply.End");
             lock (_lifecycleGate)
                 _refreshTasks.Remove(completion.Task);
         }
@@ -300,5 +329,7 @@ public sealed class ApplicationStartupCoordinator
             CancellationToken,
             Task>
             ReleaseSingleInstanceAsync,
-        Func<CancellationToken, Task>? StopDiscoveryAsync = null);
+        Func<CancellationToken, Task>? StopDiscoveryAsync = null,
+        Func<CancellationToken, Task>? EnsureMainWindowShownAsync = null,
+        Action? SignalStartupReady = null);
 }

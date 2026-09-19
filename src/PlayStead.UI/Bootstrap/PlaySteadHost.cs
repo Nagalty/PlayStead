@@ -69,6 +69,15 @@ public static class PlaySteadHost
             Path.Combine(dataRoot, "catalog.db"),
             Path.Combine(layout.BackupsDirectory, "Catalog")));
         builder.Services.AddSingleton<CatalogDatabaseInitializer>();
+        builder.Services.AddSingleton<StartupProgressState>();
+        builder.Services.AddSingleton<SqliteCanonicalCatalogWriter>();
+        builder.Services.AddSingleton<ICanonicalCatalogWriter>(
+            services => services.GetRequiredService<SqliteCanonicalCatalogWriter>());
+        builder.Services.AddSingleton<SteamAppInfoReader>();
+        builder.Services.AddSingleton<SteamLocalCatalogImportSource>();
+        builder.Services.AddSingleton<ISteamLocalCatalogImportSource>(services =>
+            services.GetRequiredService<SteamLocalCatalogImportSource>());
+        builder.Services.AddSingleton<SteamLocalCatalogBootstrapper>();
         builder.Services.AddSingleton<SqliteCanonicalCatalogStore>();
         builder.Services.AddSingleton<PlayStead.Core.Persistence.ICanonicalCatalogStore>(
             services => services.GetRequiredService<SqliteCanonicalCatalogStore>());

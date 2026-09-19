@@ -3,6 +3,7 @@ using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Data.Database;
 using PlayStead.Data.Catalog;
+using PlayStead.Providers.Steam;
 using PlayStead.UI.Steam;
 using PlayStead.UI.Sessions;
 
@@ -25,6 +26,9 @@ public sealed class LocalStartupPipeline
         _identityResolutionCoordinator;
     private readonly NotificationRetentionStartup?
         _notificationRetentionStartup;
+    private readonly SteamLocalCatalogBootstrapper?
+        _steamLocalCatalogBootstrapper;
+    private readonly StartupProgressState? _startupProgress;
     private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
     private readonly object _refreshRequestGate = new();
     private long _latestRefreshRequest;
@@ -56,6 +60,27 @@ public sealed class LocalStartupPipeline
     {
         _notificationRetentionStartup = notificationRetentionStartup
             ?? throw new ArgumentNullException(nameof(notificationRetentionStartup));
+    }
+
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        DiscoveryInventoryManager discoveryInventory,
+        CatalogDatabaseInitializer catalogDatabaseInitializer,
+        ILocalIdentityResolutionCoordinator identityResolutionCoordinator,
+        NotificationRetentionStartup notificationRetentionStartup,
+        SteamLocalCatalogBootstrapper steamLocalCatalogBootstrapper,
+        StartupProgressState startupProgress)
+        : this(databaseInitializer, databaseHealthChecker, libraryStore, scanCoordinator,
+            steamReferenceRuntime, discoveryInventory, catalogDatabaseInitializer,
+            identityResolutionCoordinator, notificationRetentionStartup)
+    {
+        _steamLocalCatalogBootstrapper = steamLocalCatalogBootstrapper
+            ?? throw new ArgumentNullException(nameof(steamLocalCatalogBootstrapper));
+        _startupProgress = startupProgress ?? throw new ArgumentNullException(nameof(startupProgress));
     }
 
     public LocalStartupPipeline(
@@ -172,30 +197,46 @@ public sealed class LocalStartupPipeline
     public async Task<LocalStartupState> InitializeAsync(
         CancellationToken cancellationToken)
     {
+        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN DatabaseInitializer.InitializeAsync");
         await _databaseInitializer.InitializeAsync(
             cancellationToken);
+        System.Diagnostics.Trace.WriteLine("[STARTUP] END DatabaseInitializer.InitializeAsync");
 
         if (_catalogDatabaseInitializer is not null)
+        {
+            System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN CatalogDatabaseInitializer.InitializeAsync");
             await _catalogDatabaseInitializer.InitializeAsync(cancellationToken);
+            System.Diagnostics.Trace.WriteLine("[STARTUP] END CatalogDatabaseInitializer.InitializeAsync");
+        }
 
         if (_notificationRetentionStartup is not null)
+        {
+            System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN NotificationRetentionStartup.InitializeAsync");
             await _notificationRetentionStartup.InitializeAsync(cancellationToken);
+            System.Diagnostics.Trace.WriteLine("[STARTUP] END NotificationRetentionStartup.InitializeAsync");
+        }
 
+        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN DatabaseHealthChecker.QuickCheckAsync");
         var health =
             await _databaseHealthChecker.QuickCheckAsync(
                 cancellationToken);
+        System.Diagnostics.Trace.WriteLine("[STARTUP] END DatabaseHealthChecker.QuickCheckAsync");
 
+        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN ILibraryStore.LoadSnapshotAsync");
         var snapshot =
             await _libraryStore.LoadSnapshotAsync(
                 cancellationToken);
+        System.Diagnostics.Trace.WriteLine("[STARTUP] END ILibraryStore.LoadSnapshotAsync");
 
         if (health.IsHealthy)
             _discoveryInventory?.Schedule(snapshot, cancellationToken);
 
         if (_steamReferenceRuntime is not null)
         {
+            System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN ISteamReferenceRuntime.LoadCachedAsync");
             await _steamReferenceRuntime.LoadCachedAsync(
                 cancellationToken);
+            System.Diagnostics.Trace.WriteLine("[STARTUP] END ISteamReferenceRuntime.LoadCachedAsync");
         }
 
         return new LocalStartupState(
@@ -250,6 +291,39 @@ public sealed class LocalStartupPipeline
                 }
             }
 
+            if (_steamLocalCatalogBootstrapper is not null)
+            {
+                StartupForensicTrace.Write("SteamCatalogBootstrap.Begin");
+                try
+                {
+                    var bootstrapSnapshot =
+                        await _libraryStore.LoadSnapshotAsync(cancellationToken);
+                    var progressContext = SynchronizationContext.Current;
+                    await RunSteamCatalogBootstrapAsync(
+                        _steamLocalCatalogBootstrapper,
+                        bootstrapSnapshot,
+                        DateTimeOffset.UtcNow,
+                        _startupProgress,
+                        progressContext,
+                        cancellationToken);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    System.Diagnostics.Trace.TraceWarning(
+                        "Local Steam catalog bootstrap failed; library scan remains available. {0}",
+                        exception);
+                }
+                finally
+                {
+                    StartupForensicTrace.Write("SteamCatalogBootstrap.End");
+                }
+            }
+
             if (_steamReferenceRuntime is not null)
             {
                 await _steamReferenceRuntime.RefreshStaleAsync(
@@ -270,5 +344,46 @@ public sealed class LocalStartupPipeline
         {
             _refreshSemaphore.Release();
         }
+    }
+
+    internal static Task RunSteamCatalogBootstrapAsync(
+        SteamLocalCatalogBootstrapper bootstrapper,
+        LibrarySnapshot snapshot,
+        DateTimeOffset observedAtUtc,
+        StartupProgressState? startupProgress,
+        SynchronizationContext? progressContext,
+        CancellationToken cancellationToken) =>
+        Task.Run(
+            () => bootstrapper.RunAsync(
+                snapshot,
+                observedAtUtc,
+                cancellationToken,
+                progress => ReportSteamCatalogProgress(
+                    progressContext,
+                    startupProgress,
+                    progress)),
+            cancellationToken);
+
+    private static void ReportSteamCatalogProgress(
+        SynchronizationContext? progressContext,
+        StartupProgressState? startupProgress,
+        SteamCatalogBootstrapProgress progress)
+    {
+        if (startupProgress is null)
+            return;
+
+        void Apply() => startupProgress.Report(
+            StartupStage.EnrichingCatalog,
+            "Enrichissement du catalogue Steam",
+            progress.Current,
+            progress.Total);
+
+        if (progressContext is null || ReferenceEquals(SynchronizationContext.Current, progressContext))
+        {
+            Apply();
+            return;
+        }
+
+        progressContext.Send(_ => Apply(), null);
     }
 }

@@ -16,11 +16,13 @@ using PlayStead.UI.Settings;
 using PlayStead.UI.Shell;
 using PlayStead.UI.State;
 using PlayStead.UI.Tray;
+using PlayStead.UI.Bootstrap;
 
 namespace PlayStead.UI;
 
 public partial class MainWindow : Window
 {
+    public StartupProgressState StartupProgress { get; }
     private readonly WindowPlacementService? _windowPlacementService;
     private readonly WindowClosePolicy? _windowClosePolicy;
     private readonly LibraryView _libraryView;
@@ -48,16 +50,20 @@ public partial class MainWindow : Window
     public MainWindow()
         : this(
             new NavigationService(),
-            shellViewModel: null)
+            shellViewModel: null,
+            new StartupProgressState())
     {
     }
 
     private MainWindow(
         NavigationService navigationService,
-        ShellViewModel? shellViewModel)
+        ShellViewModel? shellViewModel,
+        StartupProgressState startupProgress)
     {
         ArgumentNullException.ThrowIfNull(
             navigationService);
+        StartupProgress = startupProgress
+            ?? throw new ArgumentNullException(nameof(startupProgress));
 
         InitializeComponent();
         SourceInitialized += (_, _) => WindowThemeHelper.ApplyDarkTitleBar(this);
@@ -157,10 +163,12 @@ public partial class MainWindow : Window
         WindowClosePolicy windowClosePolicy,
         SessionViewModel sessionViewModel,
         NavigationService navigationService,
-        ShellViewModel shellViewModel)
+        ShellViewModel shellViewModel,
+        StartupProgressState? startupProgress = null)
         : this(
             navigationService,
-            shellViewModel)
+            shellViewModel,
+            startupProgress ?? new StartupProgressState())
     {
         ArgumentNullException.ThrowIfNull(
             viewModel);
@@ -193,14 +201,16 @@ public partial class MainWindow : Window
         SessionViewModel sessionViewModel,
         NavigationService navigationService,
         ShellViewModel shellViewModel,
-        SettingsViewModel settingsViewModel)
+        SettingsViewModel settingsViewModel,
+        StartupProgressState? startupProgress = null)
         : this(
             viewModel,
             windowPlacementService,
             windowClosePolicy,
             sessionViewModel,
             navigationService,
-            shellViewModel)
+            shellViewModel,
+            startupProgress)
     {
         ArgumentNullException.ThrowIfNull(settingsViewModel);
 
@@ -216,7 +226,8 @@ public partial class MainWindow : Window
         NavigationService navigationService,
         ShellViewModel shellViewModel,
         SettingsViewModel settingsViewModel,
-        UiMotionController uiMotionController)
+        UiMotionController uiMotionController,
+        StartupProgressState? startupProgress = null)
         : this(
             viewModel,
             windowPlacementService,
@@ -224,7 +235,8 @@ public partial class MainWindow : Window
             sessionViewModel,
             navigationService,
             shellViewModel,
-            settingsViewModel)
+            settingsViewModel,
+            startupProgress)
     {
         ArgumentNullException.ThrowIfNull(uiMotionController);
 
@@ -250,7 +262,8 @@ public partial class MainWindow : Window
         ShellViewModel shellViewModel,
         SettingsViewModel settingsViewModel,
         UiMotionController uiMotionController,
-        HomeViewModel homeViewModel)
+        HomeViewModel homeViewModel,
+        StartupProgressState? startupProgress = null)
         : this(
             viewModel,
             windowPlacementService,
@@ -259,7 +272,8 @@ public partial class MainWindow : Window
             navigationService,
             shellViewModel,
             settingsViewModel,
-            uiMotionController)
+            uiMotionController,
+            startupProgress)
     {
         ArgumentNullException.ThrowIfNull(homeViewModel);
 
@@ -279,10 +293,12 @@ public partial class MainWindow : Window
         SettingsViewModel settingsViewModel,
         UiMotionController uiMotionController,
         HomeViewModel homeViewModel,
-        GameLaunchService gameLaunchService)
+        GameLaunchService gameLaunchService,
+        StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
-            settingsViewModel, uiMotionController, homeViewModel)
+            settingsViewModel, uiMotionController, homeViewModel,
+            startupProgress)
     {
         ArgumentNullException.ThrowIfNull(gameLaunchService);
         _gameLaunchService = gameLaunchService;
@@ -307,10 +323,12 @@ public partial class MainWindow : Window
         ISessionStore sessionStore,
         ISessionCorrectionStore sessionCorrectionStore,
         SessionCorrectionPolicy sessionCorrectionPolicy,
-        NotificationCenterViewModel notificationCenterViewModel)
+        NotificationCenterViewModel notificationCenterViewModel,
+        StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
-            settingsViewModel, uiMotionController, homeViewModel, gameLaunchService)
+            settingsViewModel, uiMotionController, homeViewModel, gameLaunchService,
+            startupProgress)
     {
         ArgumentNullException.ThrowIfNull(attentionViewModel);
         ArgumentNullException.ThrowIfNull(sessionStore);
@@ -397,14 +415,15 @@ public partial class MainWindow : Window
         NotificationCenterViewModel notificationCenterViewModel,
         IGameMediaResolver gameMediaResolver,
         ILocalGameMediaResolver localGameMediaResolver,
-        SessionMonitor sessionMonitor)
+        SessionMonitor sessionMonitor,
+        StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
             settingsViewModel, uiMotionController, homeViewModel,
             gameLaunchService, attentionViewModel, sessionStore,
             sessionCorrectionStore, sessionCorrectionPolicy,
             notificationCenterViewModel, gameMediaResolver,
-            localGameMediaResolver)
+            localGameMediaResolver, startupProgress)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -428,13 +447,14 @@ public partial class MainWindow : Window
         SessionCorrectionPolicy sessionCorrectionPolicy,
         NotificationCenterViewModel notificationCenterViewModel,
         IGameMediaResolver gameMediaResolver,
-        ILocalGameMediaResolver localGameMediaResolver)
+        ILocalGameMediaResolver localGameMediaResolver,
+        StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
             settingsViewModel, uiMotionController, homeViewModel,
             gameLaunchService, attentionViewModel, sessionStore,
             sessionCorrectionStore, sessionCorrectionPolicy,
-            notificationCenterViewModel)
+            notificationCenterViewModel, startupProgress)
     {
         ArgumentNullException.ThrowIfNull(gameMediaResolver);
         ArgumentNullException.ThrowIfNull(localGameMediaResolver);

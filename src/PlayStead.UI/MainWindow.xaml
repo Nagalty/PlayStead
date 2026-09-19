@@ -1,4 +1,5 @@
 <Window x:Class="PlayStead.UI.MainWindow"
+        x:Name="RootWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:library="clr-namespace:PlayStead.UI.Library"
@@ -17,7 +18,7 @@
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </Window.Resources>
 
-    <Grid>
+    <Grid x:Name="RootLayout">
         <Grid.RowDefinitions>
             <RowDefinition Height="72" />
             <RowDefinition Height="*" />
@@ -137,7 +138,20 @@
                 HorizontalAlignment="Right"
                 Width="360"
                 Visibility="{Binding IsPanelOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <notifications:NotificationPanel />
+                <notifications:NotificationPanel />
+        </Border>
+
+        <Border x:Name="StartupOverlay" Grid.RowSpan="2" Panel.ZIndex="100"
+                IsHitTestVisible="{Binding StartupProgress.IsBusy, ElementName=RootWindow}"
+                Background="{DynamicResource PlayStead.Brush.Background}"
+                Opacity="0.97"
+                Visibility="{Binding StartupProgress.IsBusy, ElementName=RootWindow, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel Width="420" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="Préparation de PlayStead" Style="{DynamicResource PlayStead.Text.Heading}" />
+                <TextBlock Margin="0,12,0,16" Text="{Binding StartupProgress.Message, ElementName=RootWindow}" Style="{DynamicResource PlayStead.Text.Body}" />
+                <ProgressBar x:Name="StartupProgressBar" Height="6" Style="{DynamicResource PlayStead.ProgressBar.Startup}" Maximum="{Binding StartupProgress.Total, ElementName=RootWindow}" Value="{Binding StartupProgress.Current, ElementName=RootWindow, Mode=OneWay}" IsIndeterminate="{Binding StartupProgress.IsProgressIndeterminate, ElementName=RootWindow}" />
+                <TextBlock x:Name="StartupProgressCountLabel" Margin="0,10,0,0" Text="{Binding StartupProgress.CountLabel, ElementName=RootWindow}" Visibility="{Binding StartupProgress.HasCount, ElementName=RootWindow, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            </StackPanel>
         </Border>
     </Grid>
 </Window>
