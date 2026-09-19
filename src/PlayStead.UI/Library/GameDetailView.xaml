@@ -178,6 +178,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -246,7 +247,42 @@
                     </Border>
                 </StackPanel>
 
-                <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,18,0,0"
+                <Border x:Name="RecentActivity"
+                        Grid.Row="2"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        Margin="0,18,0,0"
+                        Style="{DynamicResource PlayStead.Surface.Card}"
+                        Visibility="{Binding Activity.HasRecentActivity,
+                                             Converter={StaticResource BooleanToVisibilityConverter},
+                                             FallbackValue=Collapsed}">
+                    <StackPanel>
+                        <controls:SectionHeader Title="Activité récente"/>
+                        <ItemsControl x:Name="RecentActivityItems"
+                                      Margin="{DynamicResource PlayStead.Gap.Block.Small}"
+                                      ItemsSource="{Binding Activity.RecentActivitySessions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="{DynamicResource PlayStead.Gap.Block.Small}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding StartedAtLabel}"
+                                                   Style="{DynamicResource PlayStead.Text.Body}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Margin="{DynamicResource PlayStead.Gap.Inline.Small}"
+                                                   Text="{Binding DurationLabel}"
+                                                   HorizontalAlignment="Right"
+                                                   Style="{DynamicResource PlayStead.Text.Body}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,18,0,0"
                         Style="{DynamicResource PlayStead.Surface.Card}"
                         Visibility="{Binding HasGeneralInfo, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel>

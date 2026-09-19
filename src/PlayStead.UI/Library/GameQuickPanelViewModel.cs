@@ -21,6 +21,8 @@ public sealed class GameQuickPanelViewModel :
     private string _lastSessionDurationLabel = "—";
     private string _totalPlayTimeLabel = "0 min";
     private string _sessionCountLabel = "0 session";
+    private IReadOnlyList<RecentActivitySessionItemViewModel> _recentActivitySessions =
+        Array.Empty<RecentActivitySessionItemViewModel>();
 
     public GameQuickPanelViewModel(
         LibraryItemViewModel game,
@@ -102,6 +104,12 @@ public sealed class GameQuickPanelViewModel :
         private set => SetField(ref _sessionCountLabel, value);
     }
 
+    public IReadOnlyList<RecentActivitySessionItemViewModel> RecentActivitySessions =>
+        _recentActivitySessions;
+
+    public bool HasRecentActivity =>
+        _recentActivitySessions.Count > 0;
+
     public async Task LoadSessionSummaryAsync(
         CancellationToken cancellationToken)
     {
@@ -119,6 +127,7 @@ public sealed class GameQuickPanelViewModel :
 
         if (sessions.Count == 0)
         {
+            SetRecentActivitySessions(Array.Empty<RecentActivitySessionItemViewModel>());
             HasSessionHistory = false;
             LastActivityLabel = "Aucune activité PlayStead";
             LastSessionDateLabel = "—";
@@ -149,6 +158,26 @@ public sealed class GameQuickPanelViewModel :
                     session,
                     effective));
         }
+
+        var recentActivity = resolved
+            .Where(item =>
+                item.Session.GameId == Game.GameId.Value &&
+                item.Session.State is SessionState.Ended or SessionState.Recovered &&
+                item.Effective.EndedAtUtc is DateTimeOffset endedAt &&
+                endedAt > item.Effective.StartedAtUtc)
+            .GroupBy(item => item.Session.SessionId)
+            .Select(group => group
+                .OrderByDescending(item => item.Effective.StartedAtUtc)
+                .First())
+            .OrderByDescending(item => item.Effective.StartedAtUtc)
+            .ThenByDescending(item => item.Session.SessionId)
+            .Take(5)
+            .Select(item => new RecentActivitySessionItemViewModel(
+                item.Session.SessionId,
+                FormatTimestamp(item.Effective.StartedAtUtc),
+                FormatDuration(item.Effective.EndedAtUtc!.Value - item.Effective.StartedAtUtc)))
+            .ToArray();
+        SetRecentActivitySessions(Array.AsReadOnly(recentActivity));
 
         var completed =
             resolved
@@ -249,6 +278,13 @@ public sealed class GameQuickPanelViewModel :
             CultureInfo.GetCultureInfo("fr-FR"));
     }
 
+    private void SetRecentActivitySessions(IReadOnlyList<RecentActivitySessionItemViewModel> value)
+    {
+        _recentActivitySessions = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RecentActivitySessions)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasRecentActivity)));
+    }
+
     private static string FormatDuration(
         TimeSpan duration)
     {
@@ -300,3 +336,8 @@ public sealed class GameQuickPanelViewModel :
         GameSession Session,
         EffectiveSessionTime Effective);
 }
+
+public sealed record RecentActivitySessionItemViewModel(
+    Guid SessionId,
+    string StartedAtLabel,
+    string DurationLabel);
