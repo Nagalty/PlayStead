@@ -153,6 +153,10 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(DeveloperDisplay));
         OnPropertyChanged(nameof(PublisherDisplay));
         OnPropertyChanged(nameof(ReleaseDateDisplay));
+        OnPropertyChanged(nameof(HasDeveloper));
+        OnPropertyChanged(nameof(HasPublisher));
+        OnPropertyChanged(nameof(HasReleaseDate));
+        OnPropertyChanged(nameof(HasGeneralInfo));
     }
 
     public string Title { get; }
@@ -172,6 +176,11 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public string? DeveloperDisplay { get; private set; }
     public string? PublisherDisplay { get; private set; }
     public string? ReleaseDateDisplay { get; private set; }
+
+    public bool HasDeveloper => !string.IsNullOrWhiteSpace(DeveloperDisplay);
+    public bool HasPublisher => !string.IsNullOrWhiteSpace(PublisherDisplay);
+    public bool HasReleaseDate => !string.IsNullOrWhiteSpace(ReleaseDateDisplay);
+    public bool HasGeneralInfo => HasDeveloper || HasPublisher || HasReleaseDate;
 
     private static string GetDriveLabel(string path)
     {

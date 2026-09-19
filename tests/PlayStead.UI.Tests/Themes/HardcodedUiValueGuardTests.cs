@@ -9,7 +9,7 @@ public sealed partial class HardcodedUiValueGuardTests
     private const int ExpectedFontSizeCount = 69;
     private const int ExpectedFontWeightCount = 44;
     private const int ExpectedCornerRadiusCount = 22;
-    private const int ExpectedSpacingCount = 161;
+    private const int ExpectedSpacingCount = 168;
     private const int ExpectedLocalButtonAppearanceCount = 0;
 
     [Fact]

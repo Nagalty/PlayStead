@@ -154,7 +154,8 @@ public sealed class LibraryViewModel :
             libraryStore,
             steamReferenceRuntime,
             sessionMonitor,
-            gameMediaResolver)
+            gameMediaResolver,
+            canonicalCatalogStore)
     {
         ArgumentNullException.ThrowIfNull(uiPreferencesStore);
 

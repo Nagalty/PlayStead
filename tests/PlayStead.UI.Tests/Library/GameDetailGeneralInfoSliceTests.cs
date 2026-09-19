@@ -5,17 +5,17 @@ namespace PlayStead.UI.Tests.Library;
 public sealed class GameDetailGeneralInfoSliceTests
 {
     [Fact]
-    public void General_info_card_is_not_created_without_reliable_projected_metadata()
+    public void General_info_card_uses_reliable_projected_metadata()
     {
         var path = Path.Combine(FindRoot(), "src", "PlayStead.UI", "Library", "GameDetailView.xaml");
         var xaml = File.ReadAllText(path);
 
-        Assert.DoesNotContain("Infos générales", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Developer", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Publisher", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("ReleaseDate", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Genre", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Langue", xaml, StringComparison.Ordinal);
+        Assert.Contains("Infos générales", xaml, StringComparison.Ordinal);
+        Assert.Contains("DeveloperDisplay", xaml, StringComparison.Ordinal);
+        Assert.Contains("PublisherDisplay", xaml, StringComparison.Ordinal);
+        Assert.Contains("ReleaseDateDisplay", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"Genre\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"Langue\"", xaml, StringComparison.Ordinal);
     }
 
     private static string FindRoot()
