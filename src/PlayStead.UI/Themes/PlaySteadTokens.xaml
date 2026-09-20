@@ -80,6 +80,7 @@
     <Thickness x:Key="PlayStead.Inset.Card">16</Thickness>
     <Thickness x:Key="PlayStead.Inset.Control">8</Thickness>
     <Thickness x:Key="PlayStead.Gap.Block.Small">0,8,0,0</Thickness>
+    <Thickness x:Key="PlayStead.Gap.Block.Medium">0,16,0,0</Thickness>
     <Thickness x:Key="PlayStead.Gap.Inline.XSmall">2,0,0,0</Thickness>
     <Thickness x:Key="PlayStead.Gap.Inline.Small">0,0,8,0</Thickness>
     <Thickness x:Key="PlayStead.Border.None">0</Thickness>

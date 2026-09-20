@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using System.Globalization;
+using System.Windows.Media;
 using System.Windows.Input;
 using System.Windows;
 using System.Windows.Threading;
@@ -19,6 +21,8 @@ public sealed class HomeViewModel :
     INotifyPropertyChanged,
     IDisposable
 {
+    private const int RecentlyPlayedGameLimit = 5;
+
     private readonly LibraryViewModel _libraryViewModel;
     private readonly SessionViewModel _sessionViewModel;
     private readonly NavigationService _navigationService;
@@ -27,8 +31,12 @@ public sealed class HomeViewModel :
     private readonly SessionMonitor? _sessionMonitor;
     private readonly IGameMediaResolver? _mediaResolver;
     private readonly ILogger<HomeViewModel>? _logger;
+    private readonly GameLaunchService? _gameLaunchService;
     private CancellationTokenSource? _heroCancellation;
-    private (Guid? GameId, ProviderKind? Provider, string? Id, string? Title) _mediaKey;
+    private IReadOnlyDictionary<Guid, string> _recentLandscapeMediaPaths =
+        new Dictionary<Guid, string>();
+    private (Guid? GameId, Guid? SessionId, DateTimeOffset? StartedAtUtc,
+        ProviderKind? Provider, string? Id, string? Title) _mediaKey;
     private long _refreshVersion;
     private long _heroVersion;
     private bool _mediaStarted;
@@ -44,7 +52,8 @@ public sealed class HomeViewModel :
         ISessionStore sessionStore,
         SessionMonitor sessionMonitor,
         IGameMediaResolver mediaResolver,
-        ILogger<HomeViewModel> logger)
+        ILogger<HomeViewModel> logger,
+        GameLaunchService? gameLaunchService = null)
         : this(libraryViewModel, sessionViewModel, navigationService)
     {
         ArgumentNullException.ThrowIfNull(libraryStore);
@@ -57,6 +66,7 @@ public sealed class HomeViewModel :
         _sessionMonitor = sessionMonitor;
         _mediaResolver = mediaResolver;
         _logger = logger;
+        _gameLaunchService = gameLaunchService;
         _uiDispatcher = Application.Current?.Dispatcher ?? Dispatcher.FromThread(Thread.CurrentThread);
         _activeSessionIds = sessionMonitor.LatestSnapshot?.ActiveSessions
             .Select(session => session.SessionId).ToHashSet() ?? [];
@@ -75,6 +85,8 @@ public sealed class HomeViewModel :
         _libraryViewModel = libraryViewModel;
         _sessionViewModel = sessionViewModel;
         _navigationService = navigationService;
+        IdleHeroAssetPath = HomeHeroIdlePlaceholderPool.SelectPath(Random.Shared);
+        IdleHeroImageSource = HomeHeroIdlePlaceholderPool.TryLoad(IdleHeroAssetPath);
 
         NavigateLibraryCommand =
             new RelayCommand(
@@ -85,6 +97,13 @@ public sealed class HomeViewModel :
             new RelayCommand(
                 () => _navigationService.Navigate(
                     new NavigationRequest(AppRoute.Sessions)));
+
+        OpenRecentlyPlayedDetailsCommand = new RelayCommand<Guid>(
+            gameId => _navigationService.Navigate(
+                new NavigationRequest(AppRoute.GameDetail, new GameId(gameId))));
+        PlayRecentlyPlayedCommand = new RelayCommand<Guid>(
+            PlayRecentlyPlayed,
+            CanPlayRecentlyPlayed);
 
         _libraryViewModel.PropertyChanged += LibraryViewModel_OnPropertyChanged;
         _sessionViewModel.PropertyChanged += SessionViewModel_OnPropertyChanged;
@@ -101,6 +120,48 @@ public sealed class HomeViewModel :
     public IReadOnlyList<RecentSessionItemViewModel> RecentSessions =>
         _sessionViewModel.RecentSessions;
 
+    public IReadOnlyList<HomeRecentlyPlayedGameViewModel> RecentlyPlayedGames
+    {
+        get
+        {
+            var libraryItems = _libraryViewModel.Items
+                .ToDictionary(item => item.GameId.Value);
+            var seenGameIds = new HashSet<Guid>();
+            var games = new List<HomeRecentlyPlayedGameViewModel>(RecentlyPlayedGameLimit);
+
+            foreach (var session in RecentSessions)
+            {
+                if (!seenGameIds.Add(session.GameId))
+                {
+                    continue;
+                }
+
+                libraryItems.TryGetValue(session.GameId, out var libraryItem);
+                games.Add(new HomeRecentlyPlayedGameViewModel(
+                    session.GameId,
+                    session.Title,
+                    session.StartedAtLabel,
+                    session.DurationLabel,
+                    libraryItem,
+                    _recentLandscapeMediaPaths.TryGetValue(
+                        session.GameId,
+                        out var landscapeMediaPath)
+                        ? landscapeMediaPath
+                        : null));
+
+                if (games.Count == RecentlyPlayedGameLimit)
+                {
+                    break;
+                }
+            }
+
+            return games;
+        }
+    }
+
+    public bool HasRecentlyPlayedGames =>
+        RecentSessions.Count > 0;
+
     public bool HasRecentActivity =>
         _sessionViewModel.HasRecentSessions;
 
@@ -108,10 +169,57 @@ public sealed class HomeViewModel :
 
     public ICommand NavigateSessionsCommand { get; }
 
+    public ICommand PlayRecentlyPlayedCommand { get; }
+
+    public ICommand OpenRecentlyPlayedDetailsCommand { get; }
+
+    private bool CanPlayRecentlyPlayed(Guid gameId)
+    {
+        if (_gameLaunchService is null)
+        {
+            return false;
+        }
+
+        var game = new GameId(gameId);
+        return new GameLaunchViewModel(
+            game,
+            _libraryViewModel.GetLaunchInstallations(game),
+            _gameLaunchService).CanPlay;
+    }
+
+    private void PlayRecentlyPlayed(Guid gameId)
+    {
+        if (_gameLaunchService is null)
+        {
+            return;
+        }
+
+        var game = new GameId(gameId);
+        var launch = new GameLaunchViewModel(
+            game,
+            _libraryViewModel.GetLaunchInstallations(game),
+            _gameLaunchService);
+        launch.TryPlayDefault();
+    }
+
     public Guid? FeaturedGameId { get; private set; }
     public string? FeaturedGameTitle { get; private set; }
     public string? HeroPath { get; private set; }
     public bool HasHero => !string.IsNullOrWhiteSpace(HeroPath);
+    public bool HasActiveSessionHero { get; private set; }
+    public string? ActiveSessionStartedAtLabel { get; private set; }
+    public string HeroEyebrow => HasActiveSessionHero
+        ? "L’aventure continue"
+        : "Aucune aventure en cours";
+    public string HeroTitle => HasActiveSessionHero
+        ? FeaturedGameTitle ?? string.Empty
+        : "Prêt à replonger ?";
+    public string HeroSupportingText => HasActiveSessionHero
+        ? $"En cours depuis {ActiveSessionStartedAtLabel}"
+        : "Lance un jeu, PlayStead s’occupe du reste.";
+    public string IdleHeroAssetPath { get; }
+    public ImageSource? IdleHeroImageSource { get; }
+    public bool HasIdleHeroImage => IdleHeroImageSource is not null;
 
     public async Task RefreshFeaturedGameAsync(CancellationToken cancellationToken)
     {
@@ -127,10 +235,7 @@ public sealed class HomeViewModel :
             cancellationToken.ThrowIfCancellationRequested();
             var active = _sessionMonitor!.LatestSnapshot?.ActiveSessions
                 ?? await _sessionStore!.GetActiveAsync(cancellationToken);
-            var recent = active.Count == 0
-                ? await _sessionStore!.GetRecentAsync(int.MaxValue, cancellationToken)
-                : Array.Empty<GameSession>();
-            var selected = SelectFeaturedSession(active, recent);
+            var selected = SelectActiveSession(active);
             var library = await _libraryStore!.LoadSnapshotAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -139,9 +244,13 @@ public sealed class HomeViewModel :
                 return;
             }
 
+            RefreshRecentlyPlayedLandscapeMediaPaths(library);
+
             var game = library.Games.FirstOrDefault(game => game.Id.Value == selected?.GameId);
             var identity = CreateMediaIdentity(game, library.Installations);
-            var key = (selected?.GameId, identity?.Provider, identity?.ProviderGameId, game?.Title);
+            UpdateHeroSession(selected, game?.Title);
+            var key = (selected?.GameId, selected?.SessionId, selected?.ObservedStartedAtUtc,
+                identity?.Provider, identity?.ProviderGameId, game?.Title);
             if (_mediaKey == key)
             {
                 return;
@@ -152,11 +261,7 @@ public sealed class HomeViewModel :
             _heroCancellation?.Cancel();
             _heroCancellation?.Dispose();
             _heroCancellation = null;
-            FeaturedGameId = selected?.GameId;
-            FeaturedGameTitle = game?.Title;
             SetHeroPath(null);
-            OnPropertyChanged(nameof(FeaturedGameId));
-            OnPropertyChanged(nameof(FeaturedGameTitle));
 
             if (identity is null)
             {
@@ -184,17 +289,48 @@ public sealed class HomeViewModel :
         }
     }
 
-    private static GameSession? SelectFeaturedSession(
-        IReadOnlyList<GameSession> active,
-        IReadOnlyList<GameSession> recent) =>
+    private static GameSession? SelectActiveSession(
+        IReadOnlyList<GameSession> active) =>
         active.Where(session => session.State == SessionState.Active)
             .OrderByDescending(session => session.ObservedStartedAtUtc)
             .ThenBy(session => session.SessionId)
-            .FirstOrDefault()
-        ?? recent.Where(session => session.State != SessionState.Active && session.ObservedEndedAtUtc.HasValue)
-            .OrderByDescending(session => session.ObservedEndedAtUtc)
-            .ThenBy(session => session.SessionId)
             .FirstOrDefault();
+
+    private void UpdateHeroSession(GameSession? session, string? title)
+    {
+        var isActive = session is not null;
+        if (HasActiveSessionHero != isActive)
+        {
+            HasActiveSessionHero = isActive;
+            OnPropertyChanged(nameof(HasActiveSessionHero));
+            OnPropertyChanged(nameof(HeroEyebrow));
+            OnPropertyChanged(nameof(HeroTitle));
+            OnPropertyChanged(nameof(HeroSupportingText));
+        }
+
+        if (FeaturedGameId != session?.GameId)
+        {
+            FeaturedGameId = session?.GameId;
+            OnPropertyChanged(nameof(FeaturedGameId));
+        }
+
+        if (FeaturedGameTitle != title)
+        {
+            FeaturedGameTitle = title;
+            OnPropertyChanged(nameof(FeaturedGameTitle));
+            OnPropertyChanged(nameof(HeroTitle));
+        }
+
+        var startedAtLabel = session?.ObservedStartedAtUtc
+            .ToLocalTime()
+            .ToString("HH:mm", CultureInfo.CurrentCulture);
+        if (ActiveSessionStartedAtLabel != startedAtLabel)
+        {
+            ActiveSessionStartedAtLabel = startedAtLabel;
+            OnPropertyChanged(nameof(ActiveSessionStartedAtLabel));
+            OnPropertyChanged(nameof(HeroSupportingText));
+        }
+    }
 
     private static GameMediaIdentity? CreateMediaIdentity(
         LogicalGame? game,
@@ -221,6 +357,40 @@ public sealed class HomeViewModel :
         }
     }
 
+    private void RefreshRecentlyPlayedLandscapeMediaPaths(
+        LibrarySnapshot library)
+    {
+        var paths = new Dictionary<Guid, string>();
+        foreach (var recentGame in RecentlyPlayedGames)
+        {
+            var game = library.Games.FirstOrDefault(candidate =>
+                candidate.Id.Value == recentGame.GameId);
+            var identity = CreateMediaIdentity(game, library.Installations);
+            if (identity is null)
+            {
+                continue;
+            }
+
+            var path = _mediaResolver!.TryGetCachedPath(
+                identity,
+                GameMediaAssetType.Hero);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                path = _mediaResolver.TryGetCachedPath(
+                    identity,
+                    GameMediaAssetType.Header);
+            }
+
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                paths[recentGame.GameId] = path;
+            }
+        }
+
+        _recentLandscapeMediaPaths = paths;
+        OnPropertyChanged(nameof(RecentlyPlayedGames));
+    }
+
     private async Task LoadHeroObservedAsync(
         GameMediaIdentity identity,
         long version,
@@ -234,6 +404,16 @@ public sealed class HomeViewModel :
             if (!_disposed && version == _heroVersion)
             {
                 SetHeroPath(path);
+                if (FeaturedGameId is Guid featuredGameId &&
+                    !string.IsNullOrWhiteSpace(path))
+                {
+                    var paths = new Dictionary<Guid, string>(_recentLandscapeMediaPaths)
+                    {
+                        [featuredGameId] = path
+                    };
+                    _recentLandscapeMediaPaths = paths;
+                    OnPropertyChanged(nameof(RecentlyPlayedGames));
+                }
             }
         }
         catch (OperationCanceledException)
@@ -280,6 +460,8 @@ public sealed class HomeViewModel :
         if (e.PropertyName == nameof(LibraryViewModel.Items))
         {
             OnPropertyChanged(nameof(LibraryGameCount));
+            OnPropertyChanged(nameof(RecentlyPlayedGames));
+            OnPropertyChanged(nameof(HasRecentlyPlayedGames));
             if (_mediaStarted)
             {
                 await RefreshFeaturedGameAsync(CancellationToken.None);
@@ -298,6 +480,8 @@ public sealed class HomeViewModel :
                 break;
             case nameof(SessionViewModel.RecentSessions):
                 OnPropertyChanged(nameof(RecentSessions));
+                OnPropertyChanged(nameof(RecentlyPlayedGames));
+                OnPropertyChanged(nameof(HasRecentlyPlayedGames));
                 break;
             case nameof(SessionViewModel.HasRecentSessions):
                 OnPropertyChanged(nameof(HasRecentActivity));
@@ -348,5 +532,66 @@ public sealed class HomeViewModel :
         PropertyChanged?.Invoke(
             this,
             new PropertyChangedEventArgs(propertyName));
+    }
+}
+
+public sealed record HomeRecentlyPlayedGameViewModel(
+    Guid GameId,
+    string GameTitle,
+    string StartedAtLabel,
+    string DurationLabel,
+    LibraryItemViewModel? LibraryItem,
+    string? LandscapeMediaPath)
+{
+    public bool HasLandscapeMedia =>
+        !string.IsNullOrWhiteSpace(LandscapeMediaPath);
+
+    public string DisplayStartedAtLabel =>
+        DateTimeOffset.TryParse(
+            StartedAtLabel,
+            CultureInfo.CurrentCulture,
+            DateTimeStyles.AssumeLocal,
+            out var timestamp)
+            ? GameQuickPanelViewModel.FormatTimestampForDisplay(
+                timestamp,
+                DateTimeOffset.Now)
+            : StartedAtLabel;
+
+    public string DisplayDurationLabel =>
+        TryParseSessionDuration(
+            DurationLabel,
+            out var duration)
+            ? GameQuickPanelViewModel.FormatDurationForDisplay(duration)
+            : DurationLabel;
+
+    private static bool TryParseSessionDuration(
+        string value,
+        out TimeSpan duration)
+    {
+        var parts = value.Split(':');
+        if (parts.Length == 2 &&
+            int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) &&
+            int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) &&
+            minutes is >= 0 and < 60 &&
+            seconds is >= 0 and < 60)
+        {
+            duration = new TimeSpan(0, minutes, seconds);
+            return true;
+        }
+
+        if (parts.Length == 3 &&
+            int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var hours) &&
+            int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out minutes) &&
+            int.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out seconds) &&
+            hours >= 0 &&
+            minutes is >= 0 and < 60 &&
+            seconds is >= 0 and < 60)
+        {
+            duration = new TimeSpan(hours, minutes, seconds);
+            return true;
+        }
+
+        duration = default;
+        return false;
     }
 }

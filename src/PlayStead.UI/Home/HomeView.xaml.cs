@@ -14,4 +14,5 @@ public partial class HomeView : UserControl
         Loaded += async (_, _) =>
             await viewModel.RefreshFeaturedGameAsync(CancellationToken.None);
     }
+
 }

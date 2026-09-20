@@ -18,6 +18,14 @@
     <Resource Include="Assets\Fonts\Geist\Geist-Regular.ttf" />
     <Resource Include="Assets\Fonts\Geist\Geist-SemiBold.ttf" />
     <Resource Include="Assets\Fonts\Geist\Geist-Bold.ttf" />
+    <None Remove="Assets\Home\HomeHeroIdle01.png" />
+    <None Remove="Assets\Home\HomeHeroIdle02.png" />
+    <None Remove="Assets\Home\HomeHeroIdle03.png" />
+    <None Remove="Assets\Home\HomeHeroIdle04.png" />
+    <Resource Include="Assets\Home\HomeHeroIdle01.png" />
+    <Resource Include="Assets\Home\HomeHeroIdle02.png" />
+    <Resource Include="Assets\Home\HomeHeroIdle03.png" />
+    <Resource Include="Assets\Home\HomeHeroIdle04.png" />
     <None Update="Assets\Fonts\Geist\OFL.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

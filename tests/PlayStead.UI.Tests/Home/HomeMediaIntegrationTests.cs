@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,6 +11,7 @@ using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Home;
+using PlayStead.UI.Launching;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
@@ -30,27 +32,182 @@ public sealed class HomeMediaIntegrationTests
             "src", "PlayStead.UI", "Home", "HomeView.xaml"));
         var hero = Assert.Single(document.Descendants(), element =>
             element.Attributes().Any(attribute => attribute.Name.LocalName == "Name" && attribute.Value == "HomeHero"));
-        var brush = Assert.Single(hero.Descendants(), element => element.Name.LocalName == "ImageBrush");
-        Assert.Equal("{Binding HeroPath}", (string?)brush.Attribute("ImageSource"));
-        Assert.Equal("UniformToFill", (string?)brush.Attribute("Stretch"));
-        Assert.Contains(hero.Descendants(), element => element.Name.LocalName == "DataTrigger"
-            && (string?)element.Attribute("Binding") == "{Binding HasHero}"
-            && (string?)element.Attribute("Value") == "True");
-        Assert.Contains(hero.Descendants(), element => (string?)element.Attribute("Text") == "Accueil");
-        Assert.Contains(hero.Descendants(), element => (string?)element.Attribute("Text") == "{Binding FeaturedGameTitle}");
+        Assert.Contains(hero.Descendants(), element => element.Name.LocalName == "ImageBrush"
+            && (string?)element.Attribute("ImageSource") == "{Binding HeroPath}"
+            && (string?)element.Attribute("Stretch") == "UniformToFill");
+        Assert.Contains(hero.Descendants(), element => element.Name.LocalName == "MultiDataTrigger"
+            && element.Descendants().Any(condition => condition.Name.LocalName == "Condition"
+                && (string?)condition.Attribute("Binding") == "{Binding HasActiveSessionHero}"
+                && (string?)condition.Attribute("Value") == "True")
+            && element.Descendants().Any(condition => condition.Name.LocalName == "Condition"
+                && (string?)condition.Attribute("Binding") == "{Binding HasHero}"
+                && (string?)condition.Attribute("Value") == "True"));
+        Assert.Contains(hero.Descendants(), element => (string?)element.Attribute("Text") == "{Binding HeroEyebrow}");
+        Assert.Contains(hero.Descendants(), element => (string?)element.Attribute("Text") == "{Binding HeroTitle}");
+        Assert.Contains(hero.Descendants(), element => (string?)element.Attribute("Text") == "{Binding HeroSupportingText}");
     }
 
     [Fact]
-    public async Task No_sessions_keeps_static_fallback_without_media_calls()
+    public async Task No_active_sessions_uses_placeholder_even_when_history_exists()
     {
         var f = new Fixture();
+        f.Store.Recent = [Session(f.A, 1, 2)];
         var home = f.Create();
         await Refresh(home);
         Assert.Null(Value<Guid?>(home, "FeaturedGameId"));
         Assert.Null(Value<string>(home, "HeroPath"));
         Assert.False(Value<bool>(home, "HasHero"));
+        Assert.False(Value<bool>(home, "HasActiveSessionHero"));
+        Assert.Equal("Aucune aventure en cours", Value<string>(home, "HeroEyebrow"));
+        Assert.Equal("Prêt à replonger ?", Value<string>(home, "HeroTitle"));
+        Assert.Equal("Lance un jeu, PlayStead s’occupe du reste.", Value<string>(home, "HeroSupportingText"));
         Assert.Empty(f.Media.Requests);
         Assert.Empty(f.Media.CacheRequests);
+    }
+
+    [Fact]
+    public async Task Recently_played_projection_deduplicates_games_reuses_session_labels_and_library_artwork()
+    {
+        var f = new Fixture();
+        var games = Enumerable.Range(0, 6)
+            .Select(_ => GameId.New())
+            .ToArray();
+        f.Store.Games = games.Select((game, index) =>
+            new LogicalGame(game, $"Game {index}", false, Now, Now)).ToArray();
+        f.Store.Installations = games.Select((game, index) =>
+            new GameInstallation(InstallationId.New(), game, ProviderKind.Manual,
+                $"game-{index}", $"install-{index}", null, true, true, Now)).ToList();
+        f.Store.Recent =
+        [
+            Session(games[0], 9, 10),
+            Session(games[1], 8, 9),
+            Session(games[0], 7, 8),
+            Session(games[2], 6, 7),
+            Session(games[3], 5, 6),
+            Session(games[4], 4, 5),
+            Session(games[5], 3, 4)
+        ];
+
+        await f.Library.RefreshAsync(CancellationToken.None);
+        await f.Sessions.RefreshAsync(CancellationToken.None);
+        var cover = f.Library.Items.Single(item => item.GameId == games[0]);
+        cover.SetCoverPath("game-0-cover.jpg");
+
+        var home = f.Create();
+        var cards = home.RecentlyPlayedGames;
+
+        Assert.Equal(5, cards.Count);
+        Assert.Equal(games.Take(5).Select(game => game.Value), cards.Select(card => card.GameId));
+        Assert.Equal("Game 0", cards[0].GameTitle);
+        var newestSession = f.Sessions.RecentSessions.First(session => session.GameId == games[0].Value);
+        Assert.Equal(newestSession.StartedAtLabel, cards[0].StartedAtLabel);
+        Assert.Equal(newestSession.DurationLabel, cards[0].DurationLabel);
+        Assert.Same(cover, cards[0].LibraryItem);
+        Assert.Equal("game-0-cover.jpg", cover.CoverPath);
+
+        var changedProperties = new List<string?>();
+        home.PropertyChanged += (_, eventArgs) => changedProperties.Add(eventArgs.PropertyName);
+        f.Store.Recent = [Session(games[5], 11, 12), .. f.Store.Recent];
+        await f.Sessions.RefreshAsync(CancellationToken.None);
+
+        Assert.Contains(nameof(HomeViewModel.RecentlyPlayedGames), changedProperties);
+        Assert.Equal(games[5].Value, home.RecentlyPlayedGames[0].GameId);
+    }
+
+    [Fact]
+    public async Task Recently_played_cards_prefer_cached_Hero_then_Header_and_keep_fallback_without_media_calls()
+    {
+        var f = new Fixture();
+        var thirdGame = GameId.New();
+        f.Store.Games =
+        [
+            new(f.A, "Game A", false, Now, Now),
+            new(f.B, "Game B", false, Now, Now),
+            new(thirdGame, "Game C", false, Now, Now)
+        ];
+        f.Store.Installations.Add(new GameInstallation(InstallationId.New(), thirdGame,
+            ProviderKind.Manual, "game-c", "install-c", null, true, true, Now));
+        f.Store.Recent =
+        [
+            Session(f.A, 5, 6),
+            Session(f.B, 4, 5),
+            Session(thirdGame, 3, 4)
+        ];
+        f.Media.CachedPaths[("game-a", GameMediaAssetType.Hero)] = "game-a-hero.jpg";
+        f.Media.CachedPaths[("game-b", GameMediaAssetType.Header)] = "game-b-header.jpg";
+
+        await f.Library.RefreshAsync(CancellationToken.None);
+        await f.Sessions.RefreshAsync(CancellationToken.None);
+        var home = f.Create();
+        await Refresh(home);
+
+        var cards = home.RecentlyPlayedGames;
+        Assert.Equal("game-a-hero.jpg", cards[0].LandscapeMediaPath);
+        Assert.Equal("game-b-header.jpg", cards[1].LandscapeMediaPath);
+        Assert.Null(cards[2].LandscapeMediaPath);
+        Assert.True(cards[0].HasLandscapeMedia);
+        Assert.False(cards[2].HasLandscapeMedia);
+        Assert.Empty(f.Media.Requests);
+    }
+
+    [Fact]
+    public async Task Recently_played_play_action_uses_shared_launch_service_for_exact_game()
+    {
+        var f = new Fixture();
+        f.Store.Installations =
+        [
+            new(InstallationId.New(), f.A, ProviderKind.Steam, "111222", "C:\\Steam\\A", null, true, true, Now),
+            new(InstallationId.New(), f.B, ProviderKind.Steam, "333444", "C:\\Steam\\B", null, true, true, Now)
+        ];
+        await f.Library.RefreshAsync(CancellationToken.None);
+        var launcher = new RecordingLauncher();
+        var service = new GameLaunchService(launcher);
+        var home = f.CreateWithLaunchService(service);
+
+        var command = FindCommand(home, "PlayRecentlyPlayedCommand");
+        Assert.True(command.CanExecute(f.A.Value));
+        command.Execute(f.A.Value);
+
+        Assert.Equal("steam://rungameid/111222", launcher.Last?.ToString());
+    }
+
+    [Fact]
+    public async Task Recently_played_play_action_is_disabled_when_game_cannot_launch()
+    {
+        var f = new Fixture();
+        await f.Library.RefreshAsync(CancellationToken.None);
+        var home = f.CreateWithLaunchService(new GameLaunchService(new RecordingLauncher()));
+
+        var command = FindCommand(home, "PlayRecentlyPlayedCommand");
+
+        Assert.False(command.CanExecute(f.A.Value));
+    }
+
+    [Fact]
+    public void Recently_played_info_action_navigates_to_exact_game_detail()
+    {
+        var f = new Fixture();
+        var navigation = new NavigationService();
+        var home = f.CreateWithLaunchService(new GameLaunchService(new RecordingLauncher()), navigation);
+
+        var command = FindCommand(home, "OpenRecentlyPlayedDetailsCommand");
+        command.Execute(f.B.Value);
+
+        Assert.Equal(AppRoute.GameDetail, navigation.CurrentRoute);
+        Assert.Equal(new GameId(f.B.Value), navigation.CurrentParameter);
+    }
+
+    private static System.Windows.Input.ICommand FindCommand(HomeViewModel home, string propertyName)
+    {
+        var property = typeof(HomeViewModel).GetProperty(propertyName);
+        Assert.NotNull(property);
+        return Assert.IsAssignableFrom<System.Windows.Input.ICommand>(property!.GetValue(home));
+    }
+
+    private sealed class RecordingLauncher : IExternalUriLauncher
+    {
+        public Uri? Last { get; private set; }
+        public void Open(Uri uri) => Last = uri;
     }
 
     [Fact]
@@ -63,6 +220,11 @@ public sealed class HomeMediaIntegrationTests
         var home = f.Create();
         await Refresh(home);
         Assert.Equal(f.A.Value, Value<Guid?>(home, "FeaturedGameId"));
+        Assert.True(Value<bool>(home, "HasActiveSessionHero"));
+        Assert.Equal("L’aventure continue", Value<string>(home, "HeroEyebrow"));
+        Assert.Equal("Game A", Value<string>(home, "HeroTitle"));
+        Assert.Equal($"En cours depuis {Now.AddMinutes(1).ToLocalTime().ToString("HH:mm")}",
+            Value<string>(home, "HeroSupportingText"));
         var request = Assert.Single(f.Media.Requests);
         Assert.Equal(ProviderKind.Manual, request.Identity.Provider);
         Assert.Equal("game-a", request.Identity.ProviderGameId);
@@ -89,7 +251,9 @@ public sealed class HomeMediaIntegrationTests
         f.Store.Recent = [Session(f.A, 3, 4), Session(f.B, 1, 5)];
         var home = f.Create();
         await Refresh(home);
-        Assert.Equal(f.B.Value, Value<Guid?>(home, "FeaturedGameId"));
+        Assert.Null(Value<Guid?>(home, "FeaturedGameId"));
+        Assert.False(Value<bool>(home, "HasActiveSessionHero"));
+        Assert.Equal("Prêt à replonger ?", Value<string>(home, "HeroTitle"));
     }
 
     [Fact]
@@ -170,11 +334,15 @@ public sealed class HomeMediaIntegrationTests
         var b = new TaskCompletionSource<string?>();
         f.Media.Resolve = identity => identity.ProviderGameId == "game-a" ? a.Task : b.Task;
         var home = f.Create();
+        var changed = new List<string?>();
+        home.PropertyChanged += (_, eventArgs) => changed.Add(eventArgs.PropertyName);
         Refresh(home).GetAwaiter().GetResult();
         f.Store.Active = [Session(f.B, 2)];
         // This is the existing notification path used by live session refresh.
         f.Sessions.RefreshLive();
         Assert.Equal(f.B.Value, Value<Guid?>(home, "FeaturedGameId"));
+        Assert.Equal("Game B", Value<string>(home, "HeroTitle"));
+        Assert.Contains("HeroTitle", changed);
         b.SetResult("b.jpg");
         Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
         Assert.Equal("b.jpg", Value<string>(home, "HeroPath"));
@@ -256,6 +424,123 @@ public sealed class HomeMediaIntegrationTests
         f.Sessions.RefreshLive();
         Assert.Null(Value<Guid?>(home, "FeaturedGameId"));
         Assert.False(Value<bool>(home, "HasHero"));
+        Assert.False(Value<bool>(home, "HasActiveSessionHero"));
+        Assert.Equal("Aucune aventure en cours", Value<string>(home, "HeroEyebrow"));
+        Assert.Equal("Prêt à replonger ?", Value<string>(home, "HeroTitle"));
+    }
+
+    [Fact]
+    public async Task Home_Hero_switches_from_inactive_placeholder_to_current_active_game()
+    {
+        var f = new Fixture();
+        f.Store.Recent = [Session(f.B, 1, 2)];
+        var home = f.Create();
+        await Refresh(home);
+        Assert.False(Value<bool>(home, "HasActiveSessionHero"));
+        Assert.Equal("Prêt à replonger ?", Value<string>(home, "HeroTitle"));
+
+        var changed = new List<string?>();
+        home.PropertyChanged += (_, eventArgs) => changed.Add(eventArgs.PropertyName);
+        f.Store.Active = [Session(f.A, 3)];
+        f.Sessions.RefreshLive();
+
+        Assert.True(Value<bool>(home, "HasActiveSessionHero"));
+        Assert.Equal(f.A.Value, Value<Guid?>(home, "FeaturedGameId"));
+        Assert.Equal("L’aventure continue", Value<string>(home, "HeroEyebrow"));
+        Assert.Equal("Game A", Value<string>(home, "HeroTitle"));
+        Assert.Equal($"En cours depuis {Now.AddMinutes(3).ToLocalTime().ToString("HH:mm")}",
+            Value<string>(home, "HeroSupportingText"));
+        Assert.Contains(nameof(HomeViewModel.HeroTitle), changed);
+        Assert.Contains(nameof(HomeViewModel.HeroSupportingText), changed);
+    }
+
+    [Fact]
+    public void Idle_Hero_pool_contains_and_loads_exactly_four_packaged_assets()
+    {
+        RunSta(() =>
+        {
+            var poolType = typeof(HomeViewModel).Assembly.GetType(
+                "PlayStead.UI.Home.HomeHeroIdlePlaceholderPool");
+            Assert.NotNull(poolType);
+            var pathsProperty = poolType.GetProperty("ResourcePaths",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.NotNull(pathsProperty);
+            var paths = Assert.IsAssignableFrom<IReadOnlyList<string>>(pathsProperty.GetValue(null));
+            Assert.Equal(4, paths.Count);
+            Assert.Equal(new[]
+            {
+                "Assets/Home/HomeHeroIdle01.png", "Assets/Home/HomeHeroIdle02.png",
+                "Assets/Home/HomeHeroIdle03.png", "Assets/Home/HomeHeroIdle04.png"
+            }, paths);
+
+            var load = poolType.GetMethod("TryLoad", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.NotNull(load);
+            foreach (var path in paths)
+            {
+                Assert.IsAssignableFrom<ImageSource>(load.Invoke(null, [path]));
+            }
+        });
+    }
+
+    [Fact]
+    public void Home_Hero_selects_idle_once_and_reuses_it_after_active_session()
+    {
+        RunSta(() =>
+        {
+            var f = new Fixture();
+            f.Store.Recent = [Session(f.B, 1, 2)];
+            f.Media.CachedPath = "active-game-hero.jpg";
+            var home = f.Create();
+            var selectedPath = Value<string>(home, "IdleHeroAssetPath");
+            var selectedImage = Value<ImageSource>(home, "IdleHeroImageSource");
+
+            Assert.NotNull(selectedPath);
+            Assert.NotNull(selectedImage);
+            Assert.Contains(selectedPath, IdleHeroResourcePaths());
+
+            Refresh(home).GetAwaiter().GetResult();
+            Assert.Equal(selectedPath, Value<string>(home, "IdleHeroAssetPath"));
+            Assert.Same(selectedImage, Value<ImageSource>(home, "IdleHeroImageSource"));
+
+            f.Store.Active = [Session(f.A, 3)];
+            f.Sessions.RefreshLive();
+            Assert.True(Value<bool>(home, "HasActiveSessionHero"));
+            Assert.Equal("active-game-hero.jpg", Value<string>(home, "HeroPath"));
+            Assert.Equal(selectedPath, Value<string>(home, "IdleHeroAssetPath"));
+
+            f.Store.Active = [];
+            f.Sessions.RefreshLive();
+            Assert.False(Value<bool>(home, "HasActiveSessionHero"));
+            Assert.Equal(selectedPath, Value<string>(home, "IdleHeroAssetPath"));
+            Assert.Same(selectedImage, Value<ImageSource>(home, "IdleHeroImageSource"));
+        });
+    }
+
+    [Fact]
+    public void Missing_idle_hero_asset_falls_back_without_throwing()
+    {
+        RunSta(() =>
+        {
+            var poolType = typeof(HomeViewModel).Assembly.GetType(
+                "PlayStead.UI.Home.HomeHeroIdlePlaceholderPool");
+            Assert.NotNull(poolType);
+            var load = poolType.GetMethod("TryLoad", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.NotNull(load);
+            var result = Record.Exception(() => load.Invoke(null, ["Assets/Home/does-not-exist.png"]));
+            Assert.Null(result);
+            Assert.Null(load.Invoke(null, ["Assets/Home/does-not-exist.png"]));
+        });
+    }
+
+    private static IReadOnlyList<string> IdleHeroResourcePaths()
+    {
+        var poolType = typeof(HomeViewModel).Assembly.GetType(
+            "PlayStead.UI.Home.HomeHeroIdlePlaceholderPool");
+        Assert.NotNull(poolType);
+        var property = poolType.GetProperty("ResourcePaths",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        Assert.NotNull(property);
+        return Assert.IsAssignableFrom<IReadOnlyList<string>>(property.GetValue(null));
     }
 
     [Theory]
@@ -279,27 +564,46 @@ public sealed class HomeMediaIntegrationTests
     {
         RunSta(() =>
         {
-            var f = new Fixture();
-            f.Store.Active = [Session(f.A, 1)];
-            var pending = new TaskCompletionSource<string?>();
-            f.Media.Resolve = _ => pending.Task;
-            var home = f.Create();
-            var view = new HomeView(home);
-            var window = new Window { Content = view, Width = 900, Height = 700,
-                ShowActivated = false, ShowInTaskbar = false };
+            var app = Application.Current ?? new Application();
+            var tokens = (ResourceDictionary)Application.LoadComponent(
+                new Uri("/PlayStead.UI;component/Themes/PlaySteadTokens.xaml", UriKind.Relative));
+            var controls = (ResourceDictionary)Application.LoadComponent(
+                new Uri("/PlayStead.UI;component/Themes/PlaySteadControls.xaml", UriKind.Relative));
             try
             {
+                app.Resources.MergedDictionaries.Add(tokens);
+                app.Resources.MergedDictionaries.Add(controls);
+
+                Assert.NotNull(app.TryFindResource("PlayStead.Icon.Gamepad"));
+                Assert.NotNull(app.TryFindResource("PlayStead.Icon.History"));
+
+                var f = new Fixture();
+                f.Store.Active = [Session(f.A, 1)];
+                var pending = new TaskCompletionSource<string?>();
+                f.Media.Resolve = _ => pending.Task;
+                var home = f.Create();
+                var view = new HomeView(home);
+                var window = new Window { Content = view, Width = 900, Height = 700,
+                    ShowActivated = false, ShowInTaskbar = false };
                 window.Show();
-                window.UpdateLayout();
-                view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                Assert.True(view.IsLoaded);
-                Assert.Single(f.Media.Requests);
-                Assert.False(pending.Task.IsCompleted);
-                Assert.False(Value<bool>(home, "HasHero"));
-                pending.SetResult(null);
-                view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                try
+                {
+                    window.UpdateLayout();
+                    view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                    Assert.True(view.IsLoaded);
+                    Assert.Single(f.Media.Requests);
+                    Assert.False(pending.Task.IsCompleted);
+                    Assert.False(Value<bool>(home, "HasHero"));
+                    pending.SetResult(null);
+                    view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                }
+                finally { window.Close(); }
             }
-            finally { window.Close(); }
+            finally
+            {
+                app.Resources.MergedDictionaries.Remove(controls);
+                app.Resources.MergedDictionaries.Remove(tokens);
+            }
         });
     }
 
@@ -374,21 +678,40 @@ public sealed class HomeMediaIntegrationTests
             var constructor = typeof(HomeViewModel).GetConstructor(
                 [typeof(LibraryViewModel), typeof(SessionViewModel), typeof(NavigationService),
                  typeof(ILibraryStore), typeof(ISessionStore), typeof(SessionMonitor),
-                 typeof(IGameMediaResolver), typeof(ILogger<HomeViewModel>)]);
+                 typeof(IGameMediaResolver), typeof(ILogger<HomeViewModel>), typeof(GameLaunchService)]);
             Assert.True(constructor is not null, "Home requires generic featured-game media integration.");
             return (HomeViewModel)constructor.Invoke([Library, Sessions, new NavigationService(),
-                Store, Store, Monitor, Media, NullLogger<HomeViewModel>.Instance]);
+                Store, Store, Monitor, Media, NullLogger<HomeViewModel>.Instance, null]);
+        }
+
+        public HomeViewModel CreateWithLaunchService(
+            GameLaunchService launchService,
+            NavigationService? navigation = null)
+        {
+            var constructor = typeof(HomeViewModel).GetConstructor(
+                [typeof(LibraryViewModel), typeof(SessionViewModel), typeof(NavigationService),
+                 typeof(ILibraryStore), typeof(ISessionStore), typeof(SessionMonitor),
+                 typeof(IGameMediaResolver), typeof(ILogger<HomeViewModel>), typeof(GameLaunchService)]);
+            Assert.NotNull(constructor);
+            return (HomeViewModel)constructor!.Invoke([Library, Sessions, navigation ?? new NavigationService(),
+                Store, Store, Monitor, Media, NullLogger<HomeViewModel>.Instance, launchService]);
         }
     }
 
     private sealed class Media : IGameMediaResolver
     {
         public string? CachedPath { get; set; }
+        public Dictionary<(string ProviderGameId, GameMediaAssetType Type), string> CachedPaths { get; } = [];
         public Func<GameMediaIdentity, Task<string?>> Resolve { get; set; } = _ => Task.FromResult<string?>(null);
         public List<(GameMediaIdentity Identity, GameMediaAssetType Type)> Requests { get; } = [];
         public List<GameMediaAssetType> CacheRequests { get; } = [];
         public string? TryGetCachedPath(GameMediaIdentity identity, GameMediaAssetType type)
-        { CacheRequests.Add(type); return CachedPath; }
+        {
+            CacheRequests.Add(type);
+            return CachedPaths.TryGetValue((identity.ProviderGameId, type), out var path)
+                ? path
+                : CachedPath;
+        }
         public Task<string?> ResolveAndCacheAsync(GameMediaIdentity identity, GameMediaAssetType type,
             CancellationToken cancellationToken)
         { Requests.Add((identity, type)); return Resolve(identity); }

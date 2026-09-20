@@ -43,6 +43,12 @@
 
     <StreamGeometry x:Key="PlayStead.Icon.Play">M 1,0 L 11,6 1,12 Z</StreamGeometry>
     <StreamGeometry x:Key="PlayStead.Icon.External">M 4,3 H 11 V 10 M 11,3 L 4,10 M 8,10 H 3 V 5</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.Grid">M 3,3 H 9 V 9 H 3 Z M 11,3 H 17 V 9 H 11 Z M 3,11 H 9 V 17 H 3 Z M 11,11 H 17 V 17 H 11 Z</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.List">M 3,3 H 5 V 5 H 3 Z M 8,4 H 18 M 3,9 H 5 V 11 H 3 Z M 8,10 H 18 M 3,15 H 5 V 17 H 3 Z M 8,16 H 18</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.Verify">M 17,7 A 7,7 0 0 0 5,5 L 3,8 M 3,4 V 8 H 7 M 7,17 A 7,7 0 0 0 19,19 L 21,16 M 21,20 V 16 H 17</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.History">M 3,10 A 9,9 0 1 1 5,17 M 3,10 H 8 M 12,6 V 12 L 16,14</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.Gamepad">M 6,4 C 3,4 2,6 1.5,9 L 0.7,14 C 0.4,16.5 2.5,18 4.2,16.5 L 7,14 H 17 L 19.8,16.5 C 21.5,18 23.6,16.5 23.3,14 L 22.5,9 C 22,6 21,4 18,4 Z M 5,7 V 11 M 3,9 H 7 M 16,8 A 1,1 0 1 0 18,8 A 1,1 0 1 0 16,8 M 19,11 A 1,1 0 1 0 21,11 A 1,1 0 1 0 19,11</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.ChevronRight">M 8,4 L 14,10 L 8,16</StreamGeometry>
     <!-- Microsoft Fluent System Icons (MIT), semantic mappings for PlayStead Shell. -->
     <StreamGeometry x:Key="PlayStead.Icon.Home">M 10,2 L 2,8 V 18 H 7 V 12 H 13 V 18 H 18 V 8 Z M 10,4.5 L 16,9 V 16 H 14 V 10 H 6 V 16 H 4 V 9 Z</StreamGeometry>
     <StreamGeometry x:Key="PlayStead.Icon.Library">M 2,4 C 5,3 8,3 10,5 V 18 C 8,16 5,16 2,17 Z M 18,4 C 15,3 12,3 10,5 V 18 C 12,16 15,16 18,17 Z M 4,7 C 6,7 8,7 10,8 M 16,7 C 14,7 12,7 10,8</StreamGeometry>
@@ -295,6 +301,42 @@
                 <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextMuted}"/>
                 <Setter Property="BorderBrush" Value="Transparent"/>
                 <Setter Property="Opacity" Value="0.65"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="PlayStead.Button.MediaAction"
+           TargetType="Button"
+           BasedOn="{StaticResource PlayStead.ButtonBase}">
+        <Setter Property="Width" Value="32"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Accent}"/>
+                <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Accent}"/>
+                <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Accent}"/>
+                <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceStrong}"/>
+                <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextMuted}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}"/>
+                <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}"/>
             </Trigger>
         </Style.Triggers>
     </Style>

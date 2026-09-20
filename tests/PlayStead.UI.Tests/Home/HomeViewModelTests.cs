@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Globalization;
 using System.Windows.Input;
 using Microsoft.Extensions.DependencyInjection;
 using PlayStead.Platform.Paths;
@@ -19,6 +20,34 @@ public sealed class HomeViewModelTests :
             "PlayStead.Tests",
             nameof(HomeViewModelTests),
             Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public void Recently_played_card_metadata_uses_humanized_existing_display_formatters()
+    {
+        var now = DateTimeOffset.Now;
+        var startedAt = now.AddDays(-1).AddHours(-1);
+        var sessionLabel = startedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+        var game = new HomeRecentlyPlayedGameViewModel(
+            Guid.NewGuid(),
+            "Example game",
+            sessionLabel,
+            "04:24",
+            null,
+            null);
+
+        var dateProperty = typeof(HomeRecentlyPlayedGameViewModel).GetProperty("DisplayStartedAtLabel");
+        var durationProperty = typeof(HomeRecentlyPlayedGameViewModel).GetProperty("DisplayDurationLabel");
+
+        Assert.NotNull(dateProperty);
+        Assert.NotNull(durationProperty);
+        Assert.Equal(
+            GameQuickPanelViewModel.FormatTimestampForDisplay(startedAt, now),
+            dateProperty!.GetValue(game));
+        Assert.Equal(
+            GameQuickPanelViewModel.FormatDurationForDisplay(TimeSpan.FromSeconds(264)),
+            durationProperty!.GetValue(game));
+        Assert.Equal("4 min", durationProperty.GetValue(game));
+    }
 
     [Fact]
     public void Empty_home_uses_existing_empty_projections_without_fake_values()
@@ -56,6 +85,12 @@ public sealed class HomeViewModelTests :
 
         Assert.Empty(
             sut.RecentSessions);
+
+        Assert.Empty(
+            sut.RecentlyPlayedGames);
+
+        Assert.False(
+            sut.HasRecentlyPlayedGames);
 
         Assert.False(
             sut.HasRecentActivity);

@@ -311,6 +311,10 @@ public sealed class GameQuickPanelViewModel :
             : "0 min";
     }
 
+    internal static string FormatDurationForDisplay(
+        TimeSpan duration) =>
+        FormatDuration(duration);
+
     private void SetField<T>(
         ref T field,
         T value,
