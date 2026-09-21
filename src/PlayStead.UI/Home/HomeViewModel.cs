@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Windows.Input;
+using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using PlayStead.Core.Library;
@@ -31,6 +33,8 @@ public sealed class HomeViewModel :
     private long _heroVersion;
     private bool _mediaStarted;
     private bool _disposed;
+    private readonly Dispatcher? _uiDispatcher;
+    private HashSet<Guid> _activeSessionIds = [];
 
     public HomeViewModel(
         LibraryViewModel libraryViewModel,
@@ -53,6 +57,10 @@ public sealed class HomeViewModel :
         _sessionMonitor = sessionMonitor;
         _mediaResolver = mediaResolver;
         _logger = logger;
+        _uiDispatcher = Application.Current?.Dispatcher ?? Dispatcher.FromThread(Thread.CurrentThread);
+        _activeSessionIds = sessionMonitor.LatestSnapshot?.ActiveSessions
+            .Select(session => session.SessionId).ToHashSet() ?? [];
+        sessionMonitor.SnapshotUpdated += SessionMonitor_OnSnapshotUpdated;
     }
 
     public HomeViewModel(
@@ -259,6 +267,10 @@ public sealed class HomeViewModel :
         _heroCancellation?.Dispose();
         _libraryViewModel.PropertyChanged -= LibraryViewModel_OnPropertyChanged;
         _sessionViewModel.PropertyChanged -= SessionViewModel_OnPropertyChanged;
+        if (_sessionMonitor is not null)
+        {
+            _sessionMonitor.SnapshotUpdated -= SessionMonitor_OnSnapshotUpdated;
+        }
     }
 
     private async void LibraryViewModel_OnPropertyChanged(
@@ -296,6 +308,38 @@ public sealed class HomeViewModel :
             or nameof(SessionViewModel.RecentSessions))
         {
             await RefreshFeaturedGameAsync(CancellationToken.None);
+        }
+    }
+
+    private void SessionMonitor_OnSnapshotUpdated(SessionRuntimeSnapshot snapshot)
+    {
+        if (_disposed) return;
+        var dispatcher = _uiDispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            if (!dispatcher.HasShutdownStarted && !dispatcher.HasShutdownFinished)
+                _ = dispatcher.BeginInvoke(() => SessionMonitor_OnSnapshotUpdated(snapshot));
+            return;
+        }
+
+        var currentIds = snapshot.ActiveSessions.Select(session => session.SessionId).ToHashSet();
+        var completedSession = _activeSessionIds.Except(currentIds).Any();
+        _activeSessionIds = currentIds;
+        if (completedSession)
+        {
+            _ = RefreshRecentActivityObservedAsync();
+        }
+    }
+
+    private async Task RefreshRecentActivityObservedAsync()
+    {
+        try
+        {
+            await _sessionViewModel.RefreshRecentSessionsAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogWarning(exception, "Home recent activity refresh failed.");
         }
     }
 

@@ -231,6 +231,13 @@ public sealed class SessionViewModel :
             items);
     }
 
+    public async Task RefreshRecentSessionsAsync(
+        CancellationToken cancellationToken)
+    {
+        EnsureHistoryDependencies();
+        await RefreshHistoryAsync(cancellationToken);
+    }
+
     private SessionDetailViewModel CreateDetail(
         GameSession session,
         SessionCorrection? correction)

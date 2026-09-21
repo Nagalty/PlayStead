@@ -16,7 +16,7 @@ namespace PlayStead.UI.Tests.Sessions;
 public sealed class ProcessDiscoveryProductionPipelineTests
 {
     [Fact]
-    public async Task Real_library_snapshot_inventory_two_episodes_then_exact_signature()
+    public async Task Two_episodes_accept_exact_signature_and_persist_confirmation_as_onboarding_session()
     {
         await using var driver = await Driver.CreateAsync();
         await driver.CompleteEpisodeAsync(100, 1);
@@ -37,7 +37,10 @@ public sealed class ProcessDiscoveryProductionPipelineTests
         var consumed = await driver.Learning.LoadAsync(driver.Installation.Id, CancellationToken.None);
         Assert.Null(consumed?.Reference);
         Assert.Null(consumed?.Confirmation);
-        Assert.Empty(await driver.Sessions.GetRecentAsync(10, CancellationToken.None));
+        var onboarding = Assert.Single(await driver.Sessions.GetRecentAsync(10, CancellationToken.None));
+        Assert.Equal(driver.Installation.GameId.Value, onboarding.GameId);
+        Assert.Equal(driver.Now(22), onboarding.ObservedStartedAtUtc);
+        Assert.Equal(driver.Now(25), onboarding.ObservedEndedAtUtc);
     }
 
     [Fact]
@@ -87,7 +90,8 @@ public sealed class ProcessDiscoveryProductionPipelineTests
         await using var driver = await Driver.CreateAsync();
         await driver.CompleteEpisodeAsync(100, 1);
         await driver.CompleteEpisodeAsync(200, 20);
-        Assert.Empty(await driver.Sessions.GetRecentAsync(10, CancellationToken.None));
+        var onboarding = Assert.Single(await driver.Sessions.GetRecentAsync(10, CancellationToken.None));
+        Assert.Equal(driver.Now(22), onboarding.ObservedStartedAtUtc);
         await driver.TickAsync([driver.Process(300, 30)], 30);
         await driver.TickAsync([driver.Process(300, 30)], 31);
         var started = Assert.Single(await driver.Sessions.GetActiveAsync(CancellationToken.None));
@@ -97,7 +101,13 @@ public sealed class ProcessDiscoveryProductionPipelineTests
         Assert.Equal(driver.Now(30), heartbeat.ObservedStartedAtUtc);
         await driver.TickAsync([], 33);
         await driver.TickAsync([], 34);
-        var ended = Assert.Single(await driver.Sessions.GetRecentAsync(10, CancellationToken.None));
+        var recent = await driver.Sessions.GetRecentAsync(10, CancellationToken.None);
+        Assert.Equal(2, recent.Count);
+        var ended = Assert.Single(recent, session =>
+            session.ObservedStartedAtUtc == driver.Now(30));
+        Assert.Contains(recent, session =>
+            session.ObservedStartedAtUtc == driver.Now(22) &&
+            session.ObservedEndedAtUtc == driver.Now(25));
         Assert.Equal(started.SessionId, ended.SessionId);
         Assert.Equal(driver.Now(32), ended.LastSeenAtUtc);
         Assert.Equal(driver.Now(32), ended.ObservedEndedAtUtc);
@@ -239,10 +249,10 @@ public sealed class ProcessDiscoveryProductionPipelineTests
         await driver.TickAsync([driver.Process(300, 30)], 31);
         await driver.TickAsync([], 32);
         await driver.TickAsync([], 33);
-        Assert.Single(await driver.Sessions.GetRecentAsync(10, CancellationToken.None));
+        Assert.Equal(2, (await driver.Sessions.GetRecentAsync(10, CancellationToken.None)).Count);
         Assert.Empty(viewModel.RecentSessions); // live timer alone does not reload history
         await viewModel.RefreshAsync(CancellationToken.None); // reopen page
-        Assert.Single(viewModel.RecentSessions);
+        Assert.Equal(2, viewModel.RecentSessions.Count);
     }
 
     private sealed class Driver : IAsyncDisposable

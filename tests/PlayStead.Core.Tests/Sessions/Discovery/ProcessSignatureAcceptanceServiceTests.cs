@@ -36,11 +36,15 @@ public sealed class ProcessSignatureAcceptanceServiceTests
         var metadata = write.Signature.Discovery!;
         Assert.Equal(d.Scope.InstallationId, metadata.InstallationId);
         Assert.Equal(d.Scope.GenerationId, metadata.GenerationId);
-        Assert.Equal(1, metadata.PolicyVersion);
+        Assert.Equal(ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
+            metadata.PolicyVersion);
         Assert.Equal(ProcessSignatureValidationState.Valid, metadata.ValidationState);
         Assert.NotEqual(Guid.Empty, metadata.ConcurrencyToken);
         Assert.NotEqual(d.State.ConcurrencyToken, metadata.ConcurrencyToken);
         Assert.Null(d.RevalidationExpectation);
+        var session = Assert.Single(d.SessionStore.Sessions.Values);
+        Assert.Equal(d.State.Confirmation!.EpisodeId, session.SessionId);
+        Assert.Equal(["signature", "session"], d.PersistenceOrder);
     }
 
     [Theory]
@@ -49,20 +53,24 @@ public sealed class ProcessSignatureAcceptanceServiceTests
     public async Task Only_promote_decision_reaches_conditional_store(bool ambiguous)
     {
         var d = new Driver();
-        d.State = new(d.State.Inventory, 1, Guid.NewGuid(), 2, ambiguous,
+        d.State = new(d.State.Inventory, ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
+            Guid.NewGuid(), 2, ambiguous,
             d.State.Reference, ambiguous ? d.State.Confirmation : d.State.Reference, []);
         d.Current = new(d.State.Inventory, ambiguous);
         Assert.False(await d.AcceptAsync());
         Assert.Empty(d.Writes);
+        Assert.Empty(d.SessionStore.Sessions);
     }
 
     [Fact]
     public async Task Reference_only_does_not_write_signature()
     {
         var d = new Driver();
-        d.State = new(d.State.Inventory, 1, Guid.NewGuid(), 1, false, d.State.Reference, null, []);
+        d.State = new(d.State.Inventory, ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
+            Guid.NewGuid(), 1, false, d.State.Reference, null, []);
         Assert.False(await d.AcceptAsync());
         Assert.Empty(d.Writes);
+        Assert.Empty(d.SessionStore.Sessions);
     }
 
     [Theory]
@@ -153,6 +161,7 @@ public sealed class ProcessSignatureAcceptanceServiceTests
         var d = new Driver { FailCommit = true };
         await Assert.ThrowsAsync<InvalidOperationException>(() => d.AcceptAsync());
         Assert.Single(d.Writes);
+        Assert.Empty(d.SessionStore.Sessions);
     }
 
     [Fact]
@@ -238,13 +247,16 @@ public sealed class ProcessSignatureAcceptanceServiceTests
     [InlineData(4)]
     [InlineData(5)]
     [InlineData(6)]
+    [InlineData(7)]
     public void Constructor_dependencies_are_required(int missing)
     {
         var d = new Driver();
         Assert.Throws<ArgumentNullException>(() => new ProcessSignatureAcceptanceService(
             missing == 0 ? null! : d, missing == 1 ? null! : d, missing == 2 ? null! : d,
             missing == 3 ? null! : d, missing == 4 ? null! : new(),
-            missing == 5 ? null! : _ => d.Current, missing == 6 ? null! : new FixedTime()));
+            missing == 5 ? null! : _ => d.Current, missing == 6 ? null! : new FixedTime(),
+            missing == 7 ? null! : new DiscoveryConfirmationSessionPromoter(
+                new TestSessionStore([]), new SessionTransitionPolicy())));
     }
 
     private sealed class Driver : IProcessSignatureLearningStore, IProcessSignatureStore,
@@ -256,12 +268,16 @@ public sealed class ProcessSignatureAcceptanceServiceTests
             var candidates = new List<ExecutableCandidate> { new(@"C:\Games\Example\Game.exe", "Game.exe", new(10, Now.AddDays(-1))) };
             if (companion) candidates.Add(new(@"C:\Games\Example\Companion.exe", "Companion.exe", new(20, Now.AddDays(-1))));
             var inventory = new ExecutableInventory(Scope, InventoryCompleteness.Complete, candidates, []);
-            LearningEpisodeSummary Episode(int n) => new(Guid.NewGuid(), n, Scope, 1,
+            LearningEpisodeSummary Episode(int n) => new(Guid.NewGuid(), n, Scope,
+                ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
                 Now.AddMinutes(n - 10), Now.AddMinutes(n - 10).AddSeconds(30), 1, 9, EpisodeQuality.Complete,
                 candidates.Select(c => new CandidateEpisodeEvidence(c.ExecutablePath, c.Revision, true, true,
                     c.ExecutableName == "Game.exe" ? [new SnapshotRange(4, 7)] : [new SnapshotRange(3, 4)])).ToArray());
-            State = new(inventory, 1, Guid.NewGuid(), 2, false, Episode(1), Episode(2), []);
+            State = new(inventory, ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
+                Guid.NewGuid(), 2, false, Episode(1), Episode(2), []);
             Current = new(inventory, false);
+            SessionStore = new(PersistenceOrder);
+            SessionPromoter = new(SessionStore, new());
         }
         public InstallationScope Scope { get; }
         public ProcessSignatureLearningState State { get; set; }
@@ -277,12 +293,17 @@ public sealed class ProcessSignatureAcceptanceServiceTests
         public Action? AfterRead { get; set; }
         public List<string> ReadPaths { get; } = [];
         public int ReadCountAtCommit { get; private set; }
+        public TestSessionStore SessionStore { get; }
+        public List<string> PersistenceOrder { get; } = [];
+        public DiscoveryConfirmationSessionPromoter SessionPromoter { get; }
         public Task<bool> AcceptAsync(CancellationToken ct = default) => new ProcessSignatureAcceptanceService(
-            this, this, this, this, new(), _ => Current, new FixedTime()).TryAcceptAsync(Scope.InstallationId, ct);
+            this, this, this, this, new(), _ => Current, new FixedTime(), SessionPromoter)
+            .TryAcceptAsync(Scope.InstallationId, ct);
         public ProcessSignature Discovered(ProcessSignatureValidationState state, bool legacy = false) =>
             new(Scope.GameId.Value, [new("Old.exe", ProcessSignatureEntryKind.Main)], ProcessSignatureOrigin.Discovered,
                 Now.AddDays(-1), new(legacy ? null : Scope.InstallationId, legacy ? null : Scope.GenerationId,
-                    legacy ? null : 1, state, Guid.NewGuid()));
+                    legacy ? null : ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
+                    state, Guid.NewGuid()));
         public Task<ProcessSignatureLearningState?> LoadAsync(InstallationId id, CancellationToken ct) => Task.FromResult<ProcessSignatureLearningState?>(State);
         public Task<bool> TrySaveAsync(ProcessSignatureLearningState state, Guid? expected, CancellationToken ct)
         {
@@ -299,6 +320,7 @@ public sealed class ProcessSignatureAcceptanceServiceTests
             Writes.Add(write);
             ReadCountAtCommit = ReadPaths.Count;
             if (FailCommit) throw new InvalidOperationException("Database unavailable.");
+            if (CommitResult) PersistenceOrder.Add("signature");
             return Task.FromResult(CommitResult);
         }
         public Task<bool> TryRevalidateDiscoveredAsync(DiscoveredSignatureWrite write, DiscoveredSignatureExpectation expected, CancellationToken ct)
@@ -306,6 +328,8 @@ public sealed class ProcessSignatureAcceptanceServiceTests
             RevalidationExpectation = expected;
             return TryInsertDiscoveredIfAbsentAsync(write, ct);
         }
+        public Task<bool> TryRestoreDiscoveredValidationAsync(Guid gameId,
+            DiscoveredSignatureExpectation expected, CancellationToken ct) => throw new NotSupportedException();
         public Task<bool> TryInvalidateDiscoveredAsync(Guid gameId, DiscoveredSignatureExpectation expected, CancellationToken ct)
         {
             Invalidations.Add(expected);
@@ -319,6 +343,25 @@ public sealed class ProcessSignatureAcceptanceServiceTests
             return Task.FromResult(RevisionOverride?.Invoke(path) ??
                 new ExecutableRevisionResult(State.Inventory.Candidates.Single(c => c.ExecutablePath == path).Revision, null));
         }
+    }
+
+    private sealed class TestSessionStore(List<string> persistenceOrder) : ISessionStore
+    {
+        public Dictionary<Guid, GameSession> Sessions { get; } = [];
+        public Task UpsertAsync(GameSession session, CancellationToken cancellationToken)
+        {
+            Sessions[session.SessionId] = session;
+            persistenceOrder.Add("session");
+            return Task.CompletedTask;
+        }
+        public Task<GameSession?> GetAsync(Guid sessionId, CancellationToken cancellationToken) =>
+            Task.FromResult(Sessions.GetValueOrDefault(sessionId));
+        public Task<IReadOnlyList<GameSession>> GetActiveAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GameSession>>([]);
+        public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GameSession>>(Sessions.Values.Take(limit).ToArray());
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(Guid gameId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GameSession>>(Sessions.Values.Where(session => session.GameId == gameId).ToArray());
     }
 
     private sealed class FixedTime : TimeProvider

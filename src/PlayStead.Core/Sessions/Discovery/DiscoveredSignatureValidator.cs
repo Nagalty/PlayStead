@@ -34,7 +34,8 @@ public sealed class DiscoveredSignatureValidator : IDiscoveredSignatureValidator
     {
         ArgumentNullException.ThrowIfNull(signature);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!ProcessSignatureMatcher.IsDiscoveredAdmissible(signature))
+        var recovering = ProcessSignatureMatcher.IsDiscoveredRecoverable(signature);
+        if (!ProcessSignatureMatcher.IsDiscoveredAdmissible(signature) && !recovering)
             return DiscoveredSignatureValidationResult.Invalid;
 
         var metadata = signature.Discovery!;
@@ -48,7 +49,7 @@ public sealed class DiscoveredSignatureValidator : IDiscoveredSignatureValidator
         var learning = await _learningStore.LoadAsync(installationId, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (!SignatureEquals(signature, stored) || !MatchesInventory(signature, learning, current))
-            return await InvalidateAsync(signature.GameId, expected, cancellationToken);
+            return await RejectAsync(signature.GameId, expected, recovering, cancellationToken);
 
         foreach (var entry in signature.Entries)
         {
@@ -56,7 +57,7 @@ public sealed class DiscoveredSignatureValidator : IDiscoveredSignatureValidator
                 entry.ExecutablePath!, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (revision?.Revision is null || revision.Revision != entry.ValidatedRevision)
-                return await InvalidateAsync(signature.GameId, expected, cancellationToken);
+                return await RejectAsync(signature.GameId, expected, recovering, cancellationToken);
         }
 
         // Stores reconstruct DTOs on each load; collection identity is not authority.
@@ -65,15 +66,24 @@ public sealed class DiscoveredSignatureValidator : IDiscoveredSignatureValidator
         cancellationToken.ThrowIfCancellationRequested();
         if (!SignatureEquals(signature, stored) || reloadedLearning?.ConcurrencyToken != learning!.ConcurrencyToken ||
             !MatchesInventory(signature, reloadedLearning, current))
-            return await InvalidateAsync(signature.GameId, expected, cancellationToken);
+            return await RejectAsync(signature.GameId, expected, recovering, cancellationToken);
 
         var latestInventory = _currentInventory(installationId);
         if (latestInventory is null) return DiscoveredSignatureValidationResult.Pending;
         if (!MatchesInventory(signature, reloadedLearning, latestInventory))
-            return await InvalidateAsync(signature.GameId, expected, cancellationToken);
+            return await RejectAsync(signature.GameId, expected, recovering, cancellationToken);
+
+        if (recovering && !await _discoveryStore.TryRestoreDiscoveredValidationAsync(
+                signature.GameId, expected, cancellationToken))
+            return DiscoveredSignatureValidationResult.Invalid;
 
         return DiscoveredSignatureValidationResult.Valid;
     }
+
+    private Task<DiscoveredSignatureValidationResult> RejectAsync(Guid gameId,
+        DiscoveredSignatureExpectation expected, bool recovering, CancellationToken cancellationToken) =>
+        recovering ? Task.FromResult(DiscoveredSignatureValidationResult.Invalid) :
+            InvalidateAsync(gameId, expected, cancellationToken);
 
     private async Task<DiscoveredSignatureValidationResult> InvalidateAsync(Guid gameId,
         DiscoveredSignatureExpectation expected, CancellationToken cancellationToken)
@@ -87,8 +97,7 @@ public sealed class DiscoveredSignatureValidator : IDiscoveredSignatureValidator
     private static bool MatchesInventory(ProcessSignature signature, ProcessSignatureLearningState? learning,
         DiscoveryInventoryContext current)
     {
-        if (learning is null || current.HasAmbiguousInstallation || learning.HasAmbiguousInstallation ||
-            learning.PolicyVersion != signature.Discovery!.PolicyVersion ||
+        if (learning is null || signature.Discovery is null || current.HasAmbiguousInstallation || learning.HasAmbiguousInstallation ||
             current.Inventory.Completeness != InventoryCompleteness.Complete || !current.Inventory.Scope.IsPresent ||
             current.Inventory.Scope.GameId.Value != signature.GameId ||
             current.Inventory.Scope.InstallationId != signature.Discovery.InstallationId ||
@@ -96,10 +105,16 @@ public sealed class DiscoveredSignatureValidator : IDiscoveredSignatureValidator
             !InventoryEquals(current.Inventory, learning.Inventory)) return false;
 
         var rootPrefix = current.Inventory.Scope.RootPath.TrimEnd('\\') + '\\';
-        return signature.Entries.All(entry => entry.ExecutablePath!.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase) &&
-            current.Inventory.Candidates.Any(candidate =>
-            Equal(candidate.ExecutablePath, entry.ExecutablePath) && Equal(candidate.ExecutableName, entry.ExecutableName) &&
-            candidate.Revision == entry.ValidatedRevision));
+        var unrealFamily = UnrealExecutableFamily.TryCreate(current.Inventory);
+        return signature.Entries.All(entry =>
+        {
+            var candidate = current.Inventory.Candidates.FirstOrDefault(item =>
+                Equal(item.ExecutablePath, entry.ExecutablePath) && Equal(item.ExecutableName, entry.ExecutableName) &&
+                item.Revision == entry.ValidatedRevision);
+            return entry.ExecutablePath!.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase) &&
+                candidate is not null && !ExecutableSupportClassifier.IsSupportExecutable(
+                    current.Inventory, candidate, unrealFamily);
+        });
     }
 
     private static bool SignatureEquals(ProcessSignature expected, ProcessSignature? actual) =>

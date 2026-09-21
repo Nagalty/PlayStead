@@ -374,19 +374,21 @@ public sealed class SqliteProcessSignatureLearningStoreTests
     }
 
     [Fact]
-    public async Task Policy_change_clears_proof()
+    public async Task Policy_change_clears_learning_proof_without_invalidating_accepted_signature()
     {
         var state = Sample();
         using var fixture = await SeedAsync(state);
         Assert.True(await Store(fixture).TrySaveAsync(state, null, Ct));
         var signatureToken = await SeedSignatureAsync(fixture, state, 0);
-        var proposed = new ProcessSignatureLearningState(state.Inventory, 2, Guid.NewGuid(), 1, false,
-            Episode(state.Inventory, 1, policy: 2), null, [DiscoveryReason.PolicyVersionChanged]);
+        var proposed = new ProcessSignatureLearningState(state.Inventory,
+            ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, Guid.NewGuid(), 1, false,
+            Episode(state.Inventory, 1, policy: ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion),
+            null, [DiscoveryReason.PolicyVersionChanged]);
         Assert.True(await Store(fixture).TrySaveAsync(proposed, state.ConcurrencyToken, Ct));
         AssertState(Copy(proposed, clear: true, token: proposed.ConcurrencyToken),
             await Store(fixture).LoadAsync(state.Inventory.Scope.InstallationId, Ct));
-        Assert.Equal(0, (await ValidationAsync(fixture)).State);
-        Assert.NotEqual(signatureToken, (await ValidationAsync(fixture)).Token);
+        Assert.Equal(1, (await ValidationAsync(fixture)).State);
+        Assert.Equal(signatureToken, (await ValidationAsync(fixture)).Token);
     }
 
     [Theory]

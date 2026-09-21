@@ -76,16 +76,19 @@ public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearn
             expectedConcurrencyToken != existing.ConcurrencyToken || state.ConcurrencyToken == existing.ConcurrencyToken)
             return false;
         if (!await InstallationMatchesAsync(connection, transaction, scope, cancellationToken)) return false;
-        var invalidated = false;
+        var learningInvalidated = false;
+        var signatureInvalidated = false;
         if (existing is not null)
         {
             var inventoryChanged = !InventoryEquals(existing.Inventory, state.Inventory);
             var generationChanged = existing.Inventory.Scope.GenerationId != scope.GenerationId;
             if (inventoryChanged && !generationChanged)
                 throw new ArgumentException("Changed inventory requires a new generation.", nameof(state));
-            invalidated = inventoryChanged || generationChanged || existing.PolicyVersion != state.PolicyVersion ||
+            signatureInvalidated = inventoryChanged || generationChanged ||
                 existing.HasAmbiguousInstallation != state.HasAmbiguousInstallation;
-            if (invalidated)
+            learningInvalidated = signatureInvalidated ||
+                existing.PolicyVersion != state.PolicyVersion;
+            if (learningInvalidated)
                 state = new ProcessSignatureLearningState(state.Inventory, state.PolicyVersion, state.ConcurrencyToken,
                     state.LastSequenceNumber, state.HasAmbiguousInstallation, null, null, state.Reasons);
         }
@@ -122,7 +125,7 @@ public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearn
         command.Parameters.AddWithValue("$confirmation", state.Confirmation is null ? DBNull.Value : JsonSerializer.Serialize(state.Confirmation));
         command.Parameters.AddWithValue("$reasons", JsonSerializer.Serialize(state.Reasons));
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1) return false;
-        if (invalidated)
+        if (signatureInvalidated)
         {
             using var invalidate = connection.CreateCommand();
             invalidate.Transaction = transaction;

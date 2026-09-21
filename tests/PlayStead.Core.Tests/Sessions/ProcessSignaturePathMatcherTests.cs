@@ -11,7 +11,8 @@ public sealed class ProcessSignaturePathMatcherTests
     internal static ProcessSignature Signature() => new(Guid.NewGuid(),
         [new("Game.exe", ProcessSignatureEntryKind.Main, Path, new FileRevision(10, T0))],
         ProcessSignatureOrigin.Discovered, T0,
-        new(new InstallationId(Guid.NewGuid()), Guid.NewGuid(), 1,
+        new(new InstallationId(Guid.NewGuid()), Guid.NewGuid(),
+            ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
             ProcessSignatureValidationState.Valid, Guid.NewGuid()));
 
     [Fact]
@@ -32,6 +33,25 @@ public sealed class ProcessSignaturePathMatcherTests
     [InlineData(Path, "Other.exe", false)]
     public void Exact_path_and_name_match(string? path, string name, bool expected)
         => Assert.Equal(expected, Match(Signature(), path, name).HasMainProcess);
+
+    [Theory]
+    [InlineData("Test_C-Win64-Shipping.exe", @"H:\SteamLibrary\steamapps\common\PROJECT QUARANTINE\Test_C\Binaries\Win64\Test_C-Win64-Shipping.exe")]
+    [InlineData("enshrouded.exe", @"C:\Games\Enshrouded\enshrouded.exe")]
+    public void Valid_accepted_signature_from_previous_discovery_policy_still_matches(
+        string processName, string executablePath)
+    {
+        var current = Signature();
+        var signature = current with
+        {
+            Entries = [current.Entries[0] with { ExecutableName = processName, ExecutablePath = executablePath }],
+            Discovery = current.Discovery! with
+            {
+                PolicyVersion = ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion - 1
+            }
+        };
+
+        Assert.True(Match(signature, executablePath, processName).HasMainProcess);
+    }
 
     [Theory]
     [InlineData(ProcessSignatureOrigin.Manual)]

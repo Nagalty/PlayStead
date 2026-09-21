@@ -106,6 +106,34 @@ public sealed class SqliteProcessSignatureDiscoveryStoreTests
         AssertSignature(write.Signature, await Store(fixture).GetAsync(first.Signature.GameId, Ct));
         await AssertConsumedAsync(fixture, write);
     }
+
+    [Fact]
+    public async Task Structural_recovery_restores_only_the_expected_suspended_signature_once()
+    {
+        using var fixture = await SeedAsync();
+        var store = Store(fixture);
+        var write = await ProofAsync(fixture);
+        Assert.True(await store.TryInsertDiscoveredIfAbsentAsync(write, Ct));
+        var accepted = (await store.GetAsync(write.Signature.GameId, Ct))!;
+        Assert.True(await store.TryInvalidateDiscoveredAsync(accepted.GameId, Expect(accepted), Ct));
+        var suspended = (await store.GetAsync(accepted.GameId, Ct))!;
+        Assert.Equal(ProcessSignatureValidationState.NeedsRevalidation,
+            suspended.Discovery!.ValidationState);
+
+        Assert.True(await store.TryRestoreDiscoveredValidationAsync(
+            suspended.GameId, Expect(suspended), Ct));
+        var restored = (await store.GetAsync(accepted.GameId, Ct))!;
+        Assert.Equal(ProcessSignatureValidationState.Valid, restored.Discovery!.ValidationState);
+        Assert.Equal(suspended.Entries, restored.Entries);
+        Assert.Equal(suspended.UpdatedAtUtc, restored.UpdatedAtUtc);
+
+        Assert.False(await store.TryRestoreDiscoveredValidationAsync(
+            suspended.GameId, Expect(suspended), Ct));
+        var unchanged = (await store.GetAsync(accepted.GameId, Ct))!;
+        Assert.Equal(restored.Discovery, unchanged.Discovery);
+        Assert.Equal(restored.Entries, unchanged.Entries);
+        Assert.Equal(restored.UpdatedAtUtc, unchanged.UpdatedAtUtc);
+    }
     [Fact]
     public async Task Zero_row_proof_consumption_rolls_back_parent_and_entries()
     {
@@ -158,11 +186,13 @@ public sealed class SqliteProcessSignatureDiscoveryStoreTests
         var learning = new SqliteProcessSignatureLearningStore(fixture.Options);
         var state = (await learning.LoadAsync(write.Signature.Discovery!.InstallationId!.Value, Ct))!;
         var scope = state.Inventory.Scope;
-        LearningEpisodeSummary Episode(long sequence) => new(Guid.NewGuid(), sequence, scope, 1,
+        LearningEpisodeSummary Episode(long sequence) => new(Guid.NewGuid(), sequence, scope,
+            ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
             T0.AddMinutes(sequence), T0.AddMinutes(sequence).AddSeconds(30), 0, 5, EpisodeQuality.Complete,
             [new CandidateEpisodeEvidence(write.Signature.Entries[0].ExecutablePath!, write.Signature.Entries[0].ValidatedRevision,
                 true, true, [new SnapshotRange(0, 5)])]);
-        var fresh = new ProcessSignatureLearningState(state.Inventory, 1, Guid.NewGuid(), 2, false, Episode(1), Episode(2), []);
+        var fresh = new ProcessSignatureLearningState(state.Inventory,
+            ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, Guid.NewGuid(), 2, false, Episode(1), Episode(2), []);
         Assert.True(await learning.TrySaveAsync(fresh, state.ConcurrencyToken, Ct));
         Assert.True(await Store(fixture).TryInvalidateDiscoveredAsync(write.Signature.GameId, Expect(write.Signature), Ct));
         var actual = (await Store(fixture).GetAsync(write.Signature.GameId, Ct))!;
@@ -315,7 +345,8 @@ public sealed class SqliteProcessSignatureDiscoveryStoreTests
         if (!staleProof)
         {
             var cleared = (await learning.LoadAsync(completed.Inventory.Scope.InstallationId, Ct))!;
-            var restored = new ProcessSignatureLearningState(completed.Inventory, 1, Guid.NewGuid(), 2, false,
+            var restored = new ProcessSignatureLearningState(completed.Inventory,
+                ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, Guid.NewGuid(), 2, false,
                 completed.Reference, completed.Confirmation, []);
             Assert.True(await learning.TrySaveAsync(restored, cleared.ConcurrencyToken, Ct));
             write = write with { ExpectedLearningToken = restored.ConcurrencyToken };
@@ -497,7 +528,8 @@ public sealed class SqliteProcessSignatureDiscoveryStoreTests
         var write = await ProofAsync(fixture);
         var learning = new SqliteProcessSignatureLearningStore(fixture.Options);
         var old = (await learning.LoadAsync(write.Signature.Discovery!.InstallationId!.Value, Ct))!;
-        var policy = change == "policy" ? 2 : 1;
+        var policy = change == "policy" ? ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion + 1 :
+            ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion;
         LearningEpisodeSummary CopyEpisode(LearningEpisodeSummary e) => new(e.EpisodeId, e.SequenceNumber, e.Scope, policy,
             e.StartedAtUtc, e.EndedAtUtc, e.FirstSnapshot, e.LastSnapshot,
             change == "quality" ? EpisodeQuality.Partial : e.Quality, change == "missing-main" ? [] : e.Candidates);
@@ -514,7 +546,7 @@ public sealed class SqliteProcessSignatureDiscoveryStoreTests
         else Assert.True(await learning.TrySaveAsync(next, old.ConcurrencyToken, Ct));
         write = write with { ExpectedLearningToken = next.ConcurrencyToken };
         if (change == "policy") write = write with { Signature = write.Signature with {
-            Discovery = write.Signature.Discovery! with { PolicyVersion = 2 } } };
+            Discovery = write.Signature.Discovery! with { PolicyVersion = policy } } };
         var before = await SnapshotAsync(fixture);
         Assert.False(await Store(fixture).TryInsertDiscoveredIfAbsentAsync(write, Ct));
         Assert.Equal(before, await SnapshotAsync(fixture));
@@ -573,16 +605,19 @@ public sealed class SqliteProcessSignatureDiscoveryStoreTests
         var scope = new InstallationScope(game, installation, @"C:\Games\Example", Guid.NewGuid(), true);
         var candidate = new ExecutableCandidate(@"C:\Games\Example\Game.exe", "Game.exe", new FileRevision(123, T0));
         var inventory = new ExecutableInventory(scope, InventoryCompleteness.Complete, [candidate], []);
-        LearningEpisodeSummary Episode(long sequence) => new(Guid.NewGuid(), sequence, scope, 1,
+        LearningEpisodeSummary Episode(long sequence) => new(Guid.NewGuid(), sequence, scope,
+            ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
             T0.AddMinutes(sequence), T0.AddMinutes(sequence).AddSeconds(30), 0, 5, EpisodeQuality.Complete,
             [new CandidateEpisodeEvidence(candidate.ExecutablePath, candidate.Revision, true, true, [new SnapshotRange(0, 5)])]);
-        var state = new ProcessSignatureLearningState(inventory, 1, Guid.NewGuid(), 2, false, Episode(1), Episode(2), []);
+        var state = new ProcessSignatureLearningState(inventory,
+            ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, Guid.NewGuid(), 2, false, Episode(1), Episode(2), []);
         var learning = new SqliteProcessSignatureLearningStore(fixture.Options);
         var old = await learning.LoadAsync(installation, Ct);
         if (old is not null)
         {
             // A fresh generation resets evidence; save the completed pair only after that reset.
-            var reset = new ProcessSignatureLearningState(inventory, 1, Guid.NewGuid(), 2, false, null, null, []);
+            var reset = new ProcessSignatureLearningState(inventory,
+                ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, Guid.NewGuid(), 2, false, null, null, []);
             Assert.True(await learning.TrySaveAsync(reset, old.ConcurrencyToken, Ct));
             old = reset;
         }
@@ -590,7 +625,8 @@ public sealed class SqliteProcessSignatureDiscoveryStoreTests
         return new DiscoveredSignatureWrite(new ProcessSignature(game.Value,
             [new(candidate.ExecutableName, ProcessSignatureEntryKind.Main, candidate.ExecutablePath, candidate.Revision)],
             ProcessSignatureOrigin.Discovered, T0.AddHours(1),
-            new DiscoveredSignatureMetadata(installation, scope.GenerationId, 1, ProcessSignatureValidationState.Valid, Guid.NewGuid())),
+            new DiscoveredSignatureMetadata(installation, scope.GenerationId,
+                ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, ProcessSignatureValidationState.Valid, Guid.NewGuid())),
             state.ConcurrencyToken, state.Reference!.EpisodeId, state.Confirmation!.EpisodeId);
     }
     private static ProcessSignature Explicit(DiscoveredSignatureWrite write, ProcessSignatureOrigin origin) =>

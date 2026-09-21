@@ -60,6 +60,16 @@ public sealed class DiscoveryInventoryManager
         lock (_gate) return Array.AsReadOnly(_published.Values.ToArray());
     }
 
+    public bool ContainsExecutableName(string executableName)
+    {
+        if (string.IsNullOrWhiteSpace(executableName)) return false;
+        lock (_gate)
+            return _published.Values.Any(context =>
+                context.Inventory.Candidates.Any(candidate =>
+                    string.Equals(candidate.ExecutableName, executableName,
+                        StringComparison.OrdinalIgnoreCase)));
+    }
+
     public void MarkRefreshing()
     {
         lock (_gate)

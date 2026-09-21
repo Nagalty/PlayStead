@@ -4,7 +4,7 @@ namespace PlayStead.Core.Sessions.Discovery;
 
 public sealed class ProcessSignatureDiscoveryPolicy
 {
-    public const int CurrentPolicyVersion = 1;
+    public const int CurrentPolicyVersion = 3;
 
     public DiscoveryDecision Evaluate(DiscoveryEvaluation evaluation)
     {
@@ -28,6 +28,11 @@ public sealed class ProcessSignatureDiscoveryPolicy
         if (evaluation.Inventory.Completeness == InventoryCompleteness.Incomplete)
             return new DiscoveryDecision(DiscoveryDecisionKind.InsufficientEvidence,
                 null, [DiscoveryReason.IncompleteInventory]);
+
+        var unrealFamily = UnrealExecutableFamily.TryCreate(evaluation.Inventory);
+        evaluation = ExecutableSupportClassifier.Project(evaluation);
+        if (unrealFamily is not null)
+            evaluation = unrealFamily.Project(evaluation);
 
         if (evaluation.Inventory.Candidates.Count == 0)
             return new DiscoveryDecision(DiscoveryDecisionKind.InsufficientEvidence,

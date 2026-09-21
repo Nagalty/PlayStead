@@ -32,7 +32,8 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         Assert.Equal(ProcessSignatureValidationState.Valid, accepted.Discovery!.ValidationState);
         Assert.Equal(d.Scope.InstallationId, accepted.Discovery.InstallationId);
         Assert.Equal(d.Scope.GenerationId, accepted.Discovery.GenerationId);
-        Assert.Equal(1, accepted.Discovery.PolicyVersion);
+        Assert.Equal(ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
+            accepted.Discovery.PolicyVersion);
         var main = Assert.Single(accepted.Entries);
         Assert.Equal(@"C:\Games\Example\Game.exe", main.ExecutablePath);
         Assert.Equal("Game.exe", main.ExecutableName);
@@ -42,7 +43,11 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         Assert.Null(consumed.Reference);
         Assert.Null(consumed.Confirmation);
         Assert.NotEqual(proof.ConcurrencyToken, consumed.ConcurrencyToken);
-        Assert.Empty(await d.Sessions.GetRecentAsync(10, Ct));
+        var onboarding = Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
+        Assert.Equal(proof.Confirmation.EpisodeId, onboarding.SessionId);
+        Assert.Equal(proof.Confirmation.StartedAtUtc, onboarding.ObservedStartedAtUtc);
+        Assert.Equal(proof.Confirmation.EndedAtUtc, onboarding.ObservedEndedAtUtc);
+        Assert.Equal(SessionState.Ended, onboarding.State);
     }
 
     [Fact]
@@ -196,6 +201,7 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         Assert.Null((await d.LoadAsync())!.Confirmation);
         Assert.Equal(accepted.Discovery, (await d.Signatures.GetAsync(d.Scope.GameId.Value, Ct))!.Discovery);
         Assert.Single(await d.Signatures.GetAllAsync(Ct));
+        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
     }
 
     [Fact]
@@ -230,6 +236,7 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         };
         Assert.False(await d.AcceptAsync());
         Assert.Null(await new SqliteProcessSignatureStore(d.Fixture.Options).GetAsync(d.Scope.GameId.Value, Ct));
+        Assert.Empty(await d.Sessions.GetRecentAsync(10, Ct));
         Assert.Null((await d.LoadAsync())!.Reference);
     }
 
@@ -319,31 +326,117 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
     }
 
     [Fact]
-    public async Task SessionRuntime_tracks_only_a_future_episode()
+    public async Task SessionRuntime_tracks_future_episode_after_onboarding_confirmation()
     {
         using var d = await Driver.CreateAsync();
         await d.PairAsync();
         Assert.True(await d.AcceptAsync());
-        Assert.Empty(await d.Sessions.GetRecentAsync(10, Ct));
+        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
         var source = new Captures();
         var time = new Clock();
         var runtime = d.Runtime(source, time);
         source.Processes = [d.Process(300)];
         await runtime.RefreshAsync(Ct);
-        Assert.Empty(await d.Sessions.GetRecentAsync(10, Ct));
+        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
         time.UtcNow = T0.AddHours(1).AddSeconds(2);
         await runtime.RefreshAsync(Ct);
-        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
+        Assert.Equal(2, (await d.Sessions.GetRecentAsync(10, Ct)).Count);
         time.UtcNow = T0.AddHours(1).AddSeconds(8);
         await runtime.RefreshAsync(Ct);
         source.Processes = [];
         time.UtcNow = T0.AddHours(1).AddSeconds(10);
         await runtime.RefreshAsync(Ct);
-        var session = Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
+        var session = (await d.Sessions.GetRecentAsync(10, Ct))
+            .Single(candidate => candidate.ObservedStartedAtUtc == T0.AddHours(1));
         Assert.Equal(T0.AddHours(1), session.ObservedStartedAtUtc);
         Assert.Equal(T0.AddHours(1).AddSeconds(8), session.ObservedEndedAtUtc);
         Assert.Equal(session.ObservedEndedAtUtc, session.LastSeenAtUtc);
         Assert.Equal(SessionState.Ended, session.State);
+    }
+
+    [Fact]
+    public async Task Accepted_irr_signature_survives_policy_upgrade_and_tracks_after_restart()
+    {
+        const string root = @"H:\SteamLibrary\steamapps\common\PROJECT QUARANTINE";
+        const string executable = @"Test_C\Binaries\Win64\Test_C-Win64-Shipping.exe";
+        using var d = await Driver.CreateAsync(root: root, executableRelativePath: executable);
+        await d.PairAsync();
+        Assert.True(await d.AcceptAsync());
+        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
+        await d.SqlAsync("""
+            UPDATE process_signature_validation
+            SET policy_version=2, validation_state=1;
+            UPDATE process_signature_learning
+            SET policy_version=2;
+            """);
+
+        await d.RestartAsync();
+
+        var migrated = (await d.Signatures.GetAsync(d.Scope.GameId.Value, Ct))!;
+        Assert.Equal(2, migrated.Discovery!.PolicyVersion);
+        Assert.Equal(ProcessSignatureValidationState.Valid,
+            migrated.Discovery.ValidationState);
+        var learning = (await d.LoadAsync())!;
+        Assert.Equal(ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
+            learning.PolicyVersion);
+        Assert.Null(learning.Reference);
+        Assert.Null(learning.Confirmation);
+
+        var source = new Captures { Processes = [d.Process(300)] };
+        var time = new Clock();
+        var runtime = d.Runtime(source, time);
+        await runtime.RefreshAsync(Ct);
+        time.UtcNow = time.UtcNow.AddSeconds(2);
+        var snapshot = await runtime.RefreshAsync(Ct);
+
+        Assert.Equal(d.Scope.GameId.Value,
+            Assert.Single(snapshot.ActiveSessions).GameId);
+        Assert.Equal(2, (await d.Sessions.GetRecentAsync(10, Ct)).Count);
+    }
+
+    [Fact]
+    public async Task Structurally_valid_irr_signature_poisoned_by_old_migration_recovers_once_and_tracks()
+    {
+        const string root = @"H:\SteamLibrary\steamapps\common\PROJECT QUARANTINE";
+        const string executable = @"Test_C\Binaries\Win64\Test_C-Win64-Shipping.exe";
+        using var d = await Driver.CreateAsync(root: root, executableRelativePath: executable);
+        await d.PairAsync();
+        Assert.True(await d.AcceptAsync());
+        var accepted = (await d.Signatures.GetAsync(d.Scope.GameId.Value, Ct))!;
+        await d.SqlAsync("""
+            UPDATE process_signature_validation
+            SET policy_version=1, validation_state=0;
+            """);
+        await d.RestartAsync();
+        var poisoned = (await d.Signatures.GetAsync(d.Scope.GameId.Value, Ct))!;
+        Assert.Equal(ProcessSignatureValidationState.NeedsRevalidation,
+            poisoned.Discovery!.ValidationState);
+
+        var source = new Captures { Processes = [d.Process(300)] };
+        var time = new Clock();
+        var runtime = d.Runtime(source, time);
+        await runtime.RefreshAsync(Ct);
+
+        var restored = (await d.Signatures.GetAsync(d.Scope.GameId.Value, Ct))!;
+        Assert.Equal(ProcessSignatureValidationState.Valid,
+            restored.Discovery!.ValidationState);
+        Assert.Equal(poisoned.Entries, restored.Entries);
+        Assert.Equal(poisoned.UpdatedAtUtc, restored.UpdatedAtUtc);
+        var learning = (await d.LoadAsync())!;
+        Assert.Null(learning.Reference);
+        Assert.Null(learning.Confirmation);
+
+        time.UtcNow = time.UtcNow.AddSeconds(2);
+        var snapshot = await runtime.RefreshAsync(Ct);
+        Assert.Equal(d.Scope.GameId.Value,
+            Assert.Single(snapshot.ActiveSessions).GameId);
+        Assert.Equal(2, (await d.Sessions.GetRecentAsync(10, Ct)).Count);
+
+        var restoredToken = restored.Discovery.ConcurrencyToken;
+        await d.RestartAsync();
+        await d.Runtime(new Captures(), time).RefreshAsync(Ct);
+        Assert.Equal(restoredToken,
+            (await d.Signatures.GetAsync(d.Scope.GameId.Value, Ct))!.Discovery!.ConcurrencyToken);
     }
 
     [Fact]
@@ -362,14 +455,14 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         await runtime.RefreshAsync(Ct);
         time.UtcNow = T0.AddHours(1).AddSeconds(2);
         await runtime.RefreshAsync(Ct);
-        Assert.Equal(2, (await d.Sessions.GetRecentAsync(10, Ct)).Count);
+        Assert.Equal(3, (await d.Sessions.GetRecentAsync(10, Ct)).Count);
         time.UtcNow = T0.AddHours(1).AddSeconds(8);
         await runtime.RefreshAsync(Ct);
         source.Processes = [];
         time.UtcNow = T0.AddHours(1).AddSeconds(10);
         await runtime.RefreshAsync(Ct);
         var observed = await d.Sessions.GetRecentAsync(10, Ct);
-        Assert.Equal(2, observed.Count);
+        Assert.Equal(3, observed.Count);
         var corrections = new SqliteSessionCorrectionStore(d.Fixture.Options);
         foreach (var session in observed)
         {
@@ -393,11 +486,14 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
 
     private sealed class Driver : IDisposable, IExecutableInventorySource, IExecutableRevisionSource
     {
-        private Driver(bool companion)
+        private Driver(bool companion, string root, string executableRelativePath)
         {
-            var scope = new InstallationScope(GameId.New(), InstallationId.New(), @"C:\Games\Example", Guid.NewGuid(), true);
+            var scope = new InstallationScope(GameId.New(), InstallationId.New(), root,
+                Guid.NewGuid(), true);
+            var executablePath = root.TrimEnd('\\') + "\\" + executableRelativePath;
+            var executableName = Path.GetFileName(executablePath);
             Inventory = new(scope, InventoryCompleteness.Complete,
-                [new(@"C:\Games\Example\Game.exe", "Game.exe", new(10, T0.AddDays(-1)))], []);
+                [new(executablePath, executableName, new(10, T0.AddDays(-1)))], []);
             if (companion) Inventory = new(scope, InventoryCompleteness.Complete,
                 [.. Inventory.Candidates, new(@"C:\Games\Example\Companion.exe", "Companion.exe", new(20, T0.AddDays(-1)))], []);
             Signatures = new(Fixture.Options);
@@ -416,9 +512,10 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         private long _time;
         public ExecutableRevisionResult? RevisionResult { get; set; }
         public Func<Task>? BeforeRevisionReturns { get; set; }
-        public static async Task<Driver> CreateAsync(bool companion = false)
+        public static async Task<Driver> CreateAsync(bool companion = false,
+            string root = @"C:\Games\Example", string executableRelativePath = "Game.exe")
         {
-            var d = new Driver(companion);
+            var d = new Driver(companion, root, executableRelativePath);
             await d.Fixture.InitializeAsync(Ct);
             await d.Fixture.SeedInstallationAsync(d.Scope.GameId, d.Scope.InstallationId, d.Scope.RootPath, Ct);
             await d.RestartAsync();
@@ -470,13 +567,19 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
             await TickAsync();
             await TickAsync();
         }
-        public ProcessSnapshot Process(int pid, string name = "Game.exe") => new(pid, name,
-            Inventory.Candidates.Single(c => c.ExecutableName == name).ExecutablePath, T0.AddSeconds(_time + 1));
+        public ProcessSnapshot Process(int pid, string? name = null)
+        {
+            name ??= Inventory.Candidates[0].ExecutableName;
+            return new(pid, name,
+                Inventory.Candidates.Single(c => c.ExecutableName == name).ExecutablePath,
+                T0.AddSeconds(_time + 1));
+        }
         public Task<DiscoveryDecision?> TickAsync(params ProcessSnapshot[] processes) => Coordinator.ObserveAsync(Scope.InstallationId,
             new(++_capture, T0.AddSeconds(_time += 2), EpisodeQuality.Complete, processes), Ct);
         public Task<ProcessSignatureLearningState?> LoadAsync() => new SqliteProcessSignatureLearningStore(Fixture.Options).LoadAsync(Scope.InstallationId, Ct);
         public Task<bool> AcceptAsync() => new ProcessSignatureAcceptanceService(Learning, Signatures, Signatures,
-            this, new(), _ => new(Inventory, false), new Clock()).TryAcceptAsync(Scope.InstallationId, Ct);
+            this, new(), _ => new(Inventory, false), new Clock(),
+            new DiscoveryConfirmationSessionPromoter(Sessions, new())).TryAcceptAsync(Scope.InstallationId, Ct);
         public SessionRuntime Runtime(Captures source, Clock time) => new(source, Signatures, Sessions, new(), new(),
             new SqliteSessionCorrectionStore(Fixture.Options), new(), time,
             new DiscoveredSignatureValidator(Signatures, Learning, Signatures, this, _ => new(Inventory, false)));

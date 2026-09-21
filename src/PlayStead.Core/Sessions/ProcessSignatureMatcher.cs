@@ -69,12 +69,20 @@ public sealed class ProcessSignatureMatcher
     }
 
     internal static bool IsDiscoveredAdmissible(ProcessSignature signature)
+        => HasDurableDiscoveredIdentity(signature, ProcessSignatureValidationState.Valid);
+
+    internal static bool IsDiscoveredRecoverable(ProcessSignature signature)
+        => HasDurableDiscoveredIdentity(signature, ProcessSignatureValidationState.NeedsRevalidation);
+
+    private static bool HasDurableDiscoveredIdentity(ProcessSignature signature,
+        ProcessSignatureValidationState validationState)
     {
         return signature.Origin == ProcessSignatureOrigin.Discovered &&
-            signature.Discovery is { ValidationState: ProcessSignatureValidationState.Valid } metadata &&
+            signature.Discovery is { } metadata && metadata.ValidationState == validationState &&
             metadata.InstallationId is { } installation && installation.Value != Guid.Empty &&
             metadata.GenerationId is { } generation && generation != Guid.Empty &&
-            metadata.PolicyVersion == ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion &&
+            metadata.PolicyVersion is > 0 &&
+            metadata.PolicyVersion <= ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion &&
             metadata.ConcurrencyToken != Guid.Empty && signature.Entries.Count > 0 &&
             signature.Entries.All(entry => Enum.IsDefined(entry.Kind) && entry.ValidatedRevision is not null &&
                 HasCanonicalIdentity(entry));

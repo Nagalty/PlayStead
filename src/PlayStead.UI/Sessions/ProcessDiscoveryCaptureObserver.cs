@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Diagnostics;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using PlayStead.Core.Library;
@@ -70,6 +71,21 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
                 if (_inventory.GetCurrent(scope.InstallationId) is null ||
                     _coordinator.GetState(scope.InstallationId) is null)
                     continue;
+                foreach (var process in capture.Processes.Where(process =>
+                    context.Inventory.Candidates.Any(candidate =>
+                        string.Equals(candidate.ExecutableName, process.ExecutableName,
+                            StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(candidate.ExecutablePath, process.ExecutablePath,
+                            StringComparison.OrdinalIgnoreCase)) ||
+                    process.ExecutablePath?.StartsWith(
+                        scope.RootPath.TrimEnd('\\', '/') + "\\",
+                        StringComparison.OrdinalIgnoreCase) == true))
+                {
+                    Trace.WriteLine(
+                        $"[PROCESS-FORENSIC] ObserverForward GameId={scope.GameId} " +
+                        $"ProcessName={process.ExecutableName} " +
+                        $"ResolvedPath={Format(process.ExecutablePath)} ObservationForwarded=true");
+                }
                 _loggedPersistence.Remove(scope.InstallationId);
                 if (_refreshTriggers.TryGetValue(scope.InstallationId, out var priorRefresh) &&
                     (priorRefresh.Reason == DiscoveryReason.IncompleteInventory
@@ -209,6 +225,9 @@ public sealed class ProcessDiscoveryCaptureObserver : IProcessCaptureObserver
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
+
+    private static string Format(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "<null>" : value;
 
     private bool IsCurrentContext(DiscoveryInventoryContext context)
     {

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PlayStead.Core.Library;
 using PlayStead.Core.Sessions;
 
@@ -165,6 +166,9 @@ public sealed class ProcessSignatureLearningCoordinator
             var installation = Find(installationId);
             await FlushPendingInvalidationAsync(installation, cancellationToken);
             var state = installation.State;
+            var unrealFamily = UnrealExecutableFamily.TryCreate(state.Inventory);
+            var forensicObservation = TraceObservation(state.Inventory, unrealFamily,
+                installation.Current, batch);
             if (installation.LastCaptureSequence is { } last &&
                 (batch.SequenceNumber != last + 1 || batch.ObservedAtUtc <= installation.LastCaptureAt) ||
                 batch.Quality != EpisodeQuality.Complete)
@@ -184,18 +188,32 @@ public sealed class ProcessSignatureLearningCoordinator
                 state.Inventory.Candidates.Count == 0)
             {
                 installation.AbandonCurrent();
+                if (forensicObservation)
+                    Trace.WriteLine(
+                        $"[PROCESS-FORENSIC] LearningResult GameId={state.Inventory.Scope.GameId} " +
+                        "Action=InventoryUnavailable");
                 return null;
             }
 
             var observed = new Dictionary<string, ProcessSnapshot>(StringComparer.OrdinalIgnoreCase);
             var startsEpisode = installation.Current is null && installation.Prepared &&
                 installation.KnownAbsence >= 2 && batch.Processes.Any(process =>
-                    state.Inventory.Candidates.Any(candidate => string.Equals(candidate.ExecutablePath,
-                        process.ExecutablePath, StringComparison.OrdinalIgnoreCase)));
-            foreach (var process in batch.Processes)
+                    ResolveCandidate(state.Inventory, unrealFamily, installation.Current, process) is not null);
+            foreach (var sourceProcess in batch.Processes)
             {
-                var candidate = state.Inventory.Candidates.FirstOrDefault(item =>
-                    string.Equals(item.ExecutablePath, process.ExecutablePath, StringComparison.OrdinalIgnoreCase));
+                var candidate = ResolveCandidate(state.Inventory, unrealFamily,
+                    installation.Current, sourceProcess);
+                if (candidate is null && string.IsNullOrWhiteSpace(sourceProcess.ExecutablePath) &&
+                    ExecutableSupportClassifier.IsPathlessSupportObservation(state.Inventory,
+                        unrealFamily, sourceProcess.ExecutableName))
+                {
+                    TraceAction(state.Inventory.Scope.GameId, sourceProcess, "IgnoredSupport");
+                    continue;
+                }
+                var process = candidate is not null &&
+                    string.IsNullOrWhiteSpace(sourceProcess.ExecutablePath)
+                        ? sourceProcess with { ExecutablePath = candidate.ExecutablePath }
+                        : sourceProcess;
                 if (candidate is null)
                 {
                     if (UnderRoot(process.ExecutablePath, state.Inventory.Scope.RootPath))
@@ -212,9 +230,21 @@ public sealed class ProcessSignatureLearningCoordinator
                         (string.IsNullOrWhiteSpace(process.ExecutablePath) ||
                          installation.Current?.Identities.Values.Any(identity =>
                              identity.ProcessId == process.ProcessId) == true))
-                        return await InvalidateAsync(installation, DiscoveryReason.UnreliablePath, cancellationToken);
+                    {
+                        var namedCandidates = state.Inventory.Candidates.Where(item =>
+                            string.Equals(item.ExecutableName, process.ExecutableName,
+                                StringComparison.OrdinalIgnoreCase)).ToArray();
+                        if (namedCandidates.Any(candidate =>
+                                !ExecutableSupportClassifier.IsSupportExecutable(
+                                    state.Inventory, candidate, unrealFamily)))
+                            return await InvalidateAsync(installation,
+                                DiscoveryReason.UnreliablePath, cancellationToken);
+                    }
                     continue;
                 }
+                if (ExecutableSupportClassifier.IsSupportExecutable(
+                        state.Inventory, candidate, unrealFamily))
+                    TraceAction(state.Inventory.Scope.GameId, process, "IgnoredSupport");
                 if (process.ProcessId <= 0 || process.StartedAtUtc is null)
                     return await InvalidateAsync(installation, DiscoveryReason.UnknownProcessIdentity, cancellationToken);
                 if (!observed.TryAdd(candidate.ExecutablePath, process))
@@ -247,9 +277,22 @@ public sealed class ProcessSignatureLearningCoordinator
                     else installation.BaselineUnknown.IntersectWith(unknown);
                 }
                 installation.KnownAbsence = Math.Min(2, installation.KnownAbsence + 1);
-                if (installation.Current is null) return null;
+                if (installation.Current is null)
+                {
+                    if (forensicObservation)
+                        Trace.WriteLine(
+                            $"[PROCESS-FORENSIC] LearningResult GameId={state.Inventory.Scope.GameId} " +
+                            "Action=NoCandidateObserved");
+                    return null;
+                }
                 installation.Current.FinalAbsences++;
-                if (installation.Current.FinalAbsences < 2) return null;
+                if (installation.Current.FinalAbsences < 2)
+                {
+                    Trace.WriteLine(
+                        $"[PROCESS-FORENSIC] LearningResult GameId={state.Inventory.Scope.GameId} " +
+                        "Action=AwaitingFinalAbsence");
+                    return null;
+                }
                 return await CompleteAsync(installation, batch, cancellationToken);
             }
             if (installation.Current is null)
@@ -257,6 +300,10 @@ public sealed class ProcessSignatureLearningCoordinator
                 if (!installation.Prepared || installation.KnownAbsence < 2)
                 {
                     installation.KnownAbsence = 0;
+                    if (forensicObservation)
+                        Trace.WriteLine(
+                            $"[PROCESS-FORENSIC] LearningResult GameId={state.Inventory.Scope.GameId} " +
+                            "Action=AwaitingAbsenceBaseline");
                     return null;
                 }
                 var previous = state.Confirmation ?? state.Reference;
@@ -265,6 +312,13 @@ public sealed class ProcessSignatureLearningCoordinator
                 installation.Current = new CurrentEpisode(state.LastSequenceNumber + 1,
                     batch.SequenceNumber - 2, batch.ObservedAtUtc, state.Inventory.Candidates);
                 installation.Prepared = false;
+                TraceAction(state.Inventory.Scope.GameId, observed.Values.First(),
+                    state.Reference is null ? "ReferenceStarted" : "ConfirmationStarted");
+            }
+            else if (observed.Count > 0)
+            {
+                TraceAction(state.Inventory.Scope.GameId, observed.Values.First(),
+                    state.Reference is null ? "ReferenceUpdated" : "ConfirmationUpdated");
             }
             var current = installation.Current;
             foreach (var (path, process) in observed)
@@ -346,6 +400,9 @@ public sealed class ProcessSignatureLearningCoordinator
         var existing = await _signatureStore.GetAsync(state.Inventory.Scope.GameId.Value, cancellationToken);
         var decision = _policy.Evaluate(new DiscoveryEvaluation(state.Inventory, episodes,
             state.HasAmbiguousInstallation, existing?.Origin));
+        Trace.WriteLine(
+            $"[PROCESS-FORENSIC] LearningResult GameId={state.Inventory.Scope.GameId} " +
+            $"Action={(decision.Kind == DiscoveryDecisionKind.PromoteMain ? "PromoteMain" : decision.Reasons[0].ToString())}");
         if (state.Confirmation is not null && decision.Kind == DiscoveryDecisionKind.PromoteMain)
         {
             installation.Current = null;
@@ -376,6 +433,8 @@ public sealed class ProcessSignatureLearningCoordinator
         DiscoveryReason reason, CancellationToken cancellationToken)
     {
         var state = installation.State;
+        Trace.WriteLine(
+            $"[PROCESS-FORENSIC] LearningResult GameId={state.Inventory.Scope.GameId} Action={reason}");
         if (state.Reference is not null || state.Confirmation is not null ||
             !state.Reasons.SequenceEqual([reason]))
         {
@@ -392,6 +451,8 @@ public sealed class ProcessSignatureLearningCoordinator
     {
         var state = installation.State;
         var scope = state.Inventory.Scope;
+        Trace.WriteLine(
+            $"[PROCESS-FORENSIC] LearningResult GameId={scope.GameId} Action={reason}");
         var newScope = new InstallationScope(scope.GameId, scope.InstallationId,
             scope.RootPath, Guid.NewGuid(), scope.IsPresent);
         var inventory = new ExecutableInventory(newScope, InventoryCompleteness.Incomplete,
@@ -507,6 +568,94 @@ public sealed class ProcessSignatureLearningCoordinator
         if (string.IsNullOrWhiteSpace(path)) return false;
         var prefix = root.TrimEnd('\\', '/') + "\\";
         return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TraceObservation(
+        ExecutableInventory inventory,
+        UnrealExecutableFamily? unrealFamily,
+        CurrentEpisode? current,
+        ProcessObservationBatch batch)
+    {
+        var scope = inventory.Scope;
+        var traced = false;
+        foreach (var process in batch.Processes)
+        {
+            var nameMatches = inventory.Candidates.Where(candidate =>
+                string.Equals(candidate.ExecutableName, process.ExecutableName,
+                    StringComparison.OrdinalIgnoreCase)).ToArray();
+            var pathCandidate = inventory.Candidates.FirstOrDefault(candidate =>
+                string.Equals(candidate.ExecutablePath, process.ExecutablePath,
+                    StringComparison.OrdinalIgnoreCase));
+            var inventoryNameMatch = nameMatches.Length > 0;
+            var inventoryPathMatch = pathCandidate is not null;
+            var installRootContained = UnderRoot(process.ExecutablePath, scope.RootPath);
+            if (!inventoryNameMatch && !inventoryPathMatch && !installRootContained) continue;
+            traced = true;
+
+            var supportExcluded = pathCandidate is not null &&
+                ExecutableSupportClassifier.IsSupportExecutable(inventory, pathCandidate, unrealFamily) ||
+                nameMatches.Length > 0 && nameMatches.All(candidate =>
+                    ExecutableSupportClassifier.IsSupportExecutable(inventory, candidate, unrealFamily));
+            var resolved = ResolveCandidate(inventory, unrealFamily, current, process);
+            var dropReason = supportExcluded
+                ? "IgnoredSupport"
+                : resolved is not null
+                    ? null
+                    : installRootContained
+                        ? "IncompleteInventory"
+                        : inventoryNameMatch
+                            ? "UnreliablePath"
+                            : null;
+
+            Trace.WriteLine(
+                $"[PROCESS-FORENSIC] Correlation GameId={scope.GameId} " +
+                $"ProcessName={process.ExecutableName} ResolvedPath={Format(process.ExecutablePath)} " +
+                $"InventoryNameMatch={Bool(inventoryNameMatch)} InventoryPathMatch={Bool(inventoryPathMatch)} " +
+                $"InstallRootContained={Bool(installRootContained)} SupportExcluded={Bool(supportExcluded)} " +
+                $"ObservationForwarded=true DropReason={Format(dropReason)}");
+            Trace.WriteLine(
+                $"[PROCESS-FORENSIC] LearningEntry GameId={scope.GameId} " +
+                $"ProcessName={process.ExecutableName} ProcessPath={Format(process.ExecutablePath)} " +
+                $"HasReliablePath={Bool(!string.IsNullOrWhiteSpace(process.ExecutablePath))} " +
+                $"HasReliableIdentity={Bool(process.ProcessId > 0 && process.StartedAtUtc is not null)}");
+        }
+        return traced;
+    }
+
+    private static void TraceAction(GameId gameId, ProcessSnapshot process, string action) =>
+        Trace.WriteLine(
+            $"[PROCESS-FORENSIC] LearningResult GameId={gameId} " +
+            $"ProcessName={process.ExecutableName} Action={action}");
+
+    private static string Bool(bool value) => value.ToString().ToLowerInvariant();
+
+    private static string Format(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "<null>" : value;
+
+    private static ExecutableCandidate? ResolveCandidate(ExecutableInventory inventory,
+        UnrealExecutableFamily? unrealFamily, CurrentEpisode? current, ProcessSnapshot process)
+    {
+        var exact = inventory.Candidates.FirstOrDefault(item =>
+            string.Equals(item.ExecutablePath, process.ExecutablePath,
+                StringComparison.OrdinalIgnoreCase));
+        if (exact is not null || !string.IsNullOrWhiteSpace(process.ExecutablePath))
+            return exact;
+        if (current is null || process.ProcessId <= 0 || process.StartedAtUtc is null)
+            return null;
+
+        var identity = (process.ProcessId, process.StartedAtUtc.Value.ToUniversalTime());
+        var boundCandidates = inventory.Candidates.Where(candidate =>
+            current.Identities.TryGetValue(candidate.ExecutablePath, out var established) &&
+            established == identity).ToArray();
+        if (boundCandidates.Length != 1) return null;
+
+        var candidate = boundCandidates[0];
+        var nameMatches = inventory.Candidates.Count(item => string.Equals(item.ExecutableName,
+            process.ExecutableName, StringComparison.OrdinalIgnoreCase));
+        return nameMatches == 1 && string.Equals(candidate.ExecutableName,
+                process.ExecutableName, StringComparison.OrdinalIgnoreCase) &&
+            !ExecutableSupportClassifier.IsSupportExecutable(inventory, candidate, unrealFamily)
+                ? candidate : null;
     }
 
     private static (int ProcessId, string Name, DateTimeOffset? StartedAtUtc) UnknownIdentity(

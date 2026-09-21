@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using PlayStead.Core.Library;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Sessions.Discovery;
@@ -7,6 +9,43 @@ namespace PlayStead.Core.Tests.Sessions.Discovery;
 public sealed class ProcessSignatureLearningCoordinatorTests
 {
     private static readonly DateTimeOffset T0 = DateTimeOffset.UnixEpoch;
+
+    [Fact]
+    public async Task Observation_trace_reports_correlation_learning_entry_and_reference_start_without_changing_state()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var listener = new TextWriterTraceListener(output);
+        Trace.Listeners.Add(listener);
+        try
+        {
+            var driver = await Driver.CreateAsync();
+            await driver.CaptureAsync(1, []);
+            await driver.CaptureAsync(2, []);
+
+            var result = await driver.CaptureAsync(3, [driver.Process(100)]);
+
+            Assert.Null(result);
+            Assert.Null(driver.Coordinator.GetState(driver.Scope.InstallationId)!.Reference);
+            listener.Flush();
+            var trace = output.ToString();
+            Assert.Contains("[PROCESS-FORENSIC] Correlation", trace, StringComparison.Ordinal);
+            Assert.Contains($"GameId={driver.Scope.GameId}", trace, StringComparison.Ordinal);
+            Assert.Contains("ProcessName=Game.exe", trace, StringComparison.Ordinal);
+            Assert.Contains("InventoryNameMatch=true", trace, StringComparison.Ordinal);
+            Assert.Contains("InventoryPathMatch=true", trace, StringComparison.Ordinal);
+            Assert.Contains("InstallRootContained=true", trace, StringComparison.Ordinal);
+            Assert.Contains("SupportExcluded=false", trace, StringComparison.Ordinal);
+            Assert.Contains("ObservationForwarded=true", trace, StringComparison.Ordinal);
+            Assert.Contains("[PROCESS-FORENSIC] LearningEntry", trace, StringComparison.Ordinal);
+            Assert.Contains("HasReliablePath=true", trace, StringComparison.Ordinal);
+            Assert.Contains("HasReliableIdentity=true", trace, StringComparison.Ordinal);
+            Assert.Contains("Action=ReferenceStarted", trace, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+    }
 
     [Fact]
     public async Task Complete_episode_emits_reference_and_actual_ranges()
@@ -362,8 +401,222 @@ public sealed class ProcessSignatureLearningCoordinatorTests
         var d = await Driver.CreateAsync();
         await d.CompleteAsync(1, 100);
         var result = await d.CaptureAsync(7, [new ProcessSnapshot(200, "Game.exe", null, T0.AddSeconds(200))]);
+        Assert.NotNull(result);
         Assert.Equal([DiscoveryReason.UnreliablePath], result!.Reasons);
         Assert.Null(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+    }
+
+    [Fact]
+    public async Task Pathless_unreal_battleye_bootstrap_does_not_invalidate_family_reference()
+    {
+        var d = await Driver.CreateUnrealAsync("DuneSandbox",
+            @"DuneSandbox\Binaries\Win64\DuneSandbox_BE.exe");
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+        await d.CaptureAsync(3, [d.Process("DuneSandbox-Win64-Shipping.exe", 100)]);
+        await d.CaptureAsync(4, [d.Process("DuneSandbox-Win64-Shipping.exe", 100)]);
+        await d.CaptureAsync(5, []);
+        await d.CaptureAsync(6, []);
+        Assert.NotNull(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+
+        var result = await d.CaptureAsync(7,
+        [
+            new ProcessSnapshot(200, "DuneSandbox_BE.exe", null, T0.AddSeconds(13))
+        ]);
+
+        Assert.Null(result);
+        Assert.NotNull(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+    }
+
+    [Theory]
+    [InlineData("DuneSandbox.exe")]
+    [InlineData("DuneSandbox-Win64-Shipping.exe")]
+    public async Task First_pathless_unreal_family_observation_remains_unreliable(
+        string observedName)
+    {
+        var d = await Driver.CreateUnrealAsync("DuneSandbox");
+
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+        var result = await d.CaptureAsync(3,
+            [new ProcessSnapshot(100, observedName, null, T0.AddSeconds(5))]);
+
+        Assert.NotNull(result);
+        Assert.Equal([DiscoveryReason.UnreliablePath], result!.Reasons);
+        Assert.Null(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+    }
+
+    [Fact]
+    public async Task Pathless_observation_continues_only_the_currently_bound_process_identity()
+    {
+        var d = await Driver.CreateAsync();
+        var startedAt = T0.AddSeconds(5);
+        var known = new ProcessSnapshot(100, "Game.exe", d.Inventory.Candidates[0].ExecutablePath, startedAt);
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+        await d.CaptureAsync(3, [known]);
+
+        var continuity = await d.CaptureAsync(4,
+            [new ProcessSnapshot(100, "Game.exe", null, startedAt)]);
+        await d.CaptureAsync(5, [known]);
+        await d.CaptureAsync(6, []);
+        var completed = await d.CaptureAsync(7, []);
+
+        Assert.Null(continuity);
+        Assert.Equal(DiscoveryReason.AwaitingIndependentEpisode, Assert.Single(completed!.Reasons));
+        Assert.NotNull(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+    }
+
+    [Fact]
+    public async Task Pathless_observation_with_same_pid_and_different_start_time_is_unreliable()
+    {
+        var d = await Driver.CreateAsync();
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+        await d.CaptureAsync(3, [new ProcessSnapshot(100, "Game.exe",
+            d.Inventory.Candidates[0].ExecutablePath, T0.AddSeconds(5))]);
+
+        var result = await d.CaptureAsync(4,
+            [new ProcessSnapshot(100, "Game.exe", null, T0.AddSeconds(6))]);
+
+        Assert.Equal([DiscoveryReason.UnreliablePath], result!.Reasons);
+    }
+
+    [Fact]
+    public async Task Duplicate_candidate_names_are_not_resolved_from_a_pathless_continuation()
+    {
+        const string root = @"C:\Games\Example";
+        var d = await Driver.CreateWithCandidatesAsync(
+            ("Game.exe", root + @"\Game.exe"),
+            ("Game.exe", root + @"\Tools\Game.exe"));
+        var startedAt = T0.AddSeconds(5);
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+        await d.CaptureAsync(3, [new ProcessSnapshot(100, "Game.exe",
+            d.Inventory.Candidates[0].ExecutablePath, startedAt)]);
+
+        var result = await d.CaptureAsync(4,
+            [new ProcessSnapshot(100, "Game.exe", null, startedAt)]);
+
+        Assert.Equal([DiscoveryReason.UnreliablePath], result!.Reasons);
+    }
+
+    [Fact]
+    public async Task Identity_bound_to_multiple_candidates_is_not_resolved_pathlessly()
+    {
+        const string root = @"C:\Games\Example";
+        var d = await Driver.CreateWithCandidatesAsync(
+            ("Alpha.exe", root + @"\Alpha.exe"),
+            ("Beta.exe", root + @"\Beta.exe"));
+        var startedAt = T0.AddSeconds(5);
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+        await d.CaptureAsync(3,
+        [
+            new ProcessSnapshot(100, "Alpha.exe", d.Inventory.Candidates[0].ExecutablePath, startedAt),
+            new ProcessSnapshot(100, "Beta.exe", d.Inventory.Candidates[1].ExecutablePath, startedAt)
+        ]);
+
+        var result = await d.CaptureAsync(4,
+            [new ProcessSnapshot(100, "Alpha.exe", null, startedAt)]);
+
+        Assert.Equal([DiscoveryReason.UnreliablePath], result!.Reasons);
+    }
+
+    [Fact]
+    public async Task Pathless_generic_support_observation_is_ignored_without_starting_learning()
+    {
+        const string root = @"C:\Games\Example";
+        var d = await Driver.CreateWithCandidatesAsync(
+            ("SeaOfThieves.exe", root + @"\SeaOfThieves.exe"),
+            ("UnrealCEFSubProcess.exe", root + @"\Engine\Binaries\Win64\UnrealCEFSubProcess.exe"));
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+
+        var result = await d.CaptureAsync(3,
+            [new ProcessSnapshot(200, "UnrealCEFSubProcess.exe", null, T0.AddSeconds(8))]);
+
+        Assert.Null(result);
+        Assert.Null(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+        Assert.Empty(d.Coordinator.GetState(d.Scope.InstallationId)!.Reasons);
+    }
+
+    [Theory]
+    [InlineData(@"DuneSandbox\Binaries\Win64\DuneSandbox_BE.exe", "DuneSandbox_BE.exe")]
+    [InlineData(@"Engine\Binaries\Win64\CrashReportClient.exe", "CrashReportClient.exe")]
+    public async Task Pathless_unreal_support_process_cannot_start_an_episode(
+        string relativePath, string observedName)
+    {
+        var d = await Driver.CreateUnrealAsync("DuneSandbox", relativePath);
+
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+        await d.CaptureAsync(3,
+            [new ProcessSnapshot(100, observedName, null, T0.AddSeconds(5))]);
+        await d.CaptureAsync(4,
+            [new ProcessSnapshot(100, observedName, null, T0.AddSeconds(5))]);
+        await d.CaptureAsync(5, []);
+        var result = await d.CaptureAsync(6, []);
+
+        Assert.Null(result);
+        Assert.Null(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+    }
+
+    [Fact]
+    public async Task Pathless_unreal_name_shared_by_unrelated_inventory_candidates_is_rejected()
+    {
+        var d = await Driver.CreateUnrealAsync("DuneSandbox", @"Tools\DuneSandbox.exe");
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+
+        var result = await d.CaptureAsync(3,
+            [new ProcessSnapshot(100, "DuneSandbox.exe", null, T0.AddSeconds(5))]);
+
+        Assert.Equal([DiscoveryReason.UnreliablePath], result!.Reasons);
+        Assert.Null(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+    }
+
+    [Fact]
+    public async Task Pathless_unreal_name_with_shipping_outside_install_root_is_rejected()
+    {
+        var d = await Driver.CreateWithCandidatesAsync(
+            ("DuneSandbox.exe", @"C:\Games\Example\DuneSandbox.exe"),
+            ("DuneSandbox-Win64-Shipping.exe",
+                @"C:\Other\DuneSandbox\Binaries\Win64\DuneSandbox-Win64-Shipping.exe"));
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+
+        var result = await d.CaptureAsync(3,
+            [new ProcessSnapshot(100, "DuneSandbox.exe", null, T0.AddSeconds(5))]);
+
+        Assert.Equal([DiscoveryReason.UnreliablePath], result!.Reasons);
+        Assert.Null(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+    }
+
+    [Fact]
+    public async Task Two_reliably_observed_unreal_family_episodes_still_require_confirmation()
+    {
+        var d = await Driver.CreateUnrealAsync("Test_C");
+        async Task<DiscoveryDecision?> CompleteAsync(long first, int pid)
+        {
+            await d.CaptureAsync(first, []);
+            await d.CaptureAsync(first + 1, []);
+            await d.CaptureAsync(first + 2, [d.Process("Test_C-Win64-Shipping.exe", pid)]);
+            await d.CaptureAsync(first + 3, [d.Process("Test_C-Win64-Shipping.exe", pid)]);
+            await d.CaptureAsync(first + 4, []);
+            return await d.CaptureAsync(first + 5, []);
+        }
+
+        var reference = await CompleteAsync(1, 100);
+        Assert.Equal(DiscoveryDecisionKind.InsufficientEvidence, reference!.Kind);
+        Assert.Null(d.Coordinator.GetState(d.Scope.InstallationId)!.Confirmation);
+        Assert.True(await d.PrepareAsync());
+
+        var confirmation = await CompleteAsync(7, 200);
+
+        Assert.Equal(DiscoveryDecisionKind.PromoteMain, confirmation!.Kind);
+        Assert.Equal("Test_C-Win64-Shipping.exe", confirmation.Main!.ExecutableName);
+        Assert.NotNull(d.Coordinator.GetState(d.Scope.InstallationId)!.Confirmation);
     }
 
     [Fact]
@@ -864,16 +1117,24 @@ public sealed class ProcessSignatureLearningCoordinatorTests
     {
         var d = await Driver.CreateAsync();
         await d.CompleteAsync(1, 100);
+        Assert.True(await d.PrepareAsync());
+        await d.CaptureAsync(7, [d.Process(200)]);
+        await d.CaptureAsync(8, [d.Process(200)]);
+        await d.CaptureAsync(9, []);
+        await d.CaptureAsync(10, []);
         var old = d.Coordinator.GetState(d.Scope.InstallationId)!;
-        var stale = new ProcessSignatureLearningState(old.Inventory, old.PolicyVersion + 1,
+        Assert.NotNull(old.Reference);
+        Assert.NotNull(old.Confirmation);
+        var stale = new ProcessSignatureLearningState(old.Inventory, 2,
             Guid.NewGuid(), old.LastSequenceNumber, old.HasAmbiguousInstallation,
-            old.Reference, null, old.Reasons);
+            old.Reference, old.Confirmation, old.Reasons);
         Assert.True(await d.LearningStore.TrySaveAsync(stale, old.ConcurrencyToken, CancellationToken.None));
         var restarted = new ProcessSignatureLearningCoordinator(d.LearningStore, d.SignatureStore,
             d.RevisionSource, new ProcessSignatureDiscoveryPolicy());
         var state = await restarted.InitializeAsync(new DiscoveryInventoryContext(d.Inventory, false), CancellationToken.None);
         Assert.Equal(ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, state.PolicyVersion);
         Assert.Null(state.Reference);
+        Assert.Null(state.Confirmation);
         Assert.Equal([DiscoveryReason.PolicyVersionChanged], state.Reasons);
     }
 
@@ -990,6 +1251,49 @@ public sealed class ProcessSignatureLearningCoordinatorTests
                 revisionSource, new ProcessSignatureDiscoveryPolicy());
             await coordinator.InitializeAsync(new DiscoveryInventoryContext(inventory, false), CancellationToken.None);
             return new Driver(scope, inventory, learningStore, signatureStore, revisionSource, coordinator);
+        }
+
+        public static async Task<Driver> CreateUnrealAsync(string project,
+            params string[] extraRelativePaths)
+        {
+            var scope = new InstallationScope(GameId.New(), InstallationId.New(),
+                @"C:\Games\Example", Guid.NewGuid(), true);
+            var paths = new[]
+            {
+                project + ".exe",
+                $@"{project}\Binaries\Win64\{project}-Win64-Shipping.exe"
+            }.Concat(extraRelativePaths);
+            var inventory = new ExecutableInventory(scope, InventoryCompleteness.Complete,
+                paths.Select(path => new ExecutableCandidate(scope.RootPath + "\\" + path,
+                    Path.GetFileName(path), new FileRevision(10, T0))).ToArray(), []);
+            var learningStore = new FakeLearningStore();
+            var signatureStore = new FakeSignatureStore();
+            var revisionSource = new FakeRevisionSource(inventory);
+            var coordinator = new ProcessSignatureLearningCoordinator(learningStore,
+                signatureStore, revisionSource, new ProcessSignatureDiscoveryPolicy());
+            await coordinator.InitializeAsync(new DiscoveryInventoryContext(inventory, false),
+                CancellationToken.None);
+            return new Driver(scope, inventory, learningStore, signatureStore, revisionSource,
+                coordinator);
+        }
+
+        public static async Task<Driver> CreateWithCandidatesAsync(
+            params (string Name, string Path)[] candidates)
+        {
+            var scope = new InstallationScope(GameId.New(), InstallationId.New(),
+                @"C:\Games\Example", Guid.NewGuid(), true);
+            var inventory = new ExecutableInventory(scope, InventoryCompleteness.Complete,
+                candidates.Select(candidate => new ExecutableCandidate(candidate.Path,
+                    candidate.Name, new FileRevision(10, T0))).ToArray(), []);
+            var learningStore = new FakeLearningStore();
+            var signatureStore = new FakeSignatureStore();
+            var revisionSource = new FakeRevisionSource(inventory);
+            var coordinator = new ProcessSignatureLearningCoordinator(learningStore,
+                signatureStore, revisionSource, new ProcessSignatureDiscoveryPolicy());
+            await coordinator.InitializeAsync(new DiscoveryInventoryContext(inventory, false),
+                CancellationToken.None);
+            return new Driver(scope, inventory, learningStore, signatureStore, revisionSource,
+                coordinator);
         }
 
         public ProcessSnapshot Process(int pid) => Process("Game.exe", pid);

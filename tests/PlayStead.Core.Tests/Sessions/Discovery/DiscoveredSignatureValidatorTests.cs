@@ -89,6 +89,89 @@ public sealed class DiscoveredSignatureValidatorTests
         Assert.Equal(f.Current.Inventory.Scope, read.Scope);
         Assert.Equal(ProcessSignaturePathMatcherTests.Path, read.Path);
         Assert.Empty(f.Invalidations);
+        Assert.Empty(f.Restores);
+    }
+
+    [Fact]
+    public async Task NeedsRevalidation_with_fresh_exact_inventory_is_restored()
+    {
+        var f = new Fixture();
+        f.Input = f.Input with { Discovery = f.Input.Discovery! with {
+            ValidationState = ProcessSignatureValidationState.NeedsRevalidation } };
+        f.Stored = f.Input;
+
+        Assert.Equal(DiscoveredSignatureValidationResult.Valid, await f.Validate());
+        Assert.Single(f.Reads);
+        Assert.Single(f.Restores);
+        Assert.Equal(ProcessSignatureValidationState.NeedsRevalidation,
+            f.Restores[0].Expected.ValidationState);
+    }
+
+    [Theory]
+    [InlineData("root")]
+    [InlineData("files")]
+    [InlineData("entry-not-in-inventory")]
+    public async Task NeedsRevalidation_without_exact_current_identity_stays_rejected(string defect)
+    {
+        var f = new Fixture();
+        f.Input = f.Input with { Discovery = f.Input.Discovery! with {
+            ValidationState = ProcessSignatureValidationState.NeedsRevalidation } };
+        f.Stored = f.Input;
+        f.Corrupt(defect);
+
+        Assert.Equal(DiscoveredSignatureValidationResult.Invalid, await f.Validate());
+        Assert.Empty(f.Restores);
+    }
+
+    [Fact]
+    public async Task NeedsRevalidation_unreal_support_executable_is_not_restored()
+    {
+        var f = new Fixture();
+        var priorScope = f.Current!.Inventory.Scope;
+        var scope = new InstallationScope(priorScope.GameId, priorScope.InstallationId,
+            @"C:\Games\DuneAwakening", priorScope.GenerationId, true);
+        var revision = new FileRevision(10, ProcessSignaturePathMatcherTests.T0);
+        var candidates = new[]
+        {
+            new ExecutableCandidate(@"C:\Games\DuneAwakening\DuneSandbox.exe", "DuneSandbox.exe", revision),
+            new ExecutableCandidate(@"C:\Games\DuneAwakening\DuneSandbox\Binaries\Win64\DuneSandbox-Win64-Shipping.exe",
+                "DuneSandbox-Win64-Shipping.exe", revision),
+            new ExecutableCandidate(@"C:\Games\DuneAwakening\DuneSandbox\Binaries\Win64\DuneSandbox_BE.exe",
+                "DuneSandbox_BE.exe", revision)
+        };
+        var inventory = new ExecutableInventory(scope, InventoryCompleteness.Complete, candidates, []);
+        var entry = new ProcessSignatureEntry(candidates[2].ExecutableName, ProcessSignatureEntryKind.Main,
+            candidates[2].ExecutablePath, candidates[2].Revision);
+        f.Input = f.Input with { Entries = [entry], Discovery = f.Input.Discovery! with {
+            ValidationState = ProcessSignatureValidationState.NeedsRevalidation } };
+        f.Stored = f.Input;
+        f.Current = new(inventory, false);
+        f.State = f.NewState(inventory);
+
+        Assert.Equal(DiscoveredSignatureValidationResult.Invalid, await f.Validate());
+        Assert.Empty(f.Restores);
+    }
+
+    [Fact]
+    public async Task NeedsRevalidation_generic_support_executable_is_not_restored()
+    {
+        var f = new Fixture();
+        var scope = f.Current!.Inventory.Scope;
+        var revision = new FileRevision(10, ProcessSignaturePathMatcherTests.T0);
+        var support = new ExecutableCandidate(
+            @"C:\Games\One\Installers\EasyAntiCheat_EOS_Setup.exe",
+            "EasyAntiCheat_EOS_Setup.exe", revision);
+        var inventory = new ExecutableInventory(scope, InventoryCompleteness.Complete, [support], []);
+        var entry = new ProcessSignatureEntry(support.ExecutableName,
+            ProcessSignatureEntryKind.Main, support.ExecutablePath, support.Revision);
+        f.Input = f.Input with { Entries = [entry], Discovery = f.Input.Discovery! with {
+            ValidationState = ProcessSignatureValidationState.NeedsRevalidation } };
+        f.Stored = f.Input;
+        f.Current = new(inventory, false);
+        f.State = f.NewState(inventory);
+
+        Assert.Equal(DiscoveredSignatureValidationResult.Invalid, await f.Validate());
+        Assert.Empty(f.Restores);
     }
 
     [Fact]
@@ -126,7 +209,6 @@ public sealed class DiscoveredSignatureValidatorTests
 
     [Theory]
     [InlineData("generation")]
-    [InlineData("policy")]
     [InlineData("absent")]
     [InlineData("ambiguous")]
     [InlineData("persisted-ambiguous")]
@@ -184,7 +266,6 @@ public sealed class DiscoveredSignatureValidatorTests
 
     [Theory]
     [InlineData("legacy")]
-    [InlineData("state")]
     [InlineData("unknown-policy")]
     [InlineData("revision")]
     [InlineData("token")]
@@ -236,6 +317,7 @@ public sealed class DiscoveredSignatureValidatorTests
         internal bool InvalidationSucceeds = true;
         internal List<(InstallationScope Scope, string Path)> Reads = [];
         internal List<(Guid Game, DiscoveredSignatureExpectation Expected)> Invalidations = [];
+        internal List<(Guid Game, DiscoveredSignatureExpectation Expected)> Restores = [];
         internal Fixture()
         {
             Stored = Input;
@@ -247,7 +329,8 @@ public sealed class DiscoveredSignatureValidatorTests
             Current = new(new ExecutableInventory(scope, inventory.Completeness,
                 [new(ProcessSignaturePathMatcherTests.Path, "Game.exe", new(10, ProcessSignaturePathMatcherTests.T0))], []), false);
         }
-        internal ProcessSignatureLearningState NewState(ExecutableInventory? inventory = null, int policy = 1,
+        internal ProcessSignatureLearningState NewState(ExecutableInventory? inventory = null,
+            int policy = ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
             Guid? token = null, bool ambiguous = false) => new(inventory ?? State!.Inventory, policy,
                 token ?? State?.ConcurrencyToken ?? Guid.NewGuid(), 2, ambiguous, null, null, []);
         internal DiscoveredSignatureValidator Validator() => new(this, this, this, this, _ => Current);
@@ -290,6 +373,16 @@ public sealed class DiscoveredSignatureValidatorTests
         public Task<bool> TrySaveAsync(ProcessSignatureLearningState state, Guid? expectedConcurrencyToken, CancellationToken ct) => throw new NotSupportedException();
         public Task<bool> TryInsertDiscoveredIfAbsentAsync(DiscoveredSignatureWrite write, CancellationToken ct) => throw new NotSupportedException();
         public Task<bool> TryRevalidateDiscoveredAsync(DiscoveredSignatureWrite write, DiscoveredSignatureExpectation expected, CancellationToken ct) => throw new NotSupportedException();
+        public Task<bool> TryRestoreDiscoveredValidationAsync(Guid gameId,
+            DiscoveredSignatureExpectation expected, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            Restores.Add((gameId, expected));
+            if (Stored?.Discovery is { } metadata)
+                Stored = Stored with { Discovery = metadata with {
+                    ValidationState = ProcessSignatureValidationState.Valid, ConcurrencyToken = Guid.NewGuid() } };
+            return Task.FromResult(true);
+        }
         public Task<bool> TryInvalidateDiscoveredAsync(Guid gameId, DiscoveredSignatureExpectation expected, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();

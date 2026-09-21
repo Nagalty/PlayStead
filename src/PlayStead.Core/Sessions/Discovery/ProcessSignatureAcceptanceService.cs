@@ -11,6 +11,7 @@ public sealed class ProcessSignatureAcceptanceService
     private readonly ProcessSignatureDiscoveryPolicy _policy;
     private readonly Func<InstallationId, DiscoveryInventoryContext?> _currentInventory;
     private readonly TimeProvider _timeProvider;
+    private readonly DiscoveryConfirmationSessionPromoter _sessionPromoter;
     public ProcessSignatureAcceptanceService(
         IProcessSignatureLearningStore learningStore,
         IProcessSignatureStore signatureStore,
@@ -18,7 +19,8 @@ public sealed class ProcessSignatureAcceptanceService
         IExecutableRevisionSource revisionSource,
         ProcessSignatureDiscoveryPolicy policy,
         Func<InstallationId, DiscoveryInventoryContext?> currentInventory,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        DiscoveryConfirmationSessionPromoter sessionPromoter)
     {
         _learningStore = learningStore ?? throw new ArgumentNullException(nameof(learningStore));
         _signatureStore = signatureStore ?? throw new ArgumentNullException(nameof(signatureStore));
@@ -27,6 +29,7 @@ public sealed class ProcessSignatureAcceptanceService
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
         _currentInventory = currentInventory ?? throw new ArgumentNullException(nameof(currentInventory));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _sessionPromoter = sessionPromoter ?? throw new ArgumentNullException(nameof(sessionPromoter));
     }
 
     public async Task<bool> TryAcceptAsync(InstallationId installationId, CancellationToken cancellationToken)
@@ -84,9 +87,13 @@ public sealed class ProcessSignatureAcceptanceService
                 state.PolicyVersion, ProcessSignatureValidationState.Valid, Guid.NewGuid()));
         var write = new DiscoveredSignatureWrite(accepted, state.ConcurrencyToken,
             state.Reference.EpisodeId, state.Confirmation.EpisodeId);
-        return expected is null
+        var acceptedDurably = expected is null
             ? await _discoveryStore.TryInsertDiscoveredIfAbsentAsync(write, cancellationToken)
             : await _discoveryStore.TryRevalidateDiscoveredAsync(write, expected, cancellationToken);
+        if (!acceptedDurably) return false;
+
+        await _sessionPromoter.PersistAsync(state.Confirmation, cancellationToken);
+        return true;
     }
 
     private static bool InventoryEquals(ExecutableInventory left, ExecutableInventory right) =>

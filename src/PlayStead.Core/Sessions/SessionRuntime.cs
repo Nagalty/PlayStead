@@ -118,14 +118,17 @@ public sealed class SessionRuntime : ISessionRuntime
                 continue;
             }
 
-            var validation = !ProcessSignatureMatcher.IsDiscoveredAdmissible(signature)
-                ? DiscoveredSignatureValidationResult.Invalid
-                : _discoveredSignatureValidator is null
+            var validation = _discoveredSignatureValidator is null
+                ? ProcessSignatureMatcher.IsDiscoveredAdmissible(signature)
                     ? DiscoveredSignatureValidationResult.Pending
-                    : await _discoveredSignatureValidator.ValidateAsync(signature, cancellationToken);
+                    : DiscoveredSignatureValidationResult.Invalid
+                : await _discoveredSignatureValidator.ValidateAsync(signature, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (validation == DiscoveredSignatureValidationResult.Valid)
-                usableSignatures.Add(signature);
+                usableSignatures.Add(signature.Discovery?.ValidationState == ProcessSignatureValidationState.NeedsRevalidation
+                    ? signature with { Discovery = signature.Discovery with {
+                        ValidationState = ProcessSignatureValidationState.Valid } }
+                    : signature);
             else
             {
                 _pending.Remove(signature.GameId);

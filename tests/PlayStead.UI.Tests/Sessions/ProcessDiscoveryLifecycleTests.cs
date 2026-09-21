@@ -360,7 +360,8 @@ public sealed class ProcessDiscoveryLifecycleTests
             Manager = new DiscoveryInventoryManager(Source, Store, Coordinator, Logger);
             var acceptance = new ProcessSignatureAcceptanceService(Store, Store, Store,
                 Store, new ProcessSignatureDiscoveryPolicy(), Manager.GetCurrent,
-                TimeProvider.System);
+                TimeProvider.System,
+                new DiscoveryConfirmationSessionPromoter(new SessionStore(), new SessionTransitionPolicy()));
             Observer = new ProcessDiscoveryCaptureObserver(Manager, Coordinator,
                 acceptance, ObserverLogger, TimeProvider.System);
         }
@@ -505,6 +506,9 @@ public sealed class ProcessDiscoveryLifecycleTests
             RevisionPaths.Add(path);
             return Task.FromResult(new ExecutableRevisionResult(new FileRevision(10, At), null));
         }
+        public Task<bool> TryRestoreDiscoveredValidationAsync(Guid gameId,
+            DiscoveredSignatureExpectation expected, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 
     private sealed class ProcessSource(IReadOnlyList<ProcessSnapshot> processes) : IProcessSnapshotSource

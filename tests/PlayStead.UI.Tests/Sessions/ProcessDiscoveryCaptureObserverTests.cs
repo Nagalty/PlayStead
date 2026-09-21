@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
 using PlayStead.Core.Library;
 using PlayStead.Core.Sessions;
@@ -9,6 +11,33 @@ namespace PlayStead.UI.Tests.Sessions;
 public sealed class ProcessDiscoveryCaptureObserverTests
 {
     private static readonly DateTimeOffset Epoch = new(2026, 9, 15, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task Observer_trace_marks_inventory_matched_snapshot_as_forwarded_without_changing_decision()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var listener = new TextWriterTraceListener(output);
+        Trace.Listeners.Add(listener);
+        try
+        {
+            var driver = new Driver();
+            await driver.InitializeAsync();
+
+            await driver.TickAsync([driver.Process(100, 1)], 1);
+
+            Assert.Null(driver.Store.Signature);
+            listener.Flush();
+            var trace = output.ToString();
+            Assert.Contains("[PROCESS-FORENSIC] ObserverForward", trace, StringComparison.Ordinal);
+            Assert.Contains($"GameId={driver.First.GameId}", trace, StringComparison.Ordinal);
+            Assert.Contains("ProcessName=Game.exe", trace, StringComparison.Ordinal);
+            Assert.Contains("ObservationForwarded=true", trace, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+    }
 
     [Fact]
     public async Task External_absent_present_absent_episodes_promote_without_launch_intent()
@@ -322,7 +351,9 @@ public sealed class ProcessDiscoveryCaptureObserverTests
             First = Installation(@"C:\Games\Example");
             _coordinator = new(Store, Store, Store, new());
             Manager = new(Inventory, Store, _coordinator, NullLogger<DiscoveryInventoryManager>.Instance);
-            _acceptance = new(Store, Store, Store, Store, new(), Manager.GetCurrent, TimeProvider.System);
+            _acceptance = new(Store, Store, Store, Store, new(), Manager.GetCurrent,
+                TimeProvider.System,
+                new DiscoveryConfirmationSessionPromoter(new SessionStore(), new SessionTransitionPolicy()));
             Observer = new(Manager, _coordinator, _acceptance, Logger, TimeProvider.System);
         }
         public GameInstallation First { get; }
@@ -358,6 +389,24 @@ public sealed class ProcessDiscoveryCaptureObserverTests
             await TickAsync([], startingSecond + 5);
             await Manager.AwaitIdleAsync(CancellationToken.None);
         }
+    }
+
+    private sealed class SessionStore : ISessionStore
+    {
+        private readonly Dictionary<Guid, GameSession> _sessions = [];
+        public Task UpsertAsync(GameSession session, CancellationToken token)
+        {
+            _sessions[session.SessionId] = session;
+            return Task.CompletedTask;
+        }
+        public Task<GameSession?> GetAsync(Guid id, CancellationToken token) =>
+            Task.FromResult(_sessions.GetValueOrDefault(id));
+        public Task<IReadOnlyList<GameSession>> GetActiveAsync(CancellationToken token) =>
+            Task.FromResult<IReadOnlyList<GameSession>>([]);
+        public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken token) =>
+            Task.FromResult<IReadOnlyList<GameSession>>(_sessions.Values.Take(limit).ToArray());
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(Guid gameId, CancellationToken token) =>
+            Task.FromResult<IReadOnlyList<GameSession>>(_sessions.Values.Where(x => x.GameId == gameId).ToArray());
     }
 
     private sealed class TestLogger : Microsoft.Extensions.Logging.ILogger<ProcessDiscoveryCaptureObserver>
@@ -486,5 +535,8 @@ public sealed class ProcessDiscoveryCaptureObserverTests
             token.ThrowIfCancellationRequested();
             return Task.FromResult(new ExecutableRevisionResult(new FileRevision(10, Epoch), null));
         }
+        public Task<bool> TryRestoreDiscoveredValidationAsync(Guid gameId,
+            DiscoveredSignatureExpectation expected, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }

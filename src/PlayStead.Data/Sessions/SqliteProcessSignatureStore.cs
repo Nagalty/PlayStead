@@ -27,6 +27,31 @@ public sealed class SqliteProcessSignatureStore : IProcessSignatureStore, IProce
             throw new ArgumentException("Revalidation requires a suspended signature.", nameof(expected));
         return AcceptAsync(write, expected, cancellationToken);
     }
+    public async Task<bool> TryRestoreDiscoveredValidationAsync(Guid gameId,
+        DiscoveredSignatureExpectation expected, CancellationToken cancellationToken)
+    {
+        ValidateExpectation(expected);
+        if (gameId == Guid.Empty) throw new ArgumentException("Game identity must not be empty.", nameof(gameId));
+        if (expected.ValidationState != ProcessSignatureValidationState.NeedsRevalidation)
+            throw new ArgumentException("Structural recovery requires a suspended signature.", nameof(expected));
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction(deferred: false);
+        using var command = Command(connection, transaction, """
+            UPDATE process_signature_validation SET validation_state=1,concurrency_token=$newToken
+            WHERE game_id=$gameId AND concurrency_token=$expectedSignatureToken
+                AND generation_id IS $expectedGeneration AND validation_state=$expectedState
+                AND installation_id IS $expectedInstallation
+                AND EXISTS (SELECT 1 FROM process_signatures p WHERE p.game_id=$gameId AND p.origin=0);
+            """, ("$gameId", gameId.ToString("D")), ("$newToken", Guid.NewGuid().ToString("N")),
+            ("$expectedSignatureToken", expected.ConcurrencyToken.ToString("N")),
+            ("$expectedGeneration", expected.GenerationId?.ToString("D")),
+            ("$expectedState", (int)expected.ValidationState),
+            ("$expectedInstallation", expected.InstallationId?.ToString()));
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1) return false;
+        cancellationToken.ThrowIfCancellationRequested();
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
     public async Task<bool> TryInvalidateDiscoveredAsync(Guid gameId, DiscoveredSignatureExpectation expected,
         CancellationToken cancellationToken)
     {

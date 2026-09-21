@@ -162,6 +162,7 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<ProcessSignatureDiscoveryPolicy>();
         builder.Services.AddSingleton<ProcessSignatureLearningCoordinator>();
         builder.Services.AddSingleton<DiscoveryInventoryManager>();
+        builder.Services.AddSingleton<DiscoveryConfirmationSessionPromoter>();
         builder.Services.AddSingleton<ProcessSignatureAcceptanceService>(services =>
             new ProcessSignatureAcceptanceService(
                 services.GetRequiredService<IProcessSignatureLearningStore>(),
@@ -170,7 +171,8 @@ public static class PlaySteadHost
                 services.GetRequiredService<IExecutableRevisionSource>(),
                 services.GetRequiredService<ProcessSignatureDiscoveryPolicy>(),
                 services.GetRequiredService<DiscoveryInventoryManager>().GetCurrent,
-                services.GetRequiredService<TimeProvider>()));
+                services.GetRequiredService<TimeProvider>(),
+                services.GetRequiredService<DiscoveryConfirmationSessionPromoter>()));
         builder.Services.AddSingleton<ProcessDiscoveryCaptureObserver>();
         builder.Services.AddSingleton<IProcessCaptureObserver>(services =>
             services.GetRequiredService<ProcessDiscoveryCaptureObserver>());
@@ -190,9 +192,10 @@ public static class PlaySteadHost
             ISessionCorrectionStore,
             SqliteSessionCorrectionStore>();
 
-        builder.Services.AddSingleton<
-            IProcessSnapshotSource,
-            WindowsProcessSnapshotSource>();
+        builder.Services.AddSingleton<IProcessSnapshotSource>(services =>
+            new WindowsProcessSnapshotSource(
+                services.GetRequiredService<DiscoveryInventoryManager>()
+                    .ContainsExecutableName));
 
         builder.Services.AddSingleton<
             ProcessSignatureMatcher>();

@@ -187,6 +187,64 @@ public sealed class HomeMediaIntegrationTests
     }
 
     [Fact]
+    public void Completed_session_refreshes_home_recent_activity_once_on_ui_dispatcher()
+    {
+        RunSta(() =>
+        {
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
+            var f = new Fixture();
+            f.Store.Games =
+            [
+                new(f.A, "Enshrouded", false, Now, Now),
+                new(f.B, "Incursion: Red River", false, Now, Now)
+            ];
+            var enshrouded = Session(f.A, 1, 2);
+            f.Store.UpsertAsync(enshrouded, CancellationToken.None).GetAwaiter().GetResult();
+            var home = f.Create();
+            f.Sessions.RefreshAsync(CancellationToken.None).GetAwaiter().GetResult();
+            Assert.Equal(f.A.Value, Assert.Single(home.RecentSessions).GameId);
+            var uiThread = Environment.CurrentManagedThreadId;
+            var recentActivityThread = 0;
+            home.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(HomeViewModel.RecentSessions))
+                    recentActivityThread = Environment.CurrentManagedThreadId;
+            };
+
+            var started = Session(f.B, 3);
+            f.Store.UpsertAsync(started, CancellationToken.None).GetAwaiter().GetResult();
+            Task.Run(() => Publish(f.Monitor, new SessionRuntimeSnapshot(Now.AddMinutes(3), [started])))
+                .GetAwaiter().GetResult();
+            Assert.Equal(1, f.Store.RecentReadCount);
+
+            var ended = started with
+            {
+                LastSeenAtUtc = Now.AddMinutes(5),
+                ObservedEndedAtUtc = Now.AddMinutes(5),
+                State = SessionState.Ended,
+                EndReason = SessionEndReason.ProcessExited
+            };
+            f.Store.UpsertAsync(ended, CancellationToken.None).GetAwaiter().GetResult();
+            Task.Run(() => Publish(f.Monitor, new SessionRuntimeSnapshot(Now.AddMinutes(5), [])))
+                .GetAwaiter().GetResult();
+            DrainDispatcherUntil(() => home.RecentSessions.Count == 2 &&
+                home.RecentSessions[0].GameId == f.B.Value);
+
+            Assert.Equal([f.B.Value, f.A.Value], home.RecentSessions.Select(item => item.GameId));
+            Assert.Equal("Incursion: Red River", home.RecentSessions[0].Title);
+            Assert.Equal(uiThread, recentActivityThread);
+            Assert.Equal(2, f.Store.RecentReadCount);
+
+            Task.Run(() => Publish(f.Monitor, new SessionRuntimeSnapshot(Now.AddMinutes(6), [])))
+                .GetAwaiter().GetResult();
+            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+            Assert.Equal(2, f.Store.RecentReadCount);
+            Assert.Equal(2, home.RecentSessions.Count);
+            home.Dispose();
+        });
+    }
+
+    [Fact]
     public async Task Losing_all_sessions_clears_previous_Hero()
     {
         var f = new Fixture();
@@ -307,7 +365,8 @@ public sealed class HomeMediaIntegrationTests
                 new(InstallationId.New(), B, ProviderKind.Manual, "game-b", "b", null, true, true, Now)
             ];
             Library = new LibraryViewModel(Store);
-            Sessions = new SessionViewModel(Store, Monitor, TimeProvider.System);
+            Sessions = new SessionViewModel(Store, Monitor, TimeProvider.System, Store, new CorrectionStore(),
+                new Runtime(), new SessionCorrectionPolicy());
         }
 
         public HomeViewModel Create()
@@ -341,23 +400,75 @@ public sealed class HomeMediaIntegrationTests
         public List<GameInstallation> Installations { get; set; } = [];
         public IReadOnlyList<GameSession> Active { get; set; } = [];
         public IReadOnlyList<GameSession> Recent { get; set; } = [];
+        public int RecentReadCount { get; private set; }
         public Task<LibrarySnapshot> LoadSnapshotAsync(CancellationToken token) =>
             Task.FromResult(new LibrarySnapshot(Games, Installations));
         public Task ApplySourceScanAsync(SourceScanResult result, CancellationToken token) => throw new NotSupportedException();
-        public Task UpsertAsync(GameSession session, CancellationToken token) => throw new NotSupportedException();
-        public Task<GameSession?> GetAsync(Guid id, CancellationToken token) => Task.FromResult<GameSession?>(null);
+        public Task UpsertAsync(GameSession session, CancellationToken token)
+        {
+            Active = Active.Where(item => item.SessionId != session.SessionId).ToArray();
+            Recent = Recent.Where(item => item.SessionId != session.SessionId).Append(session).ToArray();
+            if (session.State == SessionState.Active) Active = Active.Append(session).ToArray();
+            return Task.CompletedTask;
+        }
+        public Task<GameSession?> GetAsync(Guid id, CancellationToken token) =>
+            Task.FromResult(Recent.Concat(Active).FirstOrDefault(session => session.SessionId == id));
         public Task<IReadOnlyList<GameSession>> GetByGameAsync(Guid gameId, CancellationToken token) =>
             Task.FromResult<IReadOnlyList<GameSession>>(
                 Recent
                     .Where(session => session.GameId == gameId)
                     .ToArray());
         public Task<IReadOnlyList<GameSession>> GetActiveAsync(CancellationToken token) => Task.FromResult(Active);
-        public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken token) => Task.FromResult(Recent);
+        public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken token)
+        {
+            RecentReadCount++;
+            return Task.FromResult<IReadOnlyList<GameSession>>(Recent.OrderByDescending(session => session.ObservedStartedAtUtc).Take(limit).ToArray());
+        }
     }
 
     private sealed class Runtime : ISessionRuntime
     {
         public Task<SessionRuntimeSnapshot> RefreshAsync(CancellationToken token) => Task.FromResult(new SessionRuntimeSnapshot(Now, []));
         public Task CorrectSessionAsync(SessionCorrectionRequest request, CancellationToken token) => throw new NotSupportedException();
+    }
+
+    private sealed class CorrectionStore : ISessionCorrectionStore
+    {
+        public Task UpsertAsync(SessionCorrection correction, CancellationToken token) => Task.CompletedTask;
+        public Task<SessionCorrection?> GetAsync(Guid sessionId, CancellationToken token) =>
+            Task.FromResult<SessionCorrection?>(null);
+    }
+
+    private static void Publish(SessionMonitor monitor, SessionRuntimeSnapshot snapshot)
+    {
+        var publish = (Action<SessionRuntimeSnapshot>?)typeof(SessionMonitor)
+            .GetField("SnapshotUpdated", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(monitor);
+        publish?.Invoke(snapshot);
+    }
+
+    private static void DrainDispatcherUntil(Func<bool> condition)
+    {
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer(DispatcherPriority.ApplicationIdle, dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(10)
+        };
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        timer.Tick += (_, _) =>
+        {
+            if (!condition() && DateTime.UtcNow < deadline) return;
+            timer.Stop();
+            frame.Continue = false;
+        };
+        timer.Start();
+        dispatcher.BeginInvoke(() =>
+        {
+            if (!condition() && DateTime.UtcNow < deadline) return;
+            timer.Stop();
+            frame.Continue = false;
+        });
+        Dispatcher.PushFrame(frame);
+        Assert.True(condition(), "The Home activity refresh did not complete.");
     }
 }

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using PlayStead.Core.Sessions;
 using PlayStead.Platform.Processes;
 
@@ -9,6 +10,40 @@ public sealed class WindowsProcessSnapshotSourceTests
 {
     private static readonly DateTimeOffset T0 =
         new(2026, 9, 13, 0, 30, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task Capture_traces_managed_failure_and_successful_native_fallback_without_changing_snapshot()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var listener = new TextWriterTraceListener(output);
+        Trace.Listeners.Add(listener);
+        try
+        {
+            var expectedPath = @"C:\Games\ObservedGame.exe";
+            var sut = new WindowsProcessSnapshotSource(
+                () => [Process.GetProcessById(Environment.ProcessId)],
+                _ => throw new UnauthorizedAccessException(),
+                _ => T0,
+                _ => expectedPath);
+
+            var snapshot = Assert.Single(await sut.CaptureAsync(CancellationToken.None));
+
+            Assert.Equal(expectedPath, snapshot.ExecutablePath);
+            Assert.Equal(T0, snapshot.StartedAtUtc);
+            listener.Flush();
+            var trace = output.ToString();
+            Assert.Contains("[PROCESS-FORENSIC]", trace, StringComparison.Ordinal);
+            Assert.Contains("ManagedPathResult=fail", trace, StringComparison.Ordinal);
+            Assert.Contains("FallbackAttempted=true", trace, StringComparison.Ordinal);
+            Assert.Contains("FallbackResult=success", trace, StringComparison.Ordinal);
+            Assert.Contains($"FallbackPath={expectedPath}", trace, StringComparison.Ordinal);
+            Assert.Contains($"NormalizedPath={expectedPath}", trace, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+    }
 
     [Fact]
     public async Task Capture_includes_current_process_with_real_windows_metadata()
@@ -76,6 +111,64 @@ public sealed class WindowsProcessSnapshotSourceTests
         Assert.Equal(
             T0,
             snapshot.StartedAtUtc);
+    }
+
+    [Fact]
+    public async Task Capture_does_not_use_native_fallback_when_managed_path_is_available()
+    {
+        var fallbackCalls = 0;
+        var expectedPath = @"C:\Games\ManagedGame.exe";
+        var sut = new WindowsProcessSnapshotSource(
+            () => [Process.GetProcessById(Environment.ProcessId)],
+            _ => expectedPath,
+            _ => T0,
+            _ =>
+            {
+                fallbackCalls++;
+                return @"C:\Games\FallbackGame.exe";
+            });
+
+        var snapshot = Assert.Single(
+            await sut.CaptureAsync(CancellationToken.None));
+
+        Assert.Equal(expectedPath, snapshot.ExecutablePath);
+        Assert.Equal(0, fallbackCalls);
+    }
+
+    [Fact]
+    public async Task Capture_uses_native_fallback_when_managed_path_is_inaccessible()
+    {
+        var expectedPath = @"C:\Games\NativeGame.exe";
+        var sut = new WindowsProcessSnapshotSource(
+            () => [Process.GetProcessById(Environment.ProcessId)],
+            _ => throw new UnauthorizedAccessException(),
+            _ => T0,
+            processId =>
+            {
+                Assert.Equal(Environment.ProcessId, processId);
+                return expectedPath;
+            });
+
+        var snapshot = Assert.Single(
+            await sut.CaptureAsync(CancellationToken.None));
+
+        Assert.Equal(expectedPath, snapshot.ExecutablePath);
+        Assert.Equal("NativeGame.exe", snapshot.ExecutableName);
+    }
+
+    [Fact]
+    public async Task Capture_keeps_path_unresolved_when_both_readers_fail()
+    {
+        var sut = new WindowsProcessSnapshotSource(
+            () => [Process.GetProcessById(Environment.ProcessId)],
+            _ => throw new InvalidOperationException(),
+            _ => T0,
+            _ => string.Empty);
+
+        var snapshot = Assert.Single(
+            await sut.CaptureAsync(CancellationToken.None));
+
+        Assert.Null(snapshot.ExecutablePath);
     }
 
     [Fact]
