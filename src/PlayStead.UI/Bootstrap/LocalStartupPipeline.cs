@@ -228,8 +228,12 @@ public sealed class LocalStartupPipeline
                 cancellationToken);
         System.Diagnostics.Trace.WriteLine("[STARTUP] END ILibraryStore.LoadSnapshotAsync");
 
-        if (health.IsHealthy)
-            _discoveryInventory?.Schedule(snapshot, cancellationToken);
+        if (health.IsHealthy && _discoveryInventory is { } discoveryInventory)
+        {
+            discoveryInventory.Schedule(snapshot, cancellationToken);
+            await discoveryInventory.AwaitIdleAsync(cancellationToken);
+            var contexts = discoveryInventory.GetCurrentContexts();
+        }
 
         if (_steamReferenceRuntime is not null)
         {

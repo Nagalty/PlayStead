@@ -215,7 +215,7 @@ public sealed class HomeViewModel :
         ? FeaturedGameTitle ?? string.Empty
         : "Prêt à replonger ?";
     public string HeroSupportingText => HasActiveSessionHero
-        ? $"En cours depuis {ActiveSessionStartedAtLabel}"
+        ? $"Démarré à {ActiveSessionStartedAtLabel}"
         : "Lance un jeu, PlayStead s’occupe du reste.";
     public string IdleHeroAssetPath { get; }
     public ImageSource? IdleHeroImageSource { get; }
@@ -323,7 +323,7 @@ public sealed class HomeViewModel :
 
         var startedAtLabel = session?.ObservedStartedAtUtc
             .ToLocalTime()
-            .ToString("HH:mm", CultureInfo.CurrentCulture);
+            .ToString("HH'h'mm", CultureInfo.CurrentCulture);
         if (ActiveSessionStartedAtLabel != startedAtLabel)
         {
             ActiveSessionStartedAtLabel = startedAtLabel;

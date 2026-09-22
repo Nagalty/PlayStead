@@ -70,6 +70,27 @@ public sealed class SessionMonitorTests
             runtime.RefreshCount);
     }
 
+    [Fact]
+    public async Task RunAsync_reconciles_before_using_normal_refresh()
+    {
+        var runtime = new ReconcilingFakeSessionRuntime();
+        using var cancellation = new CancellationTokenSource();
+
+        var sut = new SessionMonitor(
+            runtime,
+            SessionMonitorOptions.Default,
+            (_, _) =>
+            {
+                cancellation.Cancel();
+                return Task.CompletedTask;
+            });
+
+        await sut.RunAsync(cancellation.Token);
+
+        Assert.Equal(1, runtime.ReconcileCount);
+        Assert.Equal(0, runtime.RefreshCount);
+    }
+
     private sealed class FakeSessionRuntime :
         ISessionRuntime
     {
@@ -92,6 +113,33 @@ public sealed class SessionMonitorTests
                 new SessionRuntimeSnapshot(
                     T0,
                     []));
+        }
+    }
+
+    private sealed class ReconcilingFakeSessionRuntime :
+        ISessionRuntime,
+        IStartupSessionReconciler
+    {
+        public int RefreshCount { get; private set; }
+        public int ReconcileCount { get; private set; }
+
+        public Task CorrectSessionAsync(
+            SessionCorrectionRequest correction,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<SessionRuntimeSnapshot> RefreshAsync(
+            CancellationToken cancellationToken)
+        {
+            RefreshCount++;
+            return Task.FromResult(new SessionRuntimeSnapshot(T0, []));
+        }
+
+        public Task<SessionRuntimeSnapshot> ReconcileRunningProcessesAsync(
+            CancellationToken cancellationToken)
+        {
+            ReconcileCount++;
+            return Task.FromResult(new SessionRuntimeSnapshot(T0, []));
         }
     }
 }

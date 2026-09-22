@@ -1,3 +1,4 @@
+using PlayStead.UI.Tests.TestSupport;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Windows;
@@ -173,7 +174,7 @@ public sealed class LibraryViewMediaWiringTests
         Exception? error = null;
         var thread = new Thread(() =>
         {
-            try { action(); }
+            try { PlaySteadWpfTestResources.Run(action); }
             catch (Exception exception) { error = exception; }
         });
         thread.SetApartmentState(ApartmentState.STA);

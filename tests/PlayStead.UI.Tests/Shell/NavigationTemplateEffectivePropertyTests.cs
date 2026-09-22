@@ -1,11 +1,11 @@
-using System.Runtime.ExceptionServices;
-using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Shell;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class NavigationTemplateEffectivePropertyTests
 {
     [Fact]
@@ -13,11 +13,6 @@ public sealed class NavigationTemplateEffectivePropertyTests
     {
         RunSta(() =>
         {
-            var app = Application.Current ?? new Application();
-            app.Resources.MergedDictionaries.Add((ResourceDictionary)Application.LoadComponent(
-                new Uri("/PlayStead.UI;component/Themes/PlaySteadTokens.xaml", UriKind.Relative)));
-            app.Resources.MergedDictionaries.Add((ResourceDictionary)Application.LoadComponent(
-                new Uri("/PlayStead.UI;component/Themes/PlaySteadControls.xaml", UriKind.Relative)));
             var window = new MainWindow();
             try
             {
@@ -54,17 +49,5 @@ public sealed class NavigationTemplateEffectivePropertyTests
         });
     }
 
-    private static void RunSta(Action action)
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception exception) { failure = exception; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
-    }
+    private static void RunSta(Action action) => PlaySteadWpfTestResources.Run(action);
 }

@@ -102,9 +102,33 @@ public sealed class DiscoveredSignatureValidatorTests
 
         Assert.Equal(DiscoveredSignatureValidationResult.Valid, await f.Validate());
         Assert.Single(f.Reads);
-        Assert.Single(f.Restores);
+        Assert.Single(f.Refreshes);
         Assert.Equal(ProcessSignatureValidationState.NeedsRevalidation,
-            f.Restores[0].Expected.ValidationState);
+            f.Refreshes[0].Expected.ValidationState);
+    }
+
+    [Fact]
+    public async Task NeedsRevalidation_refreshes_stale_generation_and_revision_when_identity_is_unchanged()
+    {
+        var f = new Fixture();
+        var old = f.Input;
+        var previousScope = f.Current!.Inventory.Scope;
+        var currentScope = new InstallationScope(previousScope.GameId, previousScope.InstallationId,
+            previousScope.RootPath, Guid.NewGuid(), previousScope.IsPresent);
+        var currentRevision = new FileRevision(11, ProcessSignaturePathMatcherTests.T0.AddMinutes(1));
+        var currentInventory = new ExecutableInventory(currentScope, InventoryCompleteness.Complete,
+            [new(ProcessSignaturePathMatcherTests.Path, "Game.exe", currentRevision)], []);
+        f.Current = new(currentInventory, false);
+        f.State = f.NewState(currentInventory);
+        f.Revision = new(currentRevision, null);
+        f.Input = old with { Discovery = old.Discovery! with {
+            ValidationState = ProcessSignatureValidationState.NeedsRevalidation } };
+        f.Stored = f.Input;
+
+        Assert.Equal(DiscoveredSignatureValidationResult.Valid, await f.Validate());
+        var refresh = Assert.Single(f.Refreshes);
+        Assert.Equal(currentScope.GenerationId, refresh.Current.Inventory.Scope.GenerationId);
+        Assert.Equal(ProcessSignatureValidationState.NeedsRevalidation, refresh.Expected.ValidationState);
     }
 
     [Theory]
@@ -318,6 +342,8 @@ public sealed class DiscoveredSignatureValidatorTests
         internal List<(InstallationScope Scope, string Path)> Reads = [];
         internal List<(Guid Game, DiscoveredSignatureExpectation Expected)> Invalidations = [];
         internal List<(Guid Game, DiscoveredSignatureExpectation Expected)> Restores = [];
+        internal List<(ProcessSignature Signature, DiscoveredSignatureExpectation Expected,
+            DiscoveryInventoryContext Current)> Refreshes = [];
         internal Fixture()
         {
             Stored = Input;
@@ -381,6 +407,13 @@ public sealed class DiscoveredSignatureValidatorTests
             if (Stored?.Discovery is { } metadata)
                 Stored = Stored with { Discovery = metadata with {
                     ValidationState = ProcessSignatureValidationState.Valid, ConcurrencyToken = Guid.NewGuid() } };
+            return Task.FromResult(true);
+        }
+        public Task<bool> TryRefreshDiscoveredValidationAsync(ProcessSignature signature,
+            DiscoveredSignatureExpectation expected, DiscoveryInventoryContext current, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            Refreshes.Add((signature, expected, current));
             return Task.FromResult(true);
         }
         public Task<bool> TryInvalidateDiscoveredAsync(Guid gameId, DiscoveredSignatureExpectation expected, CancellationToken ct)

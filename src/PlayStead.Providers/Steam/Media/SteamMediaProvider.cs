@@ -8,11 +8,13 @@ public sealed class SteamMediaProvider : IGameMediaProvider
     private readonly WindowsSteamRootLocator _rootLocator;
     private readonly SteamLocalMediaLocator _localLocator;
     private readonly ISteamMediaTransport _transport;
+    private readonly IMediaDiagnostics _diagnostics;
 
     public SteamMediaProvider(
         WindowsSteamRootLocator rootLocator,
         SteamLocalMediaLocator localLocator,
-        ISteamMediaTransport transport)
+        ISteamMediaTransport transport,
+        IMediaDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(rootLocator);
         ArgumentNullException.ThrowIfNull(localLocator);
@@ -21,6 +23,7 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         _rootLocator = rootLocator;
         _localLocator = localLocator;
         _transport = transport;
+        _diagnostics = diagnostics ?? NoOpMediaDiagnostics.Instance;
     }
 
     public bool CanResolve(GameMediaIdentity identity)
@@ -62,6 +65,8 @@ public sealed class SteamMediaProvider : IGameMediaProvider
                         cancellationToken)
                     .ConfigureAwait(false);
 
+                Report(MediaResolutionEventKind.LocalProviderHit, identity, assetType);
+
                 return new GameMediaPayload(
                     assetType,
                     "steam-local",
@@ -80,11 +85,57 @@ public sealed class SteamMediaProvider : IGameMediaProvider
             identity.ProviderGameId,
             assetType);
 
-        return await _transport.TryDownloadAsync(
+        GameMediaPayload? payload;
+        try
+        {
+            payload = await _transport.TryDownloadAsync(
+                    identity.ProviderGameId,
+                    assetType,
+                    remoteCandidates,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            Report(MediaResolutionEventKind.RemoteProviderFailure, identity, assetType);
+            throw;
+        }
+
+        Report(
+            payload is null
+                ? MediaResolutionEventKind.RemoteProviderFailure
+                : MediaResolutionEventKind.RemoteProviderSuccess,
+            identity,
+            assetType);
+
+        return payload;
+    }
+
+    private void Report(
+        MediaResolutionEventKind kind,
+        GameMediaIdentity identity,
+        GameMediaAssetType assetType)
+    {
+        try
+        {
+            _diagnostics.Report(new MediaResolutionEvent(
+                kind,
+                identity.Provider,
                 identity.ProviderGameId,
-                assetType,
-                remoteCandidates,
-                cancellationToken)
-            .ConfigureAwait(false);
+                assetType));
+        }
+        catch
+        {
+            // Diagnostics must never change media resolution behavior.
+        }
+    }
+
+    private sealed class NoOpMediaDiagnostics : IMediaDiagnostics
+    {
+        public static NoOpMediaDiagnostics Instance { get; } = new();
+
+        public void Report(MediaResolutionEvent mediaEvent)
+        {
+        }
     }
 }

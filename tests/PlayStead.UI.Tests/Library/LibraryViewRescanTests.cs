@@ -1,3 +1,4 @@
+using PlayStead.UI.Tests.TestSupport;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows;
@@ -37,7 +38,7 @@ public sealed class LibraryViewRescanTests
 
         var thread = new Thread(() =>
         {
-            try { result = action(); }
+            try { result = PlaySteadWpfTestResources.Run(() => action()); }
             catch (Exception ex) { error = ex; }
         });
 

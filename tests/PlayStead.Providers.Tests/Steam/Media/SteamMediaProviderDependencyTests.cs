@@ -1,5 +1,6 @@
 using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Media;
+using PlayStead.Core.Media;
 
 namespace PlayStead.Providers.Tests.Steam.Media;
 
@@ -20,8 +21,10 @@ public sealed class SteamMediaProviderDependencyTests
             [
                 typeof(WindowsSteamRootLocator),
                 typeof(SteamLocalMediaLocator),
-                typeof(ISteamMediaTransport)
+                typeof(ISteamMediaTransport),
+                typeof(IMediaDiagnostics)
             ],
             parameterTypes);
+        Assert.True(constructor.GetParameters()[3].IsOptional);
     }
 }

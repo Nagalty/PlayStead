@@ -5,9 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 using PlayStead.Platform.Paths;
 using PlayStead.UI.Bootstrap;
 using PlayStead.UI.State;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.State;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class WindowPlacementRuntimeWiringTests : IDisposable
 {
     private readonly string _root = Path.Combine(
@@ -36,8 +38,6 @@ public sealed class WindowPlacementRuntimeWiringTests : IDisposable
                 window.WindowStartupLocation =
                     System.Windows.WindowStartupLocation.Manual;
 
-                window.Show();
-
                 window.WindowState =
                     System.Windows.WindowState.Normal;
 
@@ -46,6 +46,8 @@ public sealed class WindowPlacementRuntimeWiringTests : IDisposable
                 window.Width = 1180;
                 window.Height = 760;
 
+                host.Services.GetRequiredService<PlayStead.UI.Tray.WindowClosePolicy>()
+                    .RequestExit();
                 window.Close();
             });
 
@@ -93,8 +95,6 @@ public sealed class WindowPlacementRuntimeWiringTests : IDisposable
             {
                 var window = host.Services.GetRequiredService<MainWindow>();
 
-                window.Show();
-
                 Assert.Equal(
                     System.Windows.WindowStartupLocation.Manual,
                     window.WindowStartupLocation);
@@ -107,6 +107,8 @@ public sealed class WindowPlacementRuntimeWiringTests : IDisposable
                     System.Windows.WindowState.Normal,
                     window.WindowState);
 
+                host.Services.GetRequiredService<PlayStead.UI.Tray.WindowClosePolicy>()
+                    .RequestExit();
                 window.Close();
             });
     }
@@ -122,31 +124,5 @@ public sealed class WindowPlacementRuntimeWiringTests : IDisposable
     }
 
     private static void RunSta(Action action)
-    {
-        Exception? failure = null;
-
-        var thread = new Thread(
-            () =>
-            {
-                try
-                {
-                    action();
-                }
-                catch (Exception ex)
-                {
-                    failure = ex;
-                }
-            });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (failure is not null)
-        {
-            ExceptionDispatchInfo
-                .Capture(failure)
-                .Throw();
-        }
-    }
+        => PlaySteadWpfTestResources.Run(action);
 }

@@ -1,6 +1,6 @@
 # PlayStead
 
-**Version actuelle : `0.4.0-dev`**
+**Version actuelle : `0.4.1-dev`**
 
 PlayStead est une application Windows locale destinée à construire une bibliothèque de jeux fiable à partir des installations réellement présentes sur la machine, puis à fournir des informations de référence sur leur état sans rendre le démarrage dépendant du réseau.
 
@@ -12,11 +12,19 @@ La version 0.4 modernise l'expérience utilisateur et la direction visuelle sans
 
 ## État du projet
 
-`0.4.0-dev` est une version de développement. La version `1.0` reste réservée à la première release publique complète.
+`0.4.1-dev` est une version de développement. La version `1.0` reste réservée à la première release publique complète.
 
 La portée actuelle reste volontairement limitée à **Windows 10/11** et à **Steam**. PlayStead ne remplace pas Steam, n'installe pas de mises à jour et ne télécharge pas SteamCMD automatiquement.
 
 La version 0.4 applique la refonte visuelle globale validée en conservant les moteurs locaux, Steam et Sessions existants.
+
+## Fondation média 0.4.1
+
+- pipeline média **Steam-first** et provider-neutral pour les assets **Cover, Header, Hero et Logo** ;
+- résolution **cache-first** : cache PlayStead, médias Steam locaux, puis CDN Steam ; le démarrage et le premier rendu de la Bibliothèque ne dépendent pas du réseau ;
+- en mode hors ligne, les assets en cache restent disponibles et les autres jeux conservent leur fallback PlayStead ;
+- l'architecture est prête pour IGDB, mais **IGDB reste désactivé** en 0.4.1 ; aucun secret IGDB n'est embarqué (`IGDB_SECRET_EMBEDDED=False`) ;
+- les gates runtime et visuels font partie intégrante de l'acceptation, au même titre que le code, les tests et la cohérence produit.
 
 ## Fonctionnalités validées
 

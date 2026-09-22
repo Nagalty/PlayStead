@@ -16,9 +16,11 @@ using PlayStead.UI.Controls;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Tray;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Attention;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class Task09AttentionTests
 {
     [Theory]
@@ -104,8 +106,7 @@ public sealed class Task09AttentionTests
 
     private static void WithWindow(bool ordinaryScanData, Action<MainWindow, IServiceProvider> assertion)
     {
-        Exception? error = null;
-        var thread = new Thread(() =>
+        PlaySteadWpfTestResources.Run(() =>
         {
             var root = Path.Combine(Path.GetTempPath(), "PlayStead.Tests",
                 nameof(Task09AttentionTests), Guid.NewGuid().ToString("N"));
@@ -157,18 +158,10 @@ public sealed class Task09AttentionTests
                     window.Close();
                 }
             }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
             finally
             {
                 if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
             }
         });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
     }
 }

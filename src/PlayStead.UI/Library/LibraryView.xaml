@@ -3,15 +3,79 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:PlayStead.UI.Controls"
              xmlns:library="clr-namespace:PlayStead.UI.Library"
+             xmlns:steam="clr-namespace:PlayStead.Core.Steam;assembly=PlayStead.Core"
              Background="Transparent"
              SizeChanged="LibraryView_OnSizeChanged">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
+        <Style x:Key="Library.ViewModeButton"
+               TargetType="Button"
+               BasedOn="{StaticResource PlayStead.Button.Ghost}">
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextSecondary}" />
+            <Style.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsGridMode}" Value="True" />
+                        <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="Grid" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                    <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsListMode}" Value="True" />
+                        <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="List" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                    <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="Library.VerifySteamButton"
+               TargetType="Button"
+               BasedOn="{StaticResource PlayStead.Button.Ghost}">
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextSecondary}" />
+            <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.13}" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+
+        <Style x:Key="Library.ListSteamStatusBadge"
+               TargetType="Border"
+               BasedOn="{StaticResource PlayStead.Status.Badge.Neutral}">
+            <Setter Property="Visibility"
+                    Value="{Binding HasSteamStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SteamState}"
+                             Value="{x:Static steam:SteamUpdateState.Unknown}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="Library.ListRow"
+               TargetType="Border">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceSubtle}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Accent}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
     </UserControl.Resources>
 
-    <Grid Margin="28">
+    <Grid Margin="{DynamicResource PlayStead.Inset.Page}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -27,68 +91,69 @@
             <TextBlock x:Name="LibraryHeading"
                        Grid.Column="0"
                        Text="Bibliothèque"
-                       Foreground="#F2F4F7"
-                       FontSize="26"
-                       FontWeight="SemiBold"
+                       Style="{DynamicResource PlayStead.Text.PageTitle}"
                        VerticalAlignment="Center"/>
 
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
-
-                <Button x:Name="GridModeButton"
-                        Tag="Grid"
-                        Click="GridModeButton_OnClick"
-                        Style="{DynamicResource PlayStead.Button.Secondary}"
-                        ToolTip="Afficher la bibliothèque en grille">
+                <Border Style="{DynamicResource PlayStead.Surface.CardNested}"
+                        Padding="{DynamicResource PlayStead.Spacing.1}">
                     <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center">
-                        <TextBlock FontFamily="Segoe MDL2 Assets"
-                                   FontSize="14"
-                                   Foreground="{DynamicResource PlayStead.Brush.IconMuted}"
-                                   Text="&#xE8A9;"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Margin="8,0,0,0"
-                                   Text="Grille"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
 
-                <Button x:Name="ListModeButton"
-                        Tag="List"
-                        Click="ListModeButton_OnClick"
-                        Margin="8,0,0,0"
-                        Style="{DynamicResource PlayStead.Button.Secondary}"
-                        ToolTip="Afficher la bibliothèque en liste">
-                    <StackPanel Orientation="Horizontal"
-                                VerticalAlignment="Center">
-                        <TextBlock FontFamily="Segoe MDL2 Assets"
-                                   FontSize="14"
-                                   Foreground="{DynamicResource PlayStead.Brush.IconMuted}"
-                                   Text="&#xE8FD;"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Margin="8,0,0,0"
-                                   Text="Liste"
-                                   VerticalAlignment="Center"/>
+                        <Button x:Name="GridModeButton"
+                                Tag="Grid"
+                                Click="GridModeButton_OnClick"
+                                Style="{DynamicResource Library.ViewModeButton}"
+                                ToolTip="Afficher la bibliothèque en grille">
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <TextBlock FontFamily="Segoe MDL2 Assets"
+                                           FontSize="14"
+                                           Text="&#xE8A9;"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Margin="8,0,0,0"
+                                           Text="Grille"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button x:Name="ListModeButton"
+                                Tag="List"
+                                Click="ListModeButton_OnClick"
+                                Style="{DynamicResource Library.ViewModeButton}"
+                                ToolTip="Afficher la bibliothèque en liste">
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <TextBlock FontFamily="Segoe MDL2 Assets"
+                                           FontSize="14"
+                                           Text="&#xE8FD;"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Margin="8,0,0,0"
+                                           Text="Liste"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
-                </Button>
+                </Border>
 
                 <Button x:Name="VerifySteamButton"
                         IsEnabled="{Binding CanVerifySteam}"
                         Click="VerifySteamButton_OnClick"
-                        Margin="16,0,0,0"
-                        Style="{DynamicResource PlayStead.Button.Secondary}"
+                        Margin="{DynamicResource PlayStead.Gap.Inline.Cta}"
+                        Style="{DynamicResource Library.VerifySteamButton}"
                         ToolTip="Vérifier les installations Steam">
                     <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center">
                         <TextBlock FontFamily="Segoe MDL2 Assets"
                                    FontSize="14"
-                                   Foreground="{DynamicResource PlayStead.Brush.Copper}"
+                                   Foreground="{DynamicResource PlayStead.Brush.IconMuted}"
                                    Text="&#xE73E;"
                                    VerticalAlignment="Center"/>
                         <TextBlock Margin="8,0,0,0"
                                    Text="Vérifier Steam"
-                                   Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                   Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
@@ -167,7 +232,39 @@
                                   CanContentScroll="True"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
-                        <ItemsPresenter/>
+                        <StackPanel>
+                            <Grid x:Name="ListHeaderRow"
+                                  Margin="0,0,0,6"
+                                  MinHeight="28">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2.8*" MinWidth="260" />
+                                    <ColumnDefinition Width="1*" MinWidth="110" />
+                                    <ColumnDefinition Width="1*" MinWidth="100" />
+                                    <ColumnDefinition Width="Auto" MinWidth="120" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="Jeu"
+                                           Style="{DynamicResource PlayStead.Text.Caption}"
+                                           Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1"
+                                           Text="Plateforme"
+                                           Style="{DynamicResource PlayStead.Text.Caption}"
+                                           Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="2"
+                                           Text="Taille"
+                                           Style="{DynamicResource PlayStead.Text.Caption}"
+                                           Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="3"
+                                           Text="Statut"
+                                           Style="{DynamicResource PlayStead.Text.Caption}"
+                                           Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                           FontWeight="SemiBold" />
+                            </Grid>
+                            <ItemsPresenter />
+                        </StackPanel>
                     </ScrollViewer>
                 </ControlTemplate>
             </ItemsControl.Template>
@@ -180,68 +277,63 @@
 
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border Margin="0,0,0,10"
-                            Padding="16"
-                            Background="#1D2024"
-                            BorderBrush="#30343A"
-                            BorderThickness="1"
-                            CornerRadius="8">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
+                    <Border x:Name="ListGameRow"
+                            Padding="0,0,0,8"
+                            Margin="0,0,0,8"
+                            Style="{DynamicResource Library.ListRow}">
+                        <Grid MinHeight="64">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2.8*" MinWidth="260" />
+                                <ColumnDefinition Width="1*" MinWidth="110" />
+                                <ColumnDefinition Width="1*" MinWidth="100" />
+                                <ColumnDefinition Width="Auto" MinWidth="120" />
+                            </Grid.ColumnDefinitions>
 
-                            <Grid Grid.Row="0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Grid.Column="0"
+                            <StackPanel Grid.Column="0"
+                                        Orientation="Horizontal"
+                                        ToolTip="{Binding InstallPath}">
+                                <controls:GameArtwork Width="48"
+                                                       Height="56"
+                                                       Margin="0,0,12,0"
+                                                       SourcePath="{Binding CoverPath}"
+                                                       Title="{Binding Title}"
+                                                       ProviderLabel="{Binding ProviderLabel}"
+                                                       HasArtwork="{Binding HasCover}" />
+                                <TextBlock VerticalAlignment="Center"
                                            Text="{Binding Title}"
-                                           Foreground="#F2F4F7"
-                                           FontSize="16"
+                                           ToolTip="{Binding InstallPath}"
+                                           Style="{DynamicResource PlayStead.Text.Body}"
+                                           Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
                                            FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis"/>
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
 
-                                <StackPanel Grid.Column="1"
-                                            Margin="16,0,0,0"
-                                            Orientation="Horizontal">
-                                    <controls:StatusBadge Text="{Binding SessionStatusLabel}"
-                                                          Visibility="{Binding IsSessionActive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <TextBlock Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding ProviderLabel}"
+                                       Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                       TextTrimming="CharacterEllipsis" />
 
-                                    <Border Margin="8,0,0,0"
-                                            Padding="8,3"
-                                            Background="#25292E"
-                                            BorderBrush="#3A3F46"
-                                            BorderThickness="1"
-                                            CornerRadius="5"
-                                            Visibility="{Binding HasSteamStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                        <TextBlock Text="{Binding SteamStatusLabel}"
-                                                   Foreground="#D7B08C"
-                                                   FontSize="12"
-                                                   FontWeight="SemiBold"/>
-                                    </Border>
-                                </StackPanel>
-                            </Grid>
+                            <TextBlock Grid.Column="2"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding InstalledSizeLabel, Mode=OneWay}"
+                                       Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                       TextTrimming="CharacterEllipsis" />
 
-                            <TextBlock Grid.Row="1"
-                                       Margin="0,8,0,0"
-                                       Foreground="#A9AFB7"
-                                       FontSize="13">
-                                <Run Text="{Binding ProviderLabel}"/>
-                                <Run Text="  ·  "/>
-                                <Run Text="{Binding InstalledSizeLabel, Mode=OneWay}"/>
-                            </TextBlock>
-
-                            <TextBlock Grid.Row="2"
-                                       Margin="0,6,0,0"
-                                       Text="{Binding InstallPath}"
-                                       Foreground="#7F8791"
-                                       FontSize="12"
-                                       TextTrimming="CharacterEllipsis"/>
+                            <StackPanel Grid.Column="3"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal">
+                                <controls:StatusBadge Text="{Binding SessionStatusLabel}"
+                                                      Visibility="{Binding IsSessionActive, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <Border Margin="8,0,0,0"
+                                        Padding="8,3"
+                                        Style="{DynamicResource Library.ListSteamStatusBadge}">
+                                    <TextBlock Text="{Binding SteamStatusLabel}"
+                                               Style="{DynamicResource PlayStead.Text.Caption}"
+                                               Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                               FontWeight="SemiBold" />
+                                </Border>
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </DataTemplate>

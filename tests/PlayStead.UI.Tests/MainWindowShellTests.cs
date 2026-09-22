@@ -1,3 +1,4 @@
+using PlayStead.UI.Tests.TestSupport;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows;
@@ -91,8 +92,7 @@ public sealed class MainWindowShellTests
                 {
                     try
                     {
-                        result =
-                            action();
+                        result = PlaySteadWpfTestResources.Run(() => action());
                     }
                     catch (
                         Exception exception)

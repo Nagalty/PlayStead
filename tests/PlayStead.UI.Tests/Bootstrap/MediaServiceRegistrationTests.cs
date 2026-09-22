@@ -83,6 +83,12 @@ public sealed class MediaServiceRegistrationTests :
         Assert.IsType<GameMediaResolver>(
             resolver);
 
+        Assert.IsType<PlayStead.UI.Media.TraceMediaDiagnostics>(
+            host.Services.GetRequiredService<IMediaDiagnostics>());
+
+        Assert.IsType<PlayStead.UI.Media.TraceMediaDiagnostics>(
+            host.Services.GetRequiredService<IMediaDiagnostics>());
+
         Assert.NotNull(
             libraryViewModel);
     }
@@ -123,6 +129,14 @@ public sealed class MediaServiceRegistrationTests :
                 IGameMediaResolver>(),
             host.Services.GetRequiredService<
                 IGameMediaResolver>());
+
+        Assert.Same(
+            host.Services.GetRequiredService<IMediaDiagnostics>(),
+            host.Services.GetRequiredService<IMediaDiagnostics>());
+
+        Assert.Same(
+            host.Services.GetRequiredService<IMediaDiagnostics>(),
+            host.Services.GetRequiredService<IMediaDiagnostics>());
     }
 
     public void Dispose()

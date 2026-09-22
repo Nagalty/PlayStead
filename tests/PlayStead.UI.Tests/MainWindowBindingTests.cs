@@ -1,3 +1,4 @@
+using PlayStead.UI.Tests.TestSupport;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Windows.Controls;
@@ -156,8 +157,7 @@ public sealed class MainWindowBindingTests
                 {
                     try
                     {
-                        result =
-                            action();
+                        result = PlaySteadWpfTestResources.Run(() => action());
                     }
                     catch (
                         Exception exception)

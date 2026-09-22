@@ -2,7 +2,7 @@ using System.ComponentModel;
 
 namespace PlayStead.Core.Sessions;
 
-public sealed class SessionRuntime : ISessionRuntime
+public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler
 {
     private static readonly TimeSpan HeartbeatPersistenceInterval =
         TimeSpan.FromSeconds(5);
@@ -29,6 +29,14 @@ public sealed class SessionRuntime : ISessionRuntime
         _lastPersistedAtUtc = [];
 
     private bool _recoveryInitialized;
+    private bool _startupReconciliationRequested;
+
+    public Task<SessionRuntimeSnapshot> ReconcileRunningProcessesAsync(
+        CancellationToken cancellationToken)
+    {
+        _startupReconciliationRequested = true;
+        return RefreshAsync(cancellationToken);
+    }
 
     public SessionRuntime(
         IProcessSnapshotSource processSource,
@@ -183,6 +191,7 @@ public sealed class SessionRuntime : ISessionRuntime
                     signature,
                     processes);
 
+
             if (!match.HasMainProcess)
             {
                 continue;
@@ -225,6 +234,36 @@ public sealed class SessionRuntime : ISessionRuntime
                         updatedActive.LastSeenAtUtc;
                 }
 
+                continue;
+            }
+
+            if (_startupReconciliationRequested)
+            {
+                var processStartedAtUtc =
+                    match.MainProcesses
+                        .Select(process => process.StartedAtUtc)
+                        .Where(startedAtUtc => startedAtUtc is not null)
+                        .Select(startedAtUtc => startedAtUtc!.Value)
+                        .OrderBy(startedAtUtc => startedAtUtc)
+                        .FirstOrDefault(nowUtc);
+
+                var startupStarted =
+                    _transitions.Start(
+                        signature.GameId,
+                        processStartedAtUtc,
+                        nowUtc).Session
+                    ?? throw new InvalidOperationException(
+                        "Session start transition did not produce a session.");
+
+                var startupCurrent =
+                    _transitions.Heartbeat(
+                        startupStarted,
+                        nowUtc).Session
+                    ?? startupStarted;
+
+                _active[signature.GameId] = startupCurrent;
+                await _sessionStore.UpsertAsync(startupCurrent, cancellationToken);
+                _lastPersistedAtUtc[signature.GameId] = startupCurrent.LastSeenAtUtc;
                 continue;
             }
 
@@ -338,6 +377,7 @@ public sealed class SessionRuntime : ISessionRuntime
         }
 
         _unresolvedRecovered.ExceptWith(matchedMainGames);
+        _startupReconciliationRequested = false;
 
         return ProjectSnapshot(nowUtc);
     }

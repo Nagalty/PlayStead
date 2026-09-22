@@ -4,9 +4,11 @@ using System.Windows.Threading;
 using PlayStead.Core.Library;
 using PlayStead.UI.Controls;
 using PlayStead.UI.Library;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Controls;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class GameCardMediaRequestTests
 {
     [Fact]
@@ -113,7 +115,7 @@ public sealed class GameCardMediaRequestTests
         };
         try
         {
-            window.Show();
+            PlaySteadWpfTestResources.ShowAndPumpLoaded(window, card);
             window.UpdateLayout();
             window.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
             Assert.True(card.IsLoaded);
@@ -126,16 +128,5 @@ public sealed class GameCardMediaRequestTests
     }
 
     private static void RunSta(Action action)
-    {
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception exception) { error = exception; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
-    }
+        => PlaySteadWpfTestResources.Run(action);
 }

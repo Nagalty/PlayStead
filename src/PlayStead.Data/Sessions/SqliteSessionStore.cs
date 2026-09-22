@@ -214,6 +214,8 @@ public sealed class SqliteSessionStore : ISessionStore
                 created_at_utc,
                 updated_at_utc
             FROM game_sessions
+            WHERE state IN ($endedState, $recoveredState)
+                AND observed_ended_at_utc IS NOT NULL
             ORDER BY observed_started_at_utc DESC, session_id DESC
             LIMIT $limit;
             """;
@@ -221,6 +223,12 @@ public sealed class SqliteSessionStore : ISessionStore
         command.Parameters.AddWithValue(
             "$limit",
             limit);
+        command.Parameters.AddWithValue(
+            "$endedState",
+            (int)SessionState.Ended);
+        command.Parameters.AddWithValue(
+            "$recoveredState",
+            (int)SessionState.Recovered);
 
         return await ReadManyAsync(
             command,

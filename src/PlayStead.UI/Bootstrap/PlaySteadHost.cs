@@ -30,6 +30,7 @@ using PlayStead.Providers.Steam.Remote;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
+using PlayStead.UI.Media;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Notifications;
 using PlayStead.UI.Sessions;
@@ -240,6 +241,8 @@ public static class PlaySteadHost
             IGameMediaCache>(
             _ => new FileGameMediaCache(
                 layout.MediaDirectory));
+
+        builder.Services.AddSingleton<IMediaDiagnostics, TraceMediaDiagnostics>();
 
         builder.Services.AddSingleton<
             SteamLocalMediaLocator>();

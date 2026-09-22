@@ -134,6 +134,36 @@ public sealed class SqliteProcessSignatureDiscoveryStoreTests
         Assert.Equal(restored.Entries, unchanged.Entries);
         Assert.Equal(restored.UpdatedAtUtc, unchanged.UpdatedAtUtc);
     }
+
+    [Fact]
+    public async Task Structural_refresh_updates_generation_and_revision_without_relearning()
+    {
+        using var fixture = await SeedAsync();
+        var store = Store(fixture);
+        var write = await ProofAsync(fixture);
+        Assert.True(await store.TryInsertDiscoveredIfAbsentAsync(write, Ct));
+        var accepted = (await store.GetAsync(write.Signature.GameId, Ct))!;
+        Assert.True(await store.TryInvalidateDiscoveredAsync(accepted.GameId, Expect(accepted), Ct));
+        var suspended = (await store.GetAsync(accepted.GameId, Ct))!;
+        var newRevision = new FileRevision(999, T0.AddHours(1));
+        var installation = suspended.Discovery?.InstallationId
+            ?? throw new InvalidOperationException("Suspended signature has no installation.");
+        var currentScope = new InstallationScope(new GameId(suspended.GameId),
+            installation, @"C:\Games\Example", Guid.NewGuid(), true);
+        var currentInventory = new ExecutableInventory(currentScope, InventoryCompleteness.Complete,
+            [new(write.Signature.Entries[0].ExecutablePath!, write.Signature.Entries[0].ExecutableName!, newRevision)], []);
+        Assert.True(await store.TryRefreshDiscoveredValidationAsync(suspended, Expect(suspended),
+            new DiscoveryInventoryContext(currentInventory, false), Ct));
+
+        var refreshed = (await store.GetAsync(accepted.GameId, Ct))!;
+        Assert.Equal(ProcessSignatureValidationState.Valid, refreshed.Discovery!.ValidationState);
+        Assert.Equal(currentScope.GenerationId, refreshed.Discovery.GenerationId);
+        Assert.Equal(newRevision, refreshed.Entries[0].ValidatedRevision);
+        var learning = await new SqliteProcessSignatureLearningStore(fixture.Options)
+            .LoadAsync(currentScope.InstallationId, Ct);
+        Assert.NotNull(learning);
+        Assert.Equal(2, learning!.LastSequenceNumber);
+    }
     [Fact]
     public async Task Zero_row_proof_consumption_rolls_back_parent_and_entries()
     {

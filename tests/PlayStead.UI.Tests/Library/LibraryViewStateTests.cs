@@ -1,5 +1,3 @@
-using System.Runtime.ExceptionServices;
-using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -7,9 +5,11 @@ using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.UI.Library;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Library;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class LibraryViewStateTests
 {
     [Fact]
@@ -23,7 +23,7 @@ public sealed class LibraryViewStateTests
 
         await vm.RefreshAsync(CancellationToken.None);
 
-        RunSta(() =>
+        PlaySteadWpfTestResources.Run(() =>
         {
             var view = new LibraryView { DataContext = vm };
             using var host = Show(view);
@@ -73,7 +73,7 @@ public sealed class LibraryViewStateTests
 
         await vm.RefreshAsync(CancellationToken.None);
 
-        RunSta(() =>
+        PlaySteadWpfTestResources.Run(() =>
         {
             var view = new LibraryView { DataContext = vm };
             using var host = Show(view);
@@ -132,26 +132,4 @@ public sealed class LibraryViewStateTests
             Task.FromResult(snapshot);
     }
 
-    private static T RunSta<T>(Func<T> action)
-    {
-        T? result = default;
-        Exception? error = null;
-
-        var thread = new Thread(() =>
-        {
-            try { result = action(); }
-            catch (Exception ex) { error = ex; }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (error is not null)
-        {
-            ExceptionDispatchInfo.Capture(error).Throw();
-        }
-
-        return result!;
-    }
 }

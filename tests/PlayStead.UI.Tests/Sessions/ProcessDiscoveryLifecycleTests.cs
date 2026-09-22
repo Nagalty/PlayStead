@@ -509,6 +509,9 @@ public sealed class ProcessDiscoveryLifecycleTests
         public Task<bool> TryRestoreDiscoveredValidationAsync(Guid gameId,
             DiscoveredSignatureExpectation expected, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+        public Task<bool> TryRefreshDiscoveredValidationAsync(ProcessSignature signature,
+            DiscoveredSignatureExpectation expected, DiscoveryInventoryContext current,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class ProcessSource(IReadOnlyList<ProcessSnapshot> processes) : IProcessSnapshotSource

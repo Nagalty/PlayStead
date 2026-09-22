@@ -216,7 +216,7 @@ public sealed class TaskB3DiscoveryStartupTests : IDisposable
     }
 
     [Fact]
-    public async Task Cached_snapshot_returns_while_inventory_source_is_blocked()
+    public async Task Cached_snapshot_waits_for_initial_inventory_before_returning()
     {
         Directory.CreateDirectory(_root);
         var install = Path.Combine(_root, "InstalledGame");
@@ -242,12 +242,14 @@ public sealed class TaskB3DiscoveryStartupTests : IDisposable
             new LocalScanCoordinator([]), new EmptySteamReferenceRuntime(), manager);
         try
         {
-            var state = await pipeline.InitializeAsync(CancellationToken.None)
-                .WaitAsync(TimeSpan.FromSeconds(2));
+            var initialize = pipeline.InitializeAsync(CancellationToken.None);
+            await source.Entered.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.False(initialize.IsCompleted);
+            source.Release();
+            var state = await initialize.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.True(state.Health.IsHealthy);
             Assert.Single(state.Snapshot.Games);
-            await source.Entered.WaitAsync(TimeSpan.FromSeconds(2));
-            Assert.Null(manager.GetCurrent(Assert.Single(state.Snapshot.Installations).Id));
+            Assert.NotNull(manager.GetCurrent(Assert.Single(state.Snapshot.Installations).Id));
         }
         finally
         {

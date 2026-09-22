@@ -113,25 +113,22 @@ public sealed class ApplicationStartupCoordinatorTests
             ["--activate"],
             CancellationToken.None);
 
-        await WaitForAsync(
-            () => probe.RefreshStarted,
-            TimeSpan.FromSeconds(2));
-
-        Assert.False(startTask.IsCompleted);
-        Assert.Equal(0, probe.ReadySignalCount);
-        Assert.True(probe.ProgressState.IsBusy);
-        Assert.Equal(StartupStage.EnrichingCatalog, probe.ProgressState.Stage);
-
-        var initialRefresh = Assert.IsAssignableFrom<Task>(sut.BackgroundRefreshTask);
-        Assert.False(initialRefresh.IsCompleted);
-
-        refreshCompletion.SetResult(probe.FreshSnapshot);
-
         var result = await startTask.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.Equal(
             ApplicationStartupCoordinator.StartResult.Started,
             result);
+
+        await WaitForAsync(
+            () => probe.RefreshStarted,
+            TimeSpan.FromSeconds(2));
+
+        Assert.Equal(1, probe.ReadySignalCount);
+        Assert.False(probe.ProgressState.IsBusy);
+        Assert.Equal(StartupStage.Ready, probe.StageAtReady);
+
+        var initialRefresh = Assert.IsAssignableFrom<Task>(sut.BackgroundRefreshTask);
+        Assert.False(initialRefresh.IsCompleted);
 
         Assert.True(probe.HostBuilt);
         Assert.True(probe.DatabaseInitialized);
@@ -144,13 +141,17 @@ public sealed class ApplicationStartupCoordinatorTests
             probe.ShownSnapshot);
 
         Assert.Same(initialRefresh, sut.BackgroundRefreshTask);
-        Assert.True(initialRefresh.IsCompletedSuccessfully);
         Assert.Equal(1, probe.RefreshRunCount);
 
-        Assert.Equal(1, probe.ReadySignalCount);
-        Assert.Equal(StartupStage.Ready, probe.ProgressState.Stage);
-        Assert.False(probe.ProgressState.IsBusy);
+        refreshCompletion.SetResult(probe.FreshSnapshot);
+        await initialRefresh.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(initialRefresh.IsCompletedSuccessfully);
 
+        Assert.Same(
+            probe.FreshSnapshot,
+            probe.AppliedSnapshot);
+
+        Assert.Equal("apply-ui", probe.LogSnapshot()[^1]);
         AssertAppearsBefore(
             probe.LogSnapshot(),
             "parse",
@@ -161,16 +162,10 @@ public sealed class ApplicationStartupCoordinatorTests
             "initialize",
             "start-host",
             "show-cache",
+            "ready",
             "scan",
             "catalog-final",
-            "apply-ui",
-            "ready");
-
-        Assert.Same(
-            probe.FreshSnapshot,
-            probe.AppliedSnapshot);
-
-        Assert.Equal("ready", probe.LogSnapshot()[^1]);
+            "apply-ui");
     }
 
     [Fact]
@@ -198,14 +193,14 @@ public sealed class ApplicationStartupCoordinatorTests
         Assert.Equal(1, probe.RefreshRunCount);
         Assert.Equal(1, probe.ReadySignalCount);
         Assert.False(probe.ProgressState.IsBusy);
-        Assert.Equal(StartupStage.Ready, probe.ProgressState.Stage);
+        Assert.Equal(StartupStage.Ready, probe.StageAtReady);
         Assert.True(sut.BackgroundRefreshTask!.IsFaulted);
         AssertAppearsBefore(
             probe.LogSnapshot(),
             "show-cache",
+            "ready",
             "scan",
-            "catalog-final",
-            "ready");
+            "catalog-final");
     }
 
     [Fact]
@@ -623,6 +618,7 @@ public sealed class ApplicationStartupCoordinatorTests
 
         public StartupProgressState ProgressState { get; } = new();
         public int ReadySignalCount { get; private set; }
+        public StartupStage? StageAtReady { get; private set; }
         public int RefreshRunCount { get; private set; }
         public Func<LibrarySnapshot, CancellationToken, Task>? ShowCachedBehavior { get; init; }
         public Func<CancellationToken, Task<LocalStartupState>>? InitializeBehavior { get; init; }
@@ -892,6 +888,7 @@ public sealed class ApplicationStartupCoordinatorTests
                         Mark("ready");
                         ReadySignalCount++;
                         ProgressState.Ready();
+                        StageAtReady = ProgressState.Stage;
                     });
         }
 

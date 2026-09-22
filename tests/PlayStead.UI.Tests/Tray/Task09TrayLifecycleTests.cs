@@ -4,9 +4,11 @@ using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using PlayStead.Platform.Paths;
 using PlayStead.UI.Bootstrap;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Tray;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class Task09TrayLifecycleTests
 {
     [Fact]
@@ -196,35 +198,7 @@ public sealed class Task09TrayLifecycleTests
 
     private static void RunSta(
         Action action)
-    {
-        Exception? failure = null;
-
-        var thread = new Thread(
-            () =>
-            {
-                try
-                {
-                    action();
-                }
-                catch (Exception exception)
-                {
-                    failure = exception;
-                }
-            });
-
-        thread.SetApartmentState(
-            ApartmentState.STA);
-
-        thread.Start();
-        thread.Join();
-
-        if (failure is not null)
-        {
-            ExceptionDispatchInfo
-                .Capture(failure)
-                .Throw();
-        }
-    }
+        => PlaySteadWpfTestResources.Run(action);
 
     private static string FindRepositoryFile(
         params string[] relativeParts)

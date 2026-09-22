@@ -9,9 +9,11 @@ using PlayStead.Core.Steam;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Library;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class GameDetailActivityTests
 {
     [Fact]
@@ -206,7 +208,8 @@ public sealed class GameDetailActivityTests
     }
 
     [Fact]
-    public async Task Live_session_completion_refreshes_recent_activity_without_navigation()
+    public Task Live_session_completion_refreshes_recent_activity_without_navigation() =>
+        PlaySteadWpfTestResources.RunAsync(async () =>
     {
         var gameId = Guid.NewGuid();
         var active = new GameSession(Guid.NewGuid(), gameId, DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now, null,
@@ -234,7 +237,7 @@ public sealed class GameDetailActivityTests
         Assert.Single(ReadRecentRows(activity));
         Assert.False(detail.Game.IsSessionActive);
         detail.Deactivate();
-    }
+    });
 
     private static LibraryItemViewModel Item(Guid gameId) =>
         new(
@@ -294,15 +297,7 @@ public sealed class GameDetailActivityTests
 
     private static void Drain(Dispatcher dispatcher) => dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
 
-    private static void RunSta(Action action)
-    {
-        Exception? error = null;
-        var thread = new Thread(() => { try { action(); } catch (Exception exception) { error = exception; } });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
-    }
+    private static void RunSta(Action action) => PlaySteadWpfTestResources.Run(action);
 
     private sealed record RecentRow(Guid SessionId, string StartedAtLabel, string DurationLabel);
 

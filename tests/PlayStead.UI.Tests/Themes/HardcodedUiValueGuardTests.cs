@@ -5,11 +5,11 @@ namespace PlayStead.UI.Tests.Themes;
 
 public sealed partial class HardcodedUiValueGuardTests
 {
-    private const int ExpectedHexColorCount = 48;
-    private const int ExpectedFontSizeCount = 69;
-    private const int ExpectedFontWeightCount = 44;
-    private const int ExpectedCornerRadiusCount = 22;
-    private const int ExpectedSpacingCount = 168;
+    private const int ExpectedHexColorCount = 46;
+    private const int ExpectedFontSizeCount = 55;
+    private const int ExpectedFontWeightCount = 38;
+    private const int ExpectedCornerRadiusCount = 16;
+    private const int ExpectedSpacingCount = 156;
     private const int ExpectedLocalButtonAppearanceCount = 0;
 
     [Fact]

@@ -5,34 +5,45 @@ using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
 using PlayStead.UI.Library;
 using PlayStead.UI.Sessions;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Library;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class GameDetailLiveSessionRefreshTests
 {
-    [Fact] public void CurrentGame_StartSnapshot_RefreshesDetail() => Assert.True(Exercise(false, true).ViewModel.Game.IsSessionActive);
-    [Fact] public void CurrentGame_EndSnapshot_RefreshesDetail() => Assert.False(Exercise(true, false).ViewModel.Game.IsSessionActive);
-    [Fact] public void CurrentGame_EndSnapshot_ReturnsCtaStateToPlay() => Assert.Null(Exercise(true, false).ViewModel.SessionStatusLabel);
-    [Fact] public void CurrentGame_EndSnapshot_RefreshesActivitySummary() => Assert.Equal(1, Exercise(true, false).RefreshCount);
+    [Fact] public void CurrentGame_StartSnapshot_RefreshesDetail() => PlaySteadWpfTestResources.Run(() => Assert.True(Exercise(false, true).ViewModel.Game.IsSessionActive));
+    [Fact] public void CurrentGame_EndSnapshot_RefreshesDetail() => PlaySteadWpfTestResources.Run(() => Assert.False(Exercise(true, false).ViewModel.Game.IsSessionActive));
+    [Fact] public void CurrentGame_EndSnapshot_ReturnsCtaStateToPlay() => PlaySteadWpfTestResources.Run(() => Assert.Null(Exercise(true, false).ViewModel.SessionStatusLabel));
+    [Fact] public void CurrentGame_EndSnapshot_RefreshesActivitySummary() => PlaySteadWpfTestResources.Run(() => Assert.Equal(1, Exercise(true, false).RefreshCount));
     [Fact] public void OtherGame_Snapshot_DoesNotMutateCurrentDetail()
     {
-        var fixture = Create(false);
-        fixture.ViewModel.Activate();
-        Publish(fixture.Monitor, Snapshot(GameId.New()));
-        Assert.False(fixture.ViewModel.Game.IsSessionActive);
-        Assert.Equal(0, fixture.RefreshCount);
+        PlaySteadWpfTestResources.Run(() =>
+        {
+            var fixture = Create(false);
+            fixture.ViewModel.Activate();
+            Publish(fixture.Monitor, Snapshot(GameId.New()));
+            Assert.False(fixture.ViewModel.Game.IsSessionActive);
+            Assert.Equal(0, fixture.RefreshCount);
+        });
     }
     [Fact] public void ActivateTwice_SubscribesOnce()
     {
-        var fixture = Create(false); fixture.ViewModel.Activate(); fixture.ViewModel.Activate();
-        Publish(fixture.Monitor, Snapshot(fixture.GameId)); Assert.Equal(1, fixture.RefreshCount);
+        PlaySteadWpfTestResources.Run(() =>
+        {
+            var fixture = Create(false); fixture.ViewModel.Activate(); fixture.ViewModel.Activate();
+            Publish(fixture.Monitor, Snapshot(fixture.GameId)); Assert.Equal(1, fixture.RefreshCount);
+        });
     }
     [Fact] public void Deactivate_Unsubscribes()
     {
-        var fixture = Create(false); fixture.ViewModel.Activate(); fixture.ViewModel.Deactivate();
-        Publish(fixture.Monitor, Snapshot(fixture.GameId)); Assert.Equal(0, fixture.RefreshCount);
+        PlaySteadWpfTestResources.Run(() =>
+        {
+            var fixture = Create(false); fixture.ViewModel.Activate(); fixture.ViewModel.Deactivate();
+            Publish(fixture.Monitor, Snapshot(fixture.GameId)); Assert.Equal(0, fixture.RefreshCount);
+        });
     }
-    [Fact] public void SnapshotAfterDeactivate_DoesNothing() => Deactivate_Unsubscribes();
+    [Fact] public void SnapshotAfterDeactivate_DoesNothing() => PlaySteadWpfTestResources.Run(Deactivate_Unsubscribes);
 
     private static Fixture Exercise(bool initial, bool active)
     {

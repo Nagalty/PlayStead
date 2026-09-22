@@ -5,9 +5,11 @@ using PlayStead.Core.Scanning;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Library;
 using PlayStead.UI.Sessions;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Library;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class LibrarySessionIndicatorTests
 {
     [Fact]
@@ -181,7 +183,8 @@ public sealed class LibrarySessionIndicatorTests
 
     [Fact]
     [Trait("Task12", "LibraryLive")]
-    public async Task Snapshot_update_reprojects_live_state_without_library_reload()
+    public Task Snapshot_update_reprojects_live_state_without_library_reload() =>
+        PlaySteadWpfTestResources.RunAsync(async () =>
     {
         var firstGameId =
             GameId.New();
@@ -231,9 +234,9 @@ public sealed class LibrarySessionIndicatorTests
                     viewModel.Items,
                     item =>
                         item.GameId ==
-                        secondGameId),
+                    secondGameId),
                 "IsSessionActive"));
-    }
+    });
 
     [Fact]
     [Trait("Task12", "LibraryLive")]

@@ -589,5 +589,8 @@ public sealed class ProcessDiscoveryCaptureObserverTests
         public Task<bool> TryRestoreDiscoveredValidationAsync(Guid gameId,
             DiscoveredSignatureExpectation expected, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+        public Task<bool> TryRefreshDiscoveredValidationAsync(ProcessSignature signature,
+            DiscoveredSignatureExpectation expected, DiscoveryInventoryContext current,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

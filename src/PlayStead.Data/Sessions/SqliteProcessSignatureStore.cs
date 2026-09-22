@@ -52,6 +52,56 @@ public sealed class SqliteProcessSignatureStore : IProcessSignatureStore, IProce
         await transaction.CommitAsync(cancellationToken);
         return true;
     }
+
+    public async Task<bool> TryRefreshDiscoveredValidationAsync(ProcessSignature signature,
+        DiscoveredSignatureExpectation expected, DiscoveryInventoryContext current,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(signature);
+        ArgumentNullException.ThrowIfNull(current);
+        ValidateExpectation(expected);
+        if (expected.ValidationState != ProcessSignatureValidationState.NeedsRevalidation ||
+            signature.Origin != ProcessSignatureOrigin.Discovered || signature.Discovery is null)
+            throw new ArgumentException("A stale discovered signature is required.", nameof(expected));
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction(deferred: false);
+        for (var ordinal = 0; ordinal < signature.Entries.Count; ordinal++)
+        {
+            var entry = signature.Entries[ordinal];
+            var candidate = current.Inventory.Candidates.FirstOrDefault(item =>
+                PathEquals(item.ExecutablePath, entry.ExecutablePath!) &&
+                PathEquals(item.ExecutableName, entry.ExecutableName!));
+            if (candidate is null) return false;
+            using var updateEntry = Command(connection, transaction, """
+                UPDATE process_signature_entries
+                SET executable_name=$name,kind=$kind,executable_path=$path,
+                    validated_size_bytes=$size,validated_last_write_utc=$date
+                WHERE game_id=$gameId AND ordinal=$ordinal;
+                """, ("$gameId", signature.GameId.ToString("D")), ("$ordinal", ordinal),
+                ("$name", candidate.ExecutableName), ("$kind", (int)entry.Kind),
+                ("$path", candidate.ExecutablePath), ("$size", candidate.Revision.SizeBytes),
+                ("$date", FormatUtc(candidate.Revision.LastWriteTimeUtc)));
+            if (await updateEntry.ExecuteNonQueryAsync(cancellationToken) != 1) return false;
+        }
+        using var update = Command(connection, transaction, """
+            UPDATE process_signature_validation
+            SET generation_id=$generation,validation_state=1,concurrency_token=$newToken
+            WHERE game_id=$gameId AND concurrency_token=$expectedToken
+                AND generation_id IS $expectedGeneration AND validation_state=$expectedState
+                AND installation_id IS $expectedInstallation;
+            """, ("$gameId", signature.GameId.ToString("D")),
+            ("$generation", current.Inventory.Scope.GenerationId.ToString("D")),
+            ("$newToken", Guid.NewGuid().ToString("N")),
+            ("$expectedToken", expected.ConcurrencyToken.ToString("N")),
+            ("$expectedGeneration", expected.GenerationId?.ToString("D")),
+            ("$expectedState", (int)expected.ValidationState),
+            ("$expectedInstallation", expected.InstallationId?.ToString()));
+        if (await update.ExecuteNonQueryAsync(cancellationToken) != 1) return false;
+        cancellationToken.ThrowIfCancellationRequested();
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
     public async Task<bool> TryInvalidateDiscoveredAsync(Guid gameId, DiscoveredSignatureExpectation expected,
         CancellationToken cancellationToken)
     {

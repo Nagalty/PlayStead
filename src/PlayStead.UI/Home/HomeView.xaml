@@ -47,7 +47,7 @@
                     BorderBrush="{DynamicResource PlayStead.Brush.Border}"
                     BorderThickness="1"
                     CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
-                    Padding="{DynamicResource PlayStead.Spacing.4}">
+                    Padding="0">
                 <Border.Style>
                     <Style TargetType="Border">
                     <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.Surface}"/>
@@ -77,22 +77,50 @@
                     </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <StackPanel>
-                    <TextBlock Text="{Binding HeroEyebrow}">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource PlayStead.Text.Caption}">
-                                <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.Accent}" />
-                                <Setter Property="FontWeight" Value="SemiBold" />
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                    <TextBlock Text="{Binding HeroTitle}"
-                               Style="{DynamicResource PlayStead.Text.PageTitle}"
-                               Margin="{DynamicResource PlayStead.Gap.Block.Small}"
-                               TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding HeroSupportingText}"
-                               Style="{DynamicResource PlayStead.Text.BodySecondary}" />
-                </StackPanel>
+                <Grid x:Name="HomeHeroContent">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="ActiveHeroReadabilityScrim"
+                            Grid.ColumnSpan="2"
+                            Background="{DynamicResource PlayStead.Brush.Background}"
+                            CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
+                            Opacity="0.9"
+                            Visibility="{Binding HasActiveSessionHero, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            IsHitTestVisible="False">
+                        <Border.OpacityMask>
+                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                <GradientStop Color="#FFFFFFFF" Offset="0" />
+                                <GradientStop Color="#FFFFFFFF" Offset="0.2" />
+                                <GradientStop Color="#E6FFFFFF" Offset="0.32" />
+                                <GradientStop Color="#B3FFFFFF" Offset="0.42" />
+                                <GradientStop Color="#66FFFFFF" Offset="0.52" />
+                                <GradientStop Color="#00FFFFFF" Offset="0.62" />
+                                <GradientStop Color="#00FFFFFF" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.OpacityMask>
+                    </Border>
+                    <StackPanel x:Name="HeroTextSafeArea"
+                                Grid.Column="0"
+                                Margin="{DynamicResource PlayStead.Spacing.4}"
+                                MaxWidth="520">
+                        <TextBlock Text="{Binding HeroEyebrow}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource PlayStead.Text.Caption}">
+                                    <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.Accent}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding HeroTitle}"
+                                   Style="{DynamicResource PlayStead.Text.PageTitle}"
+                                   Margin="{DynamicResource PlayStead.Gap.Block.Small}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding HeroSupportingText}"
+                                   Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <StackPanel x:Name="RecentlyPlayedSection"

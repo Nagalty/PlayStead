@@ -1,16 +1,16 @@
-using System.Runtime.ExceptionServices;
-using System.Threading;
 using System.Windows.Controls;
 using PlayStead.UI.Library;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Library;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class LibraryViewTests
 {
     [Fact]
     public void LibraryView_exposes_the_minimal_0_1_library_shell()
     {
-        RunSta(() =>
+        PlaySteadWpfTestResources.Run(() =>
         {
             var view = new LibraryView();
 
@@ -35,32 +35,4 @@ public sealed class LibraryViewTests
         });
     }
 
-    private static T RunSta<T>(Func<T> action)
-    {
-        T? result = default;
-        Exception? error = null;
-
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                result = action();
-            }
-            catch (Exception ex)
-            {
-                error = ex;
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (error is not null)
-        {
-            ExceptionDispatchInfo.Capture(error).Throw();
-        }
-
-        return result!;
-    }
 }

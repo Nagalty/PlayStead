@@ -94,6 +94,11 @@ public sealed class ApplicationStartupCoordinator
             cancellationToken);
         System.Diagnostics.Trace.WriteLine("[STARTUP] END ShowCachedSnapshotAsync");
 
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _operations.SignalStartupReady?.Invoke();
+        System.Diagnostics.Trace.WriteLine("[STARTUP] READY");
+
         _operations.BindInvocationReceived(
             HandleInvocationAsync);
 
@@ -103,24 +108,9 @@ public sealed class ApplicationStartupCoordinator
         BackgroundRefreshTask =
             RefreshAndApplyAsync(
                 cancellationToken);
-
-        try
-        {
-            await BackgroundRefreshTask;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception error)
-        {
-            System.Diagnostics.Trace.TraceWarning(
-                "Initial refresh failed; cached startup snapshot remains available. {0}",
-                error);
-        }
-
-        _operations.SignalStartupReady?.Invoke();
-        System.Diagnostics.Trace.WriteLine("[STARTUP] READY");
+        _ = ObserveInitialRefreshAsync(
+            BackgroundRefreshTask,
+            cancellationToken);
 
         return StartResult.Started;
     }
@@ -250,6 +240,26 @@ public sealed class ApplicationStartupCoordinator
             StartupForensicTrace.Write("RefreshAndApply.End");
             lock (_lifecycleGate)
                 _refreshTasks.Remove(completion.Task);
+        }
+    }
+
+    private static async Task ObserveInitialRefreshAsync(
+        Task refreshTask,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await refreshTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Application shutdown cancels the tracked refresh and is joined by StopAsync.
+        }
+        catch (Exception error)
+        {
+            System.Diagnostics.Trace.TraceWarning(
+                "Initial refresh failed; cached startup snapshot remains available. {0}",
+                error);
         }
     }
 

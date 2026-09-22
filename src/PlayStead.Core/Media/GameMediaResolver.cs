@@ -4,16 +4,19 @@ public sealed class GameMediaResolver : IGameMediaResolver
 {
     private readonly IGameMediaCache _cache;
     private readonly IReadOnlyList<IGameMediaProvider> _providers;
+    private readonly IMediaDiagnostics _diagnostics;
 
     public GameMediaResolver(
         IGameMediaCache cache,
-        IEnumerable<IGameMediaProvider> providers)
+        IEnumerable<IGameMediaProvider> providers,
+        IMediaDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(cache);
         ArgumentNullException.ThrowIfNull(providers);
 
         _cache = cache;
         _providers = providers.ToArray();
+        _diagnostics = diagnostics ?? NoOpMediaDiagnostics.Instance;
     }
 
     public string? TryGetCachedPath(
@@ -36,8 +39,11 @@ public sealed class GameMediaResolver : IGameMediaResolver
 
         if (cachedPath is not null)
         {
+            Report(MediaResolutionEventKind.CacheHit, identity, assetType);
             return cachedPath;
         }
+
+        Report(MediaResolutionEventKind.CacheMiss, identity, assetType);
 
         foreach (var provider in _providers)
         {
@@ -61,11 +67,18 @@ public sealed class GameMediaResolver : IGameMediaResolver
                     continue;
                 }
 
-                return await _cache.StoreAsync(
+                try
+                {
+                    return await _cache.StoreAsync(
                         identity,
                         payload,
                         cancellationToken)
                     .ConfigureAwait(false);
+                }
+                catch (InvalidDataException)
+                {
+                    Report(MediaResolutionEventKind.InvalidImage, identity, assetType);
+                }
             }
             catch (Exception ex) when (
                 ex is HttpRequestException
@@ -73,10 +86,44 @@ public sealed class GameMediaResolver : IGameMediaResolver
                 or InvalidDataException
                 or UnauthorizedAccessException)
             {
+                if (ex is InvalidDataException)
+                {
+                    Report(MediaResolutionEventKind.InvalidImage, identity, assetType);
+                }
+
                 continue;
             }
         }
 
+        Report(MediaResolutionEventKind.FallbackUsed, identity, assetType);
         return null;
+    }
+
+    private void Report(
+        MediaResolutionEventKind kind,
+        GameMediaIdentity identity,
+        GameMediaAssetType assetType)
+    {
+        try
+        {
+            _diagnostics.Report(new MediaResolutionEvent(
+                kind,
+                identity.Provider,
+                identity.ProviderGameId,
+                assetType));
+        }
+        catch
+        {
+            // Diagnostics must never change media resolution behavior.
+        }
+    }
+
+    private sealed class NoOpMediaDiagnostics : IMediaDiagnostics
+    {
+        public static NoOpMediaDiagnostics Instance { get; } = new();
+
+        public void Report(MediaResolutionEvent mediaEvent)
+        {
+        }
     }
 }

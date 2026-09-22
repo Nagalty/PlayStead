@@ -83,13 +83,18 @@ public sealed class SessionMonitor : BackgroundService
     public async Task RunAsync(
         CancellationToken cancellationToken)
     {
+        var startupReconciliationPending = true;
         while (!cancellationToken.IsCancellationRequested)
         {
             SessionRuntimeSnapshot? snapshot = null;
             try
             {
-                snapshot = await _runtime.RefreshAsync(cancellationToken);
+                snapshot = startupReconciliationPending &&
+                    _runtime is IStartupSessionReconciler reconciler
+                    ? await reconciler.ReconcileRunningProcessesAsync(cancellationToken)
+                    : await _runtime.RefreshAsync(cancellationToken);
                 _captureUnavailable = false;
+                startupReconciliationPending = false;
             }
             catch (ProcessCaptureUnavailableException error)
             {

@@ -6,9 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 using PlayStead.Platform.Paths;
 using PlayStead.UI.Bootstrap;
 using PlayStead.UI.Navigation;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Bootstrap;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class StartupProgressWindowBindingTests
 {
     [Fact]
@@ -60,20 +62,5 @@ public sealed class StartupProgressWindowBindingTests
         });
     }
 
-    private static T RunSta<T>(Func<T> action)
-    {
-        T? result = default;
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try { result = action(); }
-            catch (Exception exception) { error = exception; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (error is not null)
-            ExceptionDispatchInfo.Capture(error).Throw();
-        return result!;
-    }
+    private static T RunSta<T>(Func<T> action) => PlaySteadWpfTestResources.Run(action);
 }

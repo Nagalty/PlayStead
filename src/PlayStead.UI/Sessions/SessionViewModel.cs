@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Globalization;
+using System.Windows;
+using System.Windows.Threading;
 using System.Runtime.CompilerServices;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Sessions;
@@ -18,6 +20,7 @@ public sealed class SessionViewModel :
     private readonly ISessionCorrectionStore? _sessionCorrectionStore;
     private readonly ISessionRuntime? _sessionRuntime;
     private readonly SessionCorrectionPolicy? _sessionCorrectionPolicy;
+    private readonly Dispatcher? _uiDispatcher;
 
     private IReadOnlyDictionary<Guid, string> _gameTitles =
         new Dictionary<Guid, string>();
@@ -44,6 +47,9 @@ public sealed class SessionViewModel :
         _libraryStore = libraryStore;
         _sessionMonitor = sessionMonitor;
         _timeProvider = timeProvider;
+        _uiDispatcher = Application.Current?.Dispatcher ??
+            Dispatcher.FromThread(Thread.CurrentThread);
+        _sessionMonitor.SnapshotUpdated += SessionMonitor_OnSnapshotUpdated;
     }
 
     public SessionViewModel(
@@ -157,6 +163,23 @@ public sealed class SessionViewModel :
                 .ToArray();
     }
 
+    private void SessionMonitor_OnSnapshotUpdated(
+        SessionRuntimeSnapshot snapshot)
+    {
+        if (_uiDispatcher is not null && !_uiDispatcher.CheckAccess())
+        {
+            if (!_uiDispatcher.HasShutdownStarted &&
+                !_uiDispatcher.HasShutdownFinished)
+            {
+                _uiDispatcher.BeginInvoke(RefreshLive);
+            }
+
+            return;
+        }
+
+        RefreshLive();
+    }
+
     public async Task SelectRecentSessionAsync(
         Guid sessionId,
         CancellationToken cancellationToken)
@@ -197,13 +220,14 @@ public sealed class SessionViewModel :
 
         var orderedSessions =
             sessions
+                .Where(IsCompletedSession)
                 .OrderByDescending(
                     session =>
                         session.ObservedStartedAtUtc)
                 .ThenByDescending(
                     session =>
                         session.SessionId)
-                .ToArray();
+            .ToArray();
 
         var items =
             new List<RecentSessionItemViewModel>(
@@ -230,6 +254,10 @@ public sealed class SessionViewModel :
         SetRecentSessions(
             items);
     }
+
+    private static bool IsCompletedSession(GameSession session) =>
+        (session.State is SessionState.Ended or SessionState.Recovered) &&
+        session.ObservedEndedAtUtc is not null;
 
     public async Task RefreshRecentSessionsAsync(
         CancellationToken cancellationToken)

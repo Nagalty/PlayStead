@@ -330,6 +330,9 @@ public sealed class ProcessSignatureAcceptanceServiceTests
         }
         public Task<bool> TryRestoreDiscoveredValidationAsync(Guid gameId,
             DiscoveredSignatureExpectation expected, CancellationToken ct) => throw new NotSupportedException();
+        public Task<bool> TryRefreshDiscoveredValidationAsync(ProcessSignature signature,
+            DiscoveredSignatureExpectation expected, DiscoveryInventoryContext current, CancellationToken ct) =>
+            throw new NotSupportedException();
         public Task<bool> TryInvalidateDiscoveredAsync(Guid gameId, DiscoveredSignatureExpectation expected, CancellationToken ct)
         {
             Invalidations.Add(expected);

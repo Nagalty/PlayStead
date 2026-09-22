@@ -7,6 +7,9 @@ public interface IProcessSignatureDiscoveryStore
         CancellationToken cancellationToken);
     Task<bool> TryRestoreDiscoveredValidationAsync(Guid gameId, DiscoveredSignatureExpectation expected,
         CancellationToken cancellationToken);
+    Task<bool> TryRefreshDiscoveredValidationAsync(ProcessSignature signature,
+        DiscoveredSignatureExpectation expected, DiscoveryInventoryContext current,
+        CancellationToken cancellationToken);
     Task<bool> TryInvalidateDiscoveredAsync(Guid gameId, DiscoveredSignatureExpectation expected,
         CancellationToken cancellationToken);
 }

@@ -14,10 +14,12 @@ using PlayStead.UI.Home;
 using PlayStead.UI.Launching;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
+using PlayStead.UI.Tests.TestSupport;
 using PlayStead.UI.Sessions;
 
 namespace PlayStead.UI.Tests.Home;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class HomeMediaIntegrationTests
 {
     [Fact]
@@ -223,7 +225,7 @@ public sealed class HomeMediaIntegrationTests
         Assert.True(Value<bool>(home, "HasActiveSessionHero"));
         Assert.Equal("L’aventure continue", Value<string>(home, "HeroEyebrow"));
         Assert.Equal("Game A", Value<string>(home, "HeroTitle"));
-        Assert.Equal($"En cours depuis {Now.AddMinutes(1).ToLocalTime().ToString("HH:mm")}",
+        Assert.Equal($"Démarré à {Now.AddMinutes(1).ToLocalTime().ToString("HH'h'mm")}",
             Value<string>(home, "HeroSupportingText"));
         var request = Assert.Single(f.Media.Requests);
         Assert.Equal(ProviderKind.Manual, request.Identity.Provider);
@@ -384,6 +386,7 @@ public sealed class HomeMediaIntegrationTests
             Task.Run(() => Publish(f.Monitor, new SessionRuntimeSnapshot(Now.AddMinutes(3), [started])))
                 .GetAwaiter().GetResult();
             Assert.Equal(1, f.Store.RecentReadCount);
+            Assert.Equal(f.A.Value, Assert.Single(home.RecentSessions).GameId);
 
             var ended = started with
             {
@@ -448,10 +451,31 @@ public sealed class HomeMediaIntegrationTests
         Assert.Equal(f.A.Value, Value<Guid?>(home, "FeaturedGameId"));
         Assert.Equal("L’aventure continue", Value<string>(home, "HeroEyebrow"));
         Assert.Equal("Game A", Value<string>(home, "HeroTitle"));
-        Assert.Equal($"En cours depuis {Now.AddMinutes(3).ToLocalTime().ToString("HH:mm")}",
+        Assert.Equal($"Démarré à {Now.AddMinutes(3).ToLocalTime().ToString("HH'h'mm")}",
             Value<string>(home, "HeroSupportingText"));
         Assert.Contains(nameof(HomeViewModel.HeroTitle), changed);
         Assert.Contains(nameof(HomeViewModel.HeroSupportingText), changed);
+    }
+
+    [Fact]
+    public async Task Home_Hero_updates_when_monitor_publishes_new_active_snapshot()
+    {
+        var f = new Fixture();
+        var home = f.Create();
+        await Refresh(home);
+        Assert.False(Value<bool>(home, "HasActiveSessionHero"));
+
+        var snapshot = new SessionRuntimeSnapshot(
+            Now.AddMinutes(3),
+            [Session(f.A, 3)]);
+        typeof(SessionMonitor).GetProperty(
+            nameof(SessionMonitor.LatestSnapshot))!
+            .SetValue(f.Monitor, snapshot);
+        Publish(f.Monitor, snapshot);
+
+        await Task.Yield();
+        Assert.True(Value<bool>(home, "HasActiveSessionHero"));
+        Assert.Equal(f.A.Value, Value<Guid?>(home, "FeaturedGameId"));
     }
 
     [Fact]
@@ -564,46 +588,32 @@ public sealed class HomeMediaIntegrationTests
     {
         RunSta(() =>
         {
-            var app = Application.Current ?? new Application();
-            var tokens = (ResourceDictionary)Application.LoadComponent(
-                new Uri("/PlayStead.UI;component/Themes/PlaySteadTokens.xaml", UriKind.Relative));
-            var controls = (ResourceDictionary)Application.LoadComponent(
-                new Uri("/PlayStead.UI;component/Themes/PlaySteadControls.xaml", UriKind.Relative));
+            var app = Application.Current!;
+
+            Assert.NotNull(app.TryFindResource("PlayStead.Icon.Gamepad"));
+            Assert.NotNull(app.TryFindResource("PlayStead.Icon.History"));
+
+            var f = new Fixture();
+            f.Store.Active = [Session(f.A, 1)];
+            var pending = new TaskCompletionSource<string?>();
+            f.Media.Resolve = _ => pending.Task;
+            var home = f.Create();
+            var view = new HomeView(home);
+            var window = new Window { Content = view, Width = 900, Height = 700,
+                ShowActivated = false, ShowInTaskbar = false };
             try
             {
-                app.Resources.MergedDictionaries.Add(tokens);
-                app.Resources.MergedDictionaries.Add(controls);
-
-                Assert.NotNull(app.TryFindResource("PlayStead.Icon.Gamepad"));
-                Assert.NotNull(app.TryFindResource("PlayStead.Icon.History"));
-
-                var f = new Fixture();
-                f.Store.Active = [Session(f.A, 1)];
-                var pending = new TaskCompletionSource<string?>();
-                f.Media.Resolve = _ => pending.Task;
-                var home = f.Create();
-                var view = new HomeView(home);
-                var window = new Window { Content = view, Width = 900, Height = 700,
-                    ShowActivated = false, ShowInTaskbar = false };
-                window.Show();
-                try
-                {
-                    window.UpdateLayout();
-                    view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                    Assert.True(view.IsLoaded);
-                    Assert.Single(f.Media.Requests);
-                    Assert.False(pending.Task.IsCompleted);
-                    Assert.False(Value<bool>(home, "HasHero"));
-                    pending.SetResult(null);
-                    view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                }
-                finally { window.Close(); }
+                PlaySteadWpfTestResources.ShowAndPumpLoaded(window, view);
+                window.UpdateLayout();
+                view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.True(view.IsLoaded);
+                Assert.Single(f.Media.Requests);
+                Assert.False(pending.Task.IsCompleted);
+                Assert.False(Value<bool>(home, "HasHero"));
+                pending.SetResult(null);
+                view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
             }
-            finally
-            {
-                app.Resources.MergedDictionaries.Remove(controls);
-                app.Resources.MergedDictionaries.Remove(tokens);
-            }
+            finally { window.Close(); }
         });
     }
 
@@ -641,14 +651,7 @@ public sealed class HomeMediaIntegrationTests
     }
 
     private static void RunSta(Action action)
-    {
-        Exception? error = null;
-        var thread = new Thread(() => { try { action(); } catch (Exception ex) { error = ex; } });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
-    }
+        => PlaySteadWpfTestResources.Run(action);
 
     private sealed class Fixture
     {

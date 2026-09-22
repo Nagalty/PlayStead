@@ -44,6 +44,30 @@ public sealed class SessionHistoryBehaviorTests
     }
 
     [Fact]
+    public async Task Refresh_excludes_active_sessions_from_recent_history()
+    {
+        var ended = Session(
+            sessionId: Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            gameId: Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            start: Utc(10),
+            end: Utc(11));
+        var active = Session(
+            sessionId: Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            gameId: Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            start: Utc(12),
+            end: Utc(12),
+            state: SessionState.Active,
+            endReason: null);
+
+        var fixture = CreateFixture([active, ended]);
+        await fixture.Sut.RefreshAsync(CancellationToken.None);
+
+        var item = Assert.Single(fixture.Sut.RecentSessions);
+        Assert.Equal(ended.SessionId, item.SessionId);
+        Assert.Equal("1:00:00", item.DurationLabel);
+    }
+
+    [Fact]
     [Trait("Task11Cycle", "BHistory")]
     public async Task B13_Refresh_orders_recent_sessions_newest_first()
     {
@@ -426,7 +450,7 @@ public sealed class SessionHistoryBehaviorTests
         DateTimeOffset start,
         DateTimeOffset end,
         SessionState state = SessionState.Ended,
-        SessionEndReason endReason =
+        SessionEndReason? endReason =
             SessionEndReason.ProcessExited) =>
         new(
             sessionId,

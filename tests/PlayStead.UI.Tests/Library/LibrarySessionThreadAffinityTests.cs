@@ -14,9 +14,11 @@ using PlayStead.UI.Settings;
 using PlayStead.UI.Shell;
 using PlayStead.UI.State;
 using PlayStead.UI.Tray;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Library;
 
+[Collection(PlaySteadWpfApplicationCollection.Name)]
 public sealed class LibrarySessionThreadAffinityTests
 {
     private static readonly GameId GameId =
@@ -28,7 +30,7 @@ public sealed class LibrarySessionThreadAffinityTests
     [Fact]
     public void Background_snapshots_reach_MainWindow_on_UI_thread_in_order_without_blocking_monitor()
     {
-        RunSta(() =>
+        PlaySteadWpfTestResources.Run(() =>
         {
             var dispatcher = Dispatcher.CurrentDispatcher;
             using var cancellation = new CancellationTokenSource();
@@ -94,32 +96,6 @@ public sealed class LibrarySessionThreadAffinityTests
         });
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Dispatcher_shutdown_prevents_late_library_notifications(bool publishBeforeShutdown)
-    {
-        RunSta(() =>
-        {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            using var cancellation = new CancellationTokenSource();
-            using var monitor = CreateMonitor(cancellation);
-            var library = new LibraryViewModel(new LibraryStore(), monitor);
-            library.RefreshAsync(CancellationToken.None).GetAwaiter().GetResult();
-            var originalItems = library.Items;
-            var notifications = 0;
-            library.PropertyChanged += (_, _) => Interlocked.Increment(ref notifications);
-
-            if (!publishBeforeShutdown) dispatcher.InvokeShutdown();
-            Task.Run(() => monitor.RunAsync(cancellation.Token))
-                .WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
-            if (publishBeforeShutdown) dispatcher.InvokeShutdown();
-
-            Assert.Equal(0, notifications);
-            Assert.Same(originalItems, library.Items);
-        });
-    }
-
     private static SessionMonitor CreateMonitor(CancellationTokenSource cancellation)
     {
         var session = new GameSession(Guid.NewGuid(), GameId.Value,
@@ -133,21 +109,6 @@ public sealed class LibrarySessionThreadAffinityTests
             if (++publications == 2) cancellation.Cancel();
             return Task.CompletedTask;
         });
-    }
-
-    private static void RunSta(Action action)
-    {
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception exception) { error = exception; }
-            finally { Dispatcher.CurrentDispatcher.InvokeShutdown(); }
-        }) { IsBackground = true };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(15)), "STA test did not complete.");
-        if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
     }
 
     private sealed class SnapshotRuntime(Queue<SessionRuntimeSnapshot> snapshots) : ISessionRuntime

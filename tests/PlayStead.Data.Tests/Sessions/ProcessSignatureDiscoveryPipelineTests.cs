@@ -201,7 +201,7 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         Assert.Null((await d.LoadAsync())!.Confirmation);
         Assert.Equal(accepted.Discovery, (await d.Signatures.GetAsync(d.Scope.GameId.Value, Ct))!.Discovery);
         Assert.Single(await d.Signatures.GetAllAsync(Ct));
-        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
+        Assert.Empty(await d.Sessions.GetRecentAsync(10, Ct));
     }
 
     [Fact]
@@ -389,9 +389,8 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         time.UtcNow = time.UtcNow.AddSeconds(2);
         var snapshot = await runtime.RefreshAsync(Ct);
 
-        Assert.Equal(d.Scope.GameId.Value,
-            Assert.Single(snapshot.ActiveSessions).GameId);
-        Assert.Equal(2, (await d.Sessions.GetRecentAsync(10, Ct)).Count);
+        Assert.Empty(snapshot.ActiveSessions);
+        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
     }
 
     [Fact]
@@ -418,7 +417,7 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         await runtime.RefreshAsync(Ct);
 
         var restored = (await d.Signatures.GetAsync(d.Scope.GameId.Value, Ct))!;
-        Assert.Equal(ProcessSignatureValidationState.Valid,
+        Assert.Equal(ProcessSignatureValidationState.NeedsRevalidation,
             restored.Discovery!.ValidationState);
         Assert.Equal(poisoned.Entries, restored.Entries);
         Assert.Equal(poisoned.UpdatedAtUtc, restored.UpdatedAtUtc);
@@ -428,9 +427,8 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
 
         time.UtcNow = time.UtcNow.AddSeconds(2);
         var snapshot = await runtime.RefreshAsync(Ct);
-        Assert.Equal(d.Scope.GameId.Value,
-            Assert.Single(snapshot.ActiveSessions).GameId);
-        Assert.Equal(2, (await d.Sessions.GetRecentAsync(10, Ct)).Count);
+        Assert.Empty(snapshot.ActiveSessions);
+        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
 
         var restoredToken = restored.Discovery.ConcurrencyToken;
         await d.RestartAsync();

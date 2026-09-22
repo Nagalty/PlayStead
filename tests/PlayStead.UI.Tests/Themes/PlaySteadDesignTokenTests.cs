@@ -108,8 +108,16 @@ public sealed class PlaySteadDesignTokenTests
             emptyState,
             StringComparison.Ordinal);
         Assert.Contains(
-            "CornerRadius=\"{DynamicResource PlayStead.Radius.Small}\"",
+            "Style=\"{DynamicResource PlayStead.Surface.Card}\"",
             gameCard,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<Style x:Key=\"PlayStead.Surface.Card\" TargetType=\"Border\" BasedOn=\"{StaticResource PlayStead.Surface.Panel}\"/>",
+            controls,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<Setter Property=\"CornerRadius\" Value=\"{DynamicResource PlayStead.Radius.Medium}\"/>",
+            controls,
             StringComparison.Ordinal);
         Assert.Contains(
             "FontFamily\" Value=\"{DynamicResource PlayStead.Font.Sans}\"",

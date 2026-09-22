@@ -14,10 +14,87 @@ public sealed class SessionRuntimeTests
         new(2026, 9, 13, 0, 45, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task Two_consecutive_main_observations_start_from_first_reliable_observation()
+    public async Task Already_running_accepted_game_is_reconciled_on_first_refresh()
+    {
+        var processStarted = T0.AddMinutes(-28);
+        var source = new QueueProcessSnapshotSource(
+            [[MainProcess(99, "GameA.exe", processStarted)]]);
+        var sessions = new FakeSessionStore();
+        var sut = CreateRuntime(
+            source,
+            new FakeProcessSignatureStore(Signature(GameA, "GameA.exe")),
+            sessions,
+            new MutableTimeProvider(T0));
+
+        var snapshot = await sut.ReconcileRunningProcessesAsync(CancellationToken.None);
+
+        var active = Assert.Single(snapshot.ActiveSessions);
+        Assert.Equal(GameA, active.GameId);
+        Assert.Equal(processStarted, active.ObservedStartedAtUtc);
+        Assert.Single(sessions.Upserts);
+    }
+
+    [Fact]
+    public async Task Startup_reconciliation_is_idempotent_on_follow_up_poll()
+    {
+        var process = MainProcess(100, "GameA.exe", T0.AddMinutes(-5));
+        var source = new QueueProcessSnapshotSource([[process], [process], [process]]);
+        var sessions = new FakeSessionStore();
+        var sut = CreateRuntime(
+            source,
+            new FakeProcessSignatureStore(Signature(GameA, "GameA.exe")),
+            sessions,
+            new MutableTimeProvider(T0));
+
+        var first = await sut.ReconcileRunningProcessesAsync(CancellationToken.None);
+        var second = await sut.RefreshAsync(CancellationToken.None);
+
+        Assert.Single(first.ActiveSessions);
+        Assert.Single(second.ActiveSessions);
+        Assert.Single(sessions.Upserts);
+    }
+
+    [Fact]
+    public async Task Startup_reconciliation_ignores_an_unaccepted_process()
+    {
+        var source = new QueueProcessSnapshotSource(
+            [[MainProcess(101, "Unknown.exe", T0.AddMinutes(-2))]]);
+        var sessions = new FakeSessionStore();
+        var sut = CreateRuntime(
+            source,
+            new FakeProcessSignatureStore(Signature(GameA, "GameA.exe")),
+            sessions,
+            new MutableTimeProvider(T0));
+
+        var snapshot = await sut.ReconcileRunningProcessesAsync(CancellationToken.None);
+
+        Assert.Empty(snapshot.ActiveSessions);
+        Assert.Empty(sessions.Upserts);
+    }
+
+    [Fact]
+    public async Task Startup_reconciliation_falls_back_to_first_observed_time_without_process_start_time()
+    {
+        var source = new QueueProcessSnapshotSource(
+            [[MainProcessWithoutStart(102, "GameA.exe")]]);
+        var sessions = new FakeSessionStore();
+        var sut = CreateRuntime(
+            source,
+            new FakeProcessSignatureStore(Signature(GameA, "GameA.exe")),
+            sessions,
+            new MutableTimeProvider(T0));
+
+        var snapshot = await sut.ReconcileRunningProcessesAsync(CancellationToken.None);
+
+        Assert.Equal(T0, Assert.Single(snapshot.ActiveSessions).ObservedStartedAtUtc);
+    }
+
+    [Fact]
+    public async Task Main_process_starting_after_startup_requires_two_reliable_observations()
     {
         var source = new QueueProcessSnapshotSource(
             [
+                [],
                 [MainProcess(100, "GameA.exe")],
                 [MainProcess(100, "GameA.exe")]
             ]);
@@ -33,6 +110,9 @@ public sealed class SessionRuntimeTests
             signatures,
             sessions,
             time);
+
+        await sut.RefreshAsync(
+            CancellationToken.None);
 
         var first = await sut.RefreshAsync(
             CancellationToken.None);
@@ -77,6 +157,7 @@ public sealed class SessionRuntimeTests
     {
         var source = new QueueProcessSnapshotSource(
             [
+                [],
                 [MainProcess(101, "GameA.exe")],
                 []
             ]);
@@ -114,6 +195,7 @@ public sealed class SessionRuntimeTests
 
         var source = new QueueProcessSnapshotSource(
             [
+                [],
                 both,
                 both
             ]);
@@ -128,6 +210,9 @@ public sealed class SessionRuntimeTests
                 Signature(GameB, "GameB.exe")),
             sessions,
             time);
+
+        await sut.RefreshAsync(
+            CancellationToken.None);
 
         await sut.RefreshAsync(
             CancellationToken.None);
@@ -159,6 +244,7 @@ public sealed class SessionRuntimeTests
     {
         var source = new QueueProcessSnapshotSource(
             [
+                [],
                 [MainProcess(301, "GameA.exe")],
                 [MainProcess(301, "GameA.exe")],
                 [MainProcess(301, "GameA.exe")],
@@ -174,6 +260,9 @@ public sealed class SessionRuntimeTests
                 Signature(GameA, "GameA.exe")),
             sessions,
             time);
+
+        await sut.RefreshAsync(
+            CancellationToken.None);
 
         await sut.RefreshAsync(
             CancellationToken.None);
@@ -290,12 +379,22 @@ public sealed class SessionRuntimeTests
 
     private static ProcessSnapshot MainProcess(
         int processId,
+        string executableName,
+        DateTimeOffset? startedAtUtc = null)
+        => new(
+            processId,
+            executableName,
+            $@"C:\Games\{executableName}",
+            startedAtUtc ?? T0);
+
+    private static ProcessSnapshot MainProcessWithoutStart(
+        int processId,
         string executableName)
         => new(
             processId,
             executableName,
             $@"C:\Games\{executableName}",
-            T0);
+            null);
 
     private sealed class QueueProcessSnapshotSource :
         IProcessSnapshotSource

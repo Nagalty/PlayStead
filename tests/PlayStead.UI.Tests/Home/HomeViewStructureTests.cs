@@ -282,6 +282,64 @@ public sealed class HomeViewStructureTests
     }
 
     [Fact]
+    public void HomeView_active_hero_scrim_starts_at_left_edge_and_text_remains_padded()
+    {
+        var document = LoadHomeView();
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        var hero = Assert.Single(document.Descendants(presentation + "Border"),
+            element => (string?)element.Attribute(xaml + "Name") == "HomeHero");
+        Assert.Equal("0", (string?)hero.Attribute("Padding"));
+        var content = Assert.Single(hero.Elements(presentation + "Grid"),
+            element => (string?)element.Attribute(xaml + "Name") == "HomeHeroContent");
+        var scrim = Assert.Single(content.Elements(presentation + "Border"),
+            element => (string?)element.Attribute(xaml + "Name") == "ActiveHeroReadabilityScrim");
+
+        Assert.Equal("2", (string?)scrim.Attribute("Grid.ColumnSpan"));
+        Assert.Equal("{DynamicResource PlayStead.Radius.Medium}", (string?)scrim.Attribute("CornerRadius"));
+        Assert.Null(scrim.Attribute("Margin"));
+        Assert.Equal(
+            "{Binding HasActiveSessionHero, Converter={StaticResource BooleanToVisibilityConverter}}",
+            (string?)scrim.Attribute("Visibility"));
+        Assert.Equal("{DynamicResource PlayStead.Brush.Background}", (string?)scrim.Attribute("Background"));
+        Assert.Equal("0.9", (string?)scrim.Attribute("Opacity"));
+
+        var mask = Assert.Single(scrim.Elements(presentation + "Border.OpacityMask"))
+            .Element(presentation + "LinearGradientBrush");
+        Assert.Equal("0,0.5", (string?)mask?.Attribute("StartPoint"));
+        Assert.Equal("1,0.5", (string?)mask?.Attribute("EndPoint"));
+        var stops = mask!.Elements(presentation + "GradientStop").ToArray();
+        Assert.Contains(stops, stop => (string?)stop.Attribute("Offset") == "0" && (string?)stop.Attribute("Color") == "#FFFFFFFF");
+        Assert.Contains(stops, stop => (string?)stop.Attribute("Offset") == "0.2" && (string?)stop.Attribute("Color") == "#FFFFFFFF");
+        Assert.Contains(stops, stop => (string?)stop.Attribute("Offset") == "0.62" && (string?)stop.Attribute("Color") == "#00FFFFFF");
+
+        var safeArea = Assert.Single(content.Elements(presentation + "StackPanel"),
+            element => (string?)element.Attribute(xaml + "Name") == "HeroTextSafeArea");
+        Assert.Equal("0", (string?)safeArea.Attribute("Grid.Column"));
+        Assert.Equal("{DynamicResource PlayStead.Spacing.4}", (string?)safeArea.Attribute("Margin"));
+        Assert.Equal("520", (string?)safeArea.Attribute("MaxWidth"));
+        Assert.Contains(safeArea.Elements(presentation + "TextBlock"),
+            element => (string?)element.Attribute("Text") == "{Binding HeroEyebrow}");
+        Assert.Contains(safeArea.Elements(presentation + "TextBlock"),
+            element => (string?)element.Attribute("Text") == "{Binding HeroTitle}" &&
+                       (string?)element.Attribute("Style") == "{DynamicResource PlayStead.Text.PageTitle}");
+        Assert.Contains(safeArea.Elements(presentation + "TextBlock"),
+            element => (string?)element.Attribute("Text") == "{Binding HeroSupportingText}" &&
+                       (string?)element.Attribute("Style") == "{DynamicResource PlayStead.Text.BodySecondary}");
+
+        Assert.Contains(hero.Descendants(presentation + "MultiDataTrigger"), trigger =>
+            trigger.Descendants(presentation + "Condition").Any(condition =>
+                (string?)condition.Attribute("Binding") == "{Binding HasActiveSessionHero}" &&
+                (string?)condition.Attribute("Value") == "False") &&
+            trigger.Descendants(presentation + "Condition").Any(condition =>
+                (string?)condition.Attribute("Binding") == "{Binding HasIdleHeroImage}" &&
+                (string?)condition.Attribute("Value") == "True") &&
+            trigger.Descendants(presentation + "ImageBrush").Any(brush =>
+                (string?)brush.Attribute("ImageSource") == "{Binding IdleHeroImageSource}"));
+    }
+
+    [Fact]
     public void HomeView_renders_recently_played_games_as_wrapping_landscape_cards()
     {
         var document = LoadHomeView();
@@ -698,9 +756,9 @@ public sealed class HomeViewStructureTests
             FindUiFile(
                 "Home/HomeView.xaml");
 
-        var source =
-            File.ReadAllText(
-                path);
+        var source = File.ReadAllText(path);
+        var document = XDocument.Load(path);
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
 
         Assert.Contains(
             "PlayStead.Brush.Background",
@@ -717,10 +775,14 @@ public sealed class HomeViewStructureTests
             source,
             StringComparison.Ordinal);
 
-        Assert.DoesNotContain(
-            "#",
-            source,
-            StringComparison.Ordinal);
+        var visibleColorLiterals = document
+            .Descendants()
+            .Where(element => !element.AncestorsAndSelf().Any(ancestor =>
+                ancestor.Name == presentation + "Rectangle.OpacityMask" ||
+                ancestor.Name == presentation + "Border.OpacityMask"))
+            .Attributes()
+            .Where(attribute => attribute.Value.Contains('#'));
+        Assert.Empty(visibleColorLiterals);
 
         Assert.DoesNotContain(
             "Chart",
