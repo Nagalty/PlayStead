@@ -70,6 +70,68 @@ public sealed class ProcessSignatureLearningCoordinatorTests
     }
 
     [Fact]
+    public async Task Present_then_zero_observations_establish_baseline_for_next_appearance()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var listener = new TextWriterTraceListener(output);
+        Trace.Listeners.Add(listener);
+        try
+        {
+            var driver = await Driver.CreateAsync();
+            await driver.CaptureAsync(1, [driver.Process(100)]);
+            Assert.Contains("Action=AwaitingAbsenceBaseline", output.ToString(), StringComparison.Ordinal);
+            Assert.Null(driver.Coordinator.GetState(driver.Scope.InstallationId)!.Reference);
+
+            await driver.CaptureAsync(2, []);
+            await driver.CaptureAsync(3, []);
+            listener.Flush();
+            Assert.Contains("[DISCOVERY-ABSENCE]", output.ToString(), StringComparison.Ordinal);
+            Assert.Contains("RelevantObservationCount=0", output.ToString(), StringComparison.Ordinal);
+            Assert.Contains("SupportObservationCount=0", output.ToString(), StringComparison.Ordinal);
+            Assert.Contains("AbsenceForwarded=true BaselineEstablished=true", output.ToString(), StringComparison.Ordinal);
+
+            await driver.CaptureAsync(4, [driver.Process(200)]);
+            Assert.Contains("Action=ReferenceStarted", output.ToString(), StringComparison.Ordinal);
+            Assert.Null(driver.Coordinator.GetState(driver.Scope.InstallationId)!.Reference);
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+    }
+
+    [Fact]
+    public async Task Unreal_support_only_capture_does_not_start_episode_or_consume_absence_baseline()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var listener = new TextWriterTraceListener(output);
+        Trace.Listeners.Add(listener);
+        try
+        {
+            var driver = await Driver.CreateUnrealAsync("SampleGame",
+                @"SampleGame\Binaries\Win64\SampleGame_BE.exe");
+            await driver.CaptureAsync(1, []);
+            await driver.CaptureAsync(2, []);
+            var support = driver.Process("SampleGame_BE.exe", 100);
+            await driver.CaptureAsync(3, [support]);
+            Assert.DoesNotContain("Action=ReferenceStarted", output.ToString(), StringComparison.Ordinal);
+
+            await driver.CaptureAsync(4, [driver.Process("SampleGame-Win64-Shipping.exe", 200)]);
+
+            var trace = output.ToString();
+            Assert.Contains("Action=ReferenceStarted", trace, StringComparison.Ordinal);
+            Assert.Contains("ProcessName=SampleGame-Win64-Shipping.exe Action=ReferenceStarted", trace,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain("ProcessName=SampleGame_BE.exe Action=ReferenceStarted", trace,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+    }
+
+    [Fact]
     public async Task reference_survives_start_of_second_episode()
     {
         var driver = await Driver.CreateAsync();

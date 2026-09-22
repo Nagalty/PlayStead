@@ -40,6 +40,57 @@ public sealed class ProcessDiscoveryCaptureObserverTests
     }
 
     [Fact]
+    public async Task Empty_captures_are_forwarded_for_published_learning_participant()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var listener = new TextWriterTraceListener(output);
+        Trace.Listeners.Add(listener);
+        try
+        {
+            var driver = new Driver();
+            await driver.InitializeAsync();
+
+            await driver.TickAsync([driver.Process(100, 1)], 1);
+            await driver.TickAsync([], 2);
+            await driver.TickAsync([], 3);
+
+            listener.Flush();
+            var trace = output.ToString();
+            Assert.Contains($"[DISCOVERY-ABSENCE] GameId={driver.First.GameId}", trace,
+                StringComparison.Ordinal);
+            Assert.Contains("RelevantObservationCount=0 SupportObservationCount=0", trace,
+                StringComparison.Ordinal);
+            Assert.Contains("AbsenceForwarded=true BaselineEstablished=true", trace,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+    }
+
+    [Fact]
+    public async Task Empty_capture_does_not_create_absence_processing_without_learning_participant()
+    {
+        using var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var listener = new TextWriterTraceListener(output);
+        Trace.Listeners.Add(listener);
+        try
+        {
+            var driver = new Driver();
+            await driver.TickAsync([], 1);
+
+            listener.Flush();
+            Assert.DoesNotContain("[DISCOVERY-ABSENCE]", output.ToString(), StringComparison.Ordinal);
+            Assert.Equal(0, driver.Store.StateCount);
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+    }
+
+    [Fact]
     public async Task External_absent_present_absent_episodes_promote_without_launch_intent()
     {
         var d = new Driver();

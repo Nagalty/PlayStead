@@ -198,7 +198,14 @@ public sealed class ProcessSignatureLearningCoordinator
             var observed = new Dictionary<string, ProcessSnapshot>(StringComparer.OrdinalIgnoreCase);
             var startsEpisode = installation.Current is null && installation.Prepared &&
                 installation.KnownAbsence >= 2 && batch.Processes.Any(process =>
-                    ResolveCandidate(state.Inventory, unrealFamily, installation.Current, process) is not null);
+                {
+                    var candidate = ResolveCandidate(state.Inventory, unrealFamily,
+                        installation.Current, process);
+                    return candidate is not null &&
+                        !ExecutableSupportClassifier.IsSupportExecutable(
+                            state.Inventory, candidate, unrealFamily);
+                });
+            var supportObservationCount = 0;
             foreach (var sourceProcess in batch.Processes)
             {
                 var candidate = ResolveCandidate(state.Inventory, unrealFamily,
@@ -207,6 +214,7 @@ public sealed class ProcessSignatureLearningCoordinator
                     ExecutableSupportClassifier.IsPathlessSupportObservation(state.Inventory,
                         unrealFamily, sourceProcess.ExecutableName))
                 {
+                    supportObservationCount++;
                     TraceAction(state.Inventory.Scope.GameId, sourceProcess, "IgnoredSupport");
                     continue;
                 }
@@ -244,7 +252,11 @@ public sealed class ProcessSignatureLearningCoordinator
                 }
                 if (ExecutableSupportClassifier.IsSupportExecutable(
                         state.Inventory, candidate, unrealFamily))
+                {
+                    supportObservationCount++;
                     TraceAction(state.Inventory.Scope.GameId, process, "IgnoredSupport");
+                    continue;
+                }
                 if (process.ProcessId <= 0 || process.StartedAtUtc is null)
                     return await InvalidateAsync(installation, DiscoveryReason.UnknownProcessIdentity, cancellationToken);
                 if (!observed.TryAdd(candidate.ExecutablePath, process))
@@ -268,6 +280,7 @@ public sealed class ProcessSignatureLearningCoordinator
             {
                 if (installation.Current is null)
                 {
+                    var absenceBaselineWasEstablished = installation.KnownAbsence >= 2;
                     var unknown = BaselineUnknownIdentities(batch, state.Inventory);
                     if (installation.KnownAbsence == 0)
                     {
@@ -275,8 +288,17 @@ public sealed class ProcessSignatureLearningCoordinator
                         installation.BaselineUnknown.UnionWith(unknown);
                     }
                     else installation.BaselineUnknown.IntersectWith(unknown);
+                    installation.KnownAbsence = Math.Min(2, installation.KnownAbsence + 1);
+                    if (!absenceBaselineWasEstablished && installation.KnownAbsence >= 2)
+                    {
+                        Trace.WriteLine(
+                            $"[DISCOVERY-ABSENCE] GameId={state.Inventory.Scope.GameId} " +
+                            "RelevantObservationCount=0 " +
+                            $"SupportObservationCount={supportObservationCount} " +
+                            "AbsenceForwarded=true BaselineEstablished=true");
+                    }
                 }
-                installation.KnownAbsence = Math.Min(2, installation.KnownAbsence + 1);
+                else installation.KnownAbsence = Math.Min(2, installation.KnownAbsence + 1);
                 if (installation.Current is null)
                 {
                     if (forensicObservation)
