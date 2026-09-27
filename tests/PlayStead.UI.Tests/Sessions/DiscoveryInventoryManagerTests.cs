@@ -35,6 +35,19 @@ public sealed class DiscoveryInventoryManagerTests
     }
 
     [Fact]
+    public async Task Explicit_non_game_installations_are_not_inventoried()
+    {
+        var d = new Driver();
+        var tool = d.First with { ContentKind = InstallationContentKind.Tool };
+
+        d.Manager.Schedule(d.Snapshot(tool), CancellationToken.None);
+        await d.Manager.AwaitIdleAsync(CancellationToken.None);
+
+        Assert.Empty(d.Source.Calls);
+        Assert.Null(d.Manager.GetCurrent(tool.Id));
+    }
+
+    [Fact]
     public async Task Restart_same_inventory_reuses_persisted_generation_and_reference()
     {
         var d = new Driver();

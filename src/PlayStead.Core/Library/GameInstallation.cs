@@ -9,4 +9,5 @@ public sealed record GameInstallation(
     long? InstalledSizeBytes,
     bool IsPreferred,
     bool IsPresent,
-    DateTimeOffset LastSeenUtc);
+    DateTimeOffset LastSeenUtc,
+    InstallationContentKind ContentKind = InstallationContentKind.Unknown);

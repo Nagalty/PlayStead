@@ -72,6 +72,48 @@ public sealed class SteamAppInfoReaderTests
         var result = new SteamAppInfoReader().Find(path, 250820, "SteamVR");
         Assert.NotNull(result);
         Assert.Equal((uint)250820, result!.AppId);
+        Assert.Equal("Tool", result.Type);
+    }
+
+
+    [Fact]
+    public void Real_appinfo_classifies_Oasis_driver_as_application_when_present()
+    {
+        var path = @"C:\Program Files (x86)\Steam\appcache\appinfo.vdf";
+        if (!File.Exists(path)) return;
+        var result = new SteamAppInfoReader().Find(path, 3824490);
+        Assert.NotNull(result);
+        Assert.Equal("Application", result!.Type);
+    }
+
+    [Fact]
+    public void Real_appinfo_exposes_windows_launch_target_for_GuildWars2_when_present()
+    {
+        var path = @"C:\Program Files (x86)\Steam\appcache\appinfo.vdf";
+        if (!File.Exists(path)) return;
+
+        var result = new SteamAppInfoReader().Find(path, 1284210);
+
+        Assert.NotNull(result);
+        var launch = Assert.Single(result!.LaunchConfigurations!,
+            x => x.OsList?.Contains("windows", StringComparison.OrdinalIgnoreCase) == true);
+        Assert.Equal("Gw2-64.exe", launch.Executable);
+    }
+
+    [Fact]
+    public void Real_appinfo_exposes_missing_windows_target_for_stale_3DMark_when_present()
+    {
+        var appInfoPath = @"C:\Program Files (x86)\Steam\appcache\appinfo.vdf";
+        var installPath = @"G:\SteamLibrary\steamapps\common\3DMark";
+        if (!File.Exists(appInfoPath) || !Directory.Exists(installPath)) return;
+
+        var result = new SteamAppInfoReader().Find(appInfoPath, 223850);
+
+        Assert.NotNull(result);
+        var launch = Assert.Single(result!.LaunchConfigurations!,
+            x => x.OsList?.Contains("windows", StringComparison.OrdinalIgnoreCase) == true);
+        Assert.Equal("bin/x64/3DMark.exe", launch.Executable.Replace('\\', '/'));
+        Assert.False(File.Exists(Path.Combine(installPath, launch.Executable.Replace('/', Path.DirectorySeparatorChar))));
     }
 
     private static byte[] CreateAppInfo(

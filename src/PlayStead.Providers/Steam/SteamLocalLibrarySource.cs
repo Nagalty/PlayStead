@@ -8,15 +8,18 @@ public sealed class SteamLocalLibrarySource : ILocalLibrarySource
     private readonly WindowsSteamRootLocator _rootLocator;
     private readonly SteamLibraryFoldersReader _foldersReader;
     private readonly SteamAppManifestReader _manifestReader;
+    private readonly SteamAppInfoReader _appInfoReader;
 
     public SteamLocalLibrarySource(
         WindowsSteamRootLocator rootLocator,
         SteamLibraryFoldersReader foldersReader,
-        SteamAppManifestReader manifestReader)
+        SteamAppManifestReader manifestReader,
+        SteamAppInfoReader appInfoReader)
     {
         _rootLocator = rootLocator;
         _foldersReader = foldersReader;
         _manifestReader = manifestReader;
+        _appInfoReader = appInfoReader;
     }
 
     public ProviderKind Provider => ProviderKind.Steam;
@@ -38,6 +41,7 @@ public sealed class SteamLocalLibrarySource : ILocalLibrarySource
 
         var found = new List<DiscoveredInstallation>();
         var warnings = new List<string>();
+        var manifests = new List<(string Path, string LibraryRoot)>();
 
         foreach (var libraryRoot in _foldersReader.Read(root))
         {
@@ -53,27 +57,60 @@ public sealed class SteamLocalLibrarySource : ILocalLibrarySource
                          SearchOption.TopDirectoryOnly))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                manifests.Add((manifest, libraryRoot));
+            }
+        }
 
-                try
-                {
-                    var item = _manifestReader.Read(
-                        manifest,
-                        libraryRoot,
-                        observedAtUtc);
+        var appInfoPath = Path.Combine(root, "appcache", "appinfo.vdf");
+        var appIds = manifests
+            .Select(x => Path.GetFileNameWithoutExtension(x.Path)?["appmanifest_".Length..])
+            .Where(x => uint.TryParse(x, out _))
+            .Select(x => uint.Parse(x!))
+            .ToArray();
+        var appInfo = _appInfoReader.FindMany(appInfoPath, appIds);
 
-                    if (Directory.Exists(item.InstallPath))
-                    {
-                        found.Add(item);
-                    }
-                }
-                catch (Exception ex) when (
-                    ex is IOException
-                    or UnauthorizedAccessException
-                    or FormatException)
+        foreach (var (manifest, libraryRoot) in manifests)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                var item = _manifestReader.Read(
+                    manifest,
+                    libraryRoot,
+                    observedAtUtc);
+
+                SteamAppInfoEntry? entry = null;
+                var kind = uint.TryParse(item.ExternalId, out var appId) &&
+                    appInfo.TryGetValue(appId, out entry)
+                    ? MapContentKind(entry.Type)
+                    : InstallationContentKind.Unknown;
+                item = item with { ContentKind = kind };
+
+                if (kind.IsGameEligible() &&
+                    Directory.Exists(item.InstallPath) &&
+                    HasDeclaredWindowsLaunchTarget(item.InstallPath, entry))
                 {
-                    warnings.Add(
-                        $"{Path.GetFileName(manifest)}: {ex.GetType().Name}");
+                    found.Add(item);
                 }
+                else if (!kind.IsGameEligible())
+                {
+                    System.Diagnostics.Trace.WriteLine(
+                        $"[DISCOVERY] Skipped non-game installation: {item.ExternalId}/{item.Title} type={entry?.Type ?? "unknown"}");
+                }
+                else if (kind.IsGameEligible() && entry?.LaunchConfigurations is not null)
+                {
+                    System.Diagnostics.Trace.WriteLine(
+                        $"[STEAM-DISCOVERY] Installation rejected: appid={item.ExternalId} reason=missing-launch-target");
+                }
+            }
+            catch (Exception ex) when (
+                ex is IOException
+                or UnauthorizedAccessException
+                or FormatException)
+            {
+                warnings.Add(
+                    $"{Path.GetFileName(manifest)}: {ex.GetType().Name}");
             }
         }
 
@@ -92,5 +129,42 @@ public sealed class SteamLocalLibrarySource : ILocalLibrarySource
                 observedAtUtc,
                 ordered,
                 warnings));
+    }
+
+    private static InstallationContentKind MapContentKind(string? type) =>
+        type?.Trim().ToLowerInvariant() switch
+        {
+            "game" => InstallationContentKind.Game,
+            "tool" => InstallationContentKind.Tool,
+            "application" => InstallationContentKind.Application,
+            "driver" => InstallationContentKind.Driver,
+            "sdk" => InstallationContentKind.Sdk,
+            "runtime" => InstallationContentKind.Runtime,
+            _ => InstallationContentKind.Unknown
+        };
+
+    private static bool HasDeclaredWindowsLaunchTarget(
+        string installPath,
+        SteamAppInfoEntry? entry)
+    {
+        // Missing appinfo/launch data remains conservative: preserve the existing
+        // manifest + directory behavior when Steam has not supplied launch data.
+        if (entry?.LaunchConfigurations is null)
+            return true;
+
+        var windows = entry.LaunchConfigurations
+            .Where(x => string.IsNullOrWhiteSpace(x.OsList) ||
+                        x.OsList.Contains("windows", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        if (windows.Length == 0)
+            return true;
+
+        return windows.Any(x =>
+        {
+            var relative = x.Executable.Replace('/', Path.DirectorySeparatorChar);
+            var path = Path.GetFullPath(Path.Combine(installPath, relative));
+            return File.Exists(path);
+        });
     }
 }

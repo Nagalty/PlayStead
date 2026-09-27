@@ -100,7 +100,14 @@ public sealed class SteamAppInfoReader
     {
         var root = document.Root;
         if (root.TryGetValue("appinfo", out var nested)) root = nested;
-        return new SteamAppInfoEntry(appId, FindValue(root, "developer"), FindValue(root, "publisher"));
+        var type = FindCommonValue(root, "type");
+        var launchConfigurations = FindLaunchConfigurations(root);
+        return new SteamAppInfoEntry(
+            appId,
+            FindValue(root, "developer"),
+            FindValue(root, "publisher"),
+            Type: type,
+            LaunchConfigurations: launchConfigurations);
     }
 
     private static string? Read(KVObject root, string key) =>
@@ -116,6 +123,61 @@ public sealed class SteamAppInfoReader
         {
             var value = FindValue(pair.Value, key);
             if (!string.IsNullOrWhiteSpace(value)) return value;
+        }
+        return null;
+    }
+
+    private static string? FindCommonValue(KVObject root, string key)
+    {
+        var common = FindNode(root, "common");
+        return common is null ? null : Read(common, key);
+    }
+
+    private static IReadOnlyList<SteamLaunchConfiguration>? FindLaunchConfigurations(KVObject root)
+    {
+        var config = root.TryGetValue("config", out var rawConfig) &&
+            rawConfig.ValueType == KVValueType.Collection
+            ? rawConfig
+            : null;
+        if (config is null ||
+            !config.TryGetValue("launch", out var rawLaunch) ||
+            rawLaunch.ValueType != KVValueType.Collection)
+        {
+            return null;
+        }
+
+        var result = new List<SteamLaunchConfiguration>();
+        foreach (var entry in rawLaunch)
+        {
+            if (entry.Value.ValueType != KVValueType.Collection)
+                continue;
+
+            var executable = Read(entry.Value, "executable");
+            if (string.IsNullOrWhiteSpace(executable))
+                continue;
+
+            var launchConfig = entry.Value.TryGetValue("config", out var rawEntryConfig) &&
+                rawEntryConfig.ValueType == KVValueType.Collection
+                ? rawEntryConfig
+                : null;
+
+            result.Add(new SteamLaunchConfiguration(
+                executable.Trim(),
+                Read(entry.Value, "workingdir")?.Trim(),
+                launchConfig is null ? null : Read(launchConfig, "oslist")?.Trim()));
+        }
+
+        return result;
+    }
+
+    private static KVObject? FindNode(KVObject node, string key)
+    {
+        if (node.TryGetValue(key, out var value) && value.ValueType == KVValueType.Collection)
+            return value;
+        foreach (var pair in node)
+        {
+            var found = FindNode(pair.Value, key);
+            if (found is not null) return found;
         }
         return null;
     }

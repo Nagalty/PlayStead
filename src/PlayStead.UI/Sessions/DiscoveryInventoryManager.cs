@@ -220,7 +220,9 @@ public sealed class DiscoveryInventoryManager
     private ImmutableDictionary<InstallationId, PreparedInstallation> PrepareSnapshot(
         LibrarySnapshot snapshot)
     {
-        var present = snapshot.Installations.Where(item => item.IsPresent).ToArray();
+        var present = snapshot.Installations
+            .Where(item => item.IsPresent && item.ContentKind.IsGameEligible())
+            .ToArray();
         var builder = ImmutableDictionary.CreateBuilder<InstallationId, PreparedInstallation>();
         foreach (var installation in present)
         {

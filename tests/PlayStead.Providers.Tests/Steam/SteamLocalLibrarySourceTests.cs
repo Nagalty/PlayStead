@@ -17,7 +17,8 @@ public sealed class SteamLocalLibrarySourceTests : IDisposable
             new WindowsSteamRootLocator(
                 [Path.Combine(_root, "MissingSteam")]),
             new SteamLibraryFoldersReader(),
-            new SteamAppManifestReader());
+            new SteamAppManifestReader(),
+            new SteamAppInfoReader(_ => new MemoryStream(Array.Empty<byte>())));
 
         var result = await source.ScanAsync(CancellationToken.None);
 
@@ -74,7 +75,8 @@ public sealed class SteamLocalLibrarySourceTests : IDisposable
         var source = new SteamLocalLibrarySource(
             new WindowsSteamRootLocator([steamRoot]),
             new SteamLibraryFoldersReader(),
-            new SteamAppManifestReader());
+            new SteamAppManifestReader(),
+            new SteamAppInfoReader(_ => new MemoryStream(Array.Empty<byte>())));
 
         var result = await source.ScanAsync(CancellationToken.None);
 
