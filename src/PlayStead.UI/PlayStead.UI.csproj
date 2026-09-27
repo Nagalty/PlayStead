@@ -4,6 +4,13 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\Branding\PlayStead.ico</ApplicationIcon>
+    <PlaySteadProductVersion Condition="'$(PlaySteadProductVersion)' == ''">0.4.1-dev</PlaySteadProductVersion>
+    <AssemblyInformationalVersion>$(PlaySteadProductVersion)</AssemblyInformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Version Condition="'$(Version)' == ''">$(PlaySteadProductVersion)</Version>
+    <RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>
+    <PlaySteadDistributionChannel Condition="'$(PlaySteadDistributionChannel)' == ''">GitHub</PlaySteadDistributionChannel>
   </PropertyGroup>
 
   <ItemGroup>
