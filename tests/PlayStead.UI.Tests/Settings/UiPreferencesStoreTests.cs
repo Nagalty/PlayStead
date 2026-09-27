@@ -80,6 +80,20 @@ public sealed class UiPreferencesStoreTests
     }
 
     [Fact]
+    public async Task SaveAsync_then_LoadAsync_round_trips_last_dormant_game()
+    {
+        using var temp = new TemporaryDirectory();
+        var sut = new UiPreferencesStore(Path.Combine(temp.Path, "ui-preferences.json"));
+        var gameId = Guid.NewGuid();
+
+        await sut.SaveAsync(new UiPreferences(LastDormantGameId: gameId), CancellationToken.None);
+
+        var actual = await sut.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(gameId, actual.LastDormantGameId);
+    }
+
+    [Fact]
     public async Task LoadAsync_falls_back_to_defaults_when_json_is_invalid()
     {
         using var temp =

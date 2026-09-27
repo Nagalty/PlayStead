@@ -11,6 +11,8 @@ using PlayStead.UI.Launching;
 using PlayStead.UI.Sessions;
 using PlayStead.UI.Settings;
 using PlayStead.UI.Steam;
+using PlayStead.Core.Shortlist;
+using PlayStead.Core.ProviderGameMetadata;
 
 namespace PlayStead.UI.Library;
 
@@ -20,6 +22,7 @@ public sealed class LibraryViewModel :
     private readonly ILibraryStore _libraryStore;
     private readonly IGameMediaResolver _gameMediaResolver;
     public ICanonicalCatalogStore? CanonicalCatalogStore { get; }
+    public IGamesDuMomentService? GamesDuMomentService { get; }
     private readonly UiPreferencesStore? _uiPreferencesStore;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly object _verifySteamGate = new();
@@ -113,7 +116,9 @@ public sealed class LibraryViewModel :
         ISteamReferenceRuntime steamReferenceRuntime,
         SessionMonitor sessionMonitor,
         IGameMediaResolver gameMediaResolver,
-        ICanonicalCatalogStore? canonicalCatalogStore = null)
+        ICanonicalCatalogStore? canonicalCatalogStore = null,
+        IGamesDuMomentService? gamesDuMomentService = null,
+        IProviderGameMetadataStore? providerGameMetadataStore = null)
         : this(
             libraryStore,
             steamReferenceRuntime,
@@ -126,6 +131,8 @@ public sealed class LibraryViewModel :
             gameMediaResolver;
 
         CanonicalCatalogStore = canonicalCatalogStore;
+        GamesDuMomentService = gamesDuMomentService;
+        ProviderGameMetadataStore = providerGameMetadataStore;
     }
 
     public LibraryViewModel(
@@ -149,13 +156,17 @@ public sealed class LibraryViewModel :
         SessionMonitor sessionMonitor,
         UiPreferencesStore uiPreferencesStore,
         IGameMediaResolver gameMediaResolver,
-        ICanonicalCatalogStore? canonicalCatalogStore = null)
+        ICanonicalCatalogStore? canonicalCatalogStore = null,
+        IGamesDuMomentService? gamesDuMomentService = null,
+        IProviderGameMetadataStore? providerGameMetadataStore = null)
         : this(
             libraryStore,
             steamReferenceRuntime,
             sessionMonitor,
             gameMediaResolver,
-            canonicalCatalogStore)
+            canonicalCatalogStore,
+            gamesDuMomentService,
+            providerGameMetadataStore)
     {
         ArgumentNullException.ThrowIfNull(uiPreferencesStore);
 
@@ -164,6 +175,8 @@ public sealed class LibraryViewModel :
 
     public event PropertyChangedEventHandler?
         PropertyChanged;
+
+    public IProviderGameMetadataStore? ProviderGameMetadataStore { get; }
 
     public IReadOnlyList<LibraryItemViewModel> Items
     {

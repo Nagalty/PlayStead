@@ -9,6 +9,10 @@ using System.Globalization;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Launching;
 using PlayStead.UI.Sessions;
+using PlayStead.Core.Shortlist;
+using PlayStead.Core.ProviderGameMetadata;
+using PlayStead.Core.GameBuildHistory;
+using CommunityToolkit.Mvvm.Input;
 
 namespace PlayStead.UI.Library;
 
@@ -18,6 +22,10 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly Func<Task>? _refreshActivityAsync;
     private bool _isActive;
     private readonly ICanonicalCatalogStore? _catalogStore;
+    private readonly IGamesDuMomentService? _gamesDuMomentService;
+    private readonly IProviderGameMetadataStore? _providerGameMetadataStore;
+    private readonly GameBuildHistoryService? _gameBuildHistoryService;
+    private bool _isShortlistOperationInProgress;
     public GameDetailViewModel(
         LibraryItemViewModel game)
         : this(game, launch: null, activity: null)
@@ -44,7 +52,10 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         GameLaunchViewModel? launch,
         GameQuickPanelViewModel? activity,
         string? heroPath,
-        ICanonicalCatalogStore? catalogStore = null)
+        ICanonicalCatalogStore? catalogStore = null,
+        IGamesDuMomentService? gamesDuMomentService = null,
+        IProviderGameMetadataStore? providerGameMetadataStore = null,
+        GameBuildHistoryService? gameBuildHistoryService = null)
     {
         ArgumentNullException.ThrowIfNull(
             game);
@@ -86,6 +97,11 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             heroPath;
 
         _catalogStore = catalogStore;
+        _gamesDuMomentService = gamesDuMomentService;
+        _providerGameMetadataStore = providerGameMetadataStore;
+        _gameBuildHistoryService = gameBuildHistoryService;
+        AddToGamesDuMomentCommand = new AsyncRelayCommand(AddToGamesDuMomentAsync, () => CanChangeGamesDuMoment);
+        RemoveFromGamesDuMomentCommand = new AsyncRelayCommand(RemoveFromGamesDuMomentAsync, () => CanChangeGamesDuMoment);
     }
 
     public GameDetailViewModel(
@@ -95,8 +111,11 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         string? heroPath,
         SessionMonitor sessionMonitor,
         Func<Task>? refreshActivityAsync = null,
-        ICanonicalCatalogStore? catalogStore = null)
-        : this(game, launch, activity, heroPath, catalogStore)
+        ICanonicalCatalogStore? catalogStore = null,
+        IGamesDuMomentService? gamesDuMomentService = null,
+        IProviderGameMetadataStore? providerGameMetadataStore = null,
+        GameBuildHistoryService? gameBuildHistoryService = null)
+        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -141,10 +160,19 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public async Task LoadAsync(CancellationToken cancellationToken)
     {
         await (Activity?.LoadSessionSummaryAsync(cancellationToken) ?? Task.CompletedTask);
-        if (_catalogStore is null || Game.CanonicalContentId is not CatalogContentId contentId)
+        if (_gamesDuMomentService is not null)
         {
-            return;
+            IsInGamesDuMoment = (await _gamesDuMomentService.GetAsync(cancellationToken)).Any(entry => entry.GameId == GameId);
+            OnPropertyChanged(nameof(IsInGamesDuMoment));
+            OnPropertyChanged(nameof(GamesDuMomentActionLabel));
         }
+        if (_providerGameMetadataStore is not null)
+            ApplyProviderMetadata(await _providerGameMetadataStore.GetAsync(GameId, Game.Provider, cancellationToken));
+
+        await LoadBuildHistoryAsync(cancellationToken);
+
+        if (_catalogStore is null || Game.CanonicalContentId is not CatalogContentId contentId)
+            return;
 
         var content = await _catalogStore.GetByIdAsync(contentId, cancellationToken);
         DeveloperDisplay = content?.Developer;
@@ -157,6 +185,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasPublisher));
         OnPropertyChanged(nameof(HasReleaseDate));
         OnPropertyChanged(nameof(HasGeneralInfo));
+
     }
 
     public string Title { get; }
@@ -176,11 +205,146 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public string? DeveloperDisplay { get; private set; }
     public string? PublisherDisplay { get; private set; }
     public string? ReleaseDateDisplay { get; private set; }
+    public IReadOnlyList<string> Genres { get; private set; } = [];
+    public IReadOnlyList<string> GameModes { get; private set; } = [];
+    public bool HasGenres => Genres.Count > 0;
+    public bool HasGameModes => GameModes.Count > 0;
+
+    public bool IsInGamesDuMoment { get; private set; }
+    public bool CanChangeGamesDuMoment => _gamesDuMomentService is not null && !_isShortlistOperationInProgress;
+    public string GamesDuMomentActionLabel => IsInGamesDuMoment ? "Retirer des jeux du moment" : "Ajouter aux jeux du moment";
+    public IAsyncRelayCommand AddToGamesDuMomentCommand { get; }
+    public IAsyncRelayCommand RemoveFromGamesDuMomentCommand { get; }
+
+    public sealed record BuildHistoryEntryViewModel(
+        string? PreviousBuildId,
+        string BuildId,
+        DateTimeOffset ObservedAtUtc,
+        bool IsBaseline,
+        bool IsSinceLastPlay)
+    {
+        public string ObservedAtLabel => ObservedAtUtc.ToLocalTime().ToString("d MMM yyyy HH:mm", CultureInfo.CurrentCulture);
+        public string BuildTransitionLabel => IsBaseline
+            ? $"Première version observée · {BuildId}"
+            : $"{PreviousBuildId} → {BuildId}";
+        public string SinceLastPlayLabel => IsSinceLastPlay ? "Depuis ta dernière partie" : string.Empty;
+    }
+
+    public IReadOnlyList<BuildHistoryEntryViewModel> BuildHistory { get; private set; } = [];
+    public bool HasBuildHistory => BuildHistory.Count > 0;
+    public bool HasBuildChanges => BuildHistory.Any(entry => !entry.IsBaseline);
+    public int BuildChangeCountSinceLastPlay => BuildHistory.Count(entry => entry.IsSinceLastPlay);
+    public string BuildHistorySummary => BuildHistory.Count == 0
+        ? "PlayStead commencera à suivre les versions observées ici."
+        : BuildChangeCountSinceLastPlay > 0
+            ? $"{BuildChangeCountSinceLastPlay} changement{(BuildChangeCountSinceLastPlay == 1 ? string.Empty : "s")} observé{(BuildChangeCountSinceLastPlay == 1 ? string.Empty : "s")} depuis ta dernière partie"
+            : HasBuildChanges ? "Historique des versions observées" : "Pas encore de changement observé.";
+
+    private async Task LoadBuildHistoryAsync(CancellationToken cancellationToken)
+    {
+        if (_gameBuildHistoryService is null)
+        {
+            BuildHistory = [];
+        }
+        else
+        {
+            var observations = (await _gameBuildHistoryService.GetHistoryAsync(GameId, Game.Provider, cancellationToken))
+                .OrderBy(x => x.ObservedAtUtc)
+                .ToArray();
+            var lastPlay = await _gameBuildHistoryService.GetLastCompletedPlayAtAsync(GameId, cancellationToken);
+            BuildHistory = observations
+                .Select((observation, index) => new BuildHistoryEntryViewModel(
+                    index == 0 ? null : observations[index - 1].BuildId,
+                    observation.BuildId,
+                    observation.ObservedAtUtc,
+                    index == 0,
+                    index > 0 && lastPlay is not null && observation.ObservedAtUtc > lastPlay.Value))
+                .OrderByDescending(entry => entry.ObservedAtUtc)
+                .ToArray();
+        }
+
+        OnPropertyChanged(nameof(BuildHistory));
+        OnPropertyChanged(nameof(HasBuildHistory));
+        OnPropertyChanged(nameof(HasBuildChanges));
+        OnPropertyChanged(nameof(BuildChangeCountSinceLastPlay));
+        OnPropertyChanged(nameof(BuildHistorySummary));
+    }
+
+    private Task AddToGamesDuMomentAsync() => ChangeGamesDuMomentAsync(true);
+    private Task RemoveFromGamesDuMomentAsync() => ChangeGamesDuMomentAsync(false);
+
+    private async Task ChangeGamesDuMomentAsync(bool add)
+    {
+        if (!CanChangeGamesDuMoment) return;
+        _isShortlistOperationInProgress = true;
+        OnPropertyChanged(nameof(CanChangeGamesDuMoment));
+        try
+        {
+            if (add)
+            {
+                var result = await _gamesDuMomentService!.AddAsync(GameId, CancellationToken.None);
+                if (result == GamesDuMomentAddResult.Full) return;
+                IsInGamesDuMoment = true;
+            }
+            else
+            {
+                await _gamesDuMomentService!.RemoveAsync(GameId, CancellationToken.None);
+                IsInGamesDuMoment = false;
+            }
+            OnPropertyChanged(nameof(IsInGamesDuMoment));
+            OnPropertyChanged(nameof(GamesDuMomentActionLabel));
+        }
+        finally
+        {
+            _isShortlistOperationInProgress = false;
+            OnPropertyChanged(nameof(CanChangeGamesDuMoment));
+        }
+    }
 
     public bool HasDeveloper => !string.IsNullOrWhiteSpace(DeveloperDisplay);
     public bool HasPublisher => !string.IsNullOrWhiteSpace(PublisherDisplay);
     public bool HasReleaseDate => !string.IsNullOrWhiteSpace(ReleaseDateDisplay);
-    public bool HasGeneralInfo => HasDeveloper || HasPublisher || HasReleaseDate;
+    public bool HasGeneralInfo => HasDeveloper || HasPublisher || HasReleaseDate || HasGenres || HasGameModes;
+
+    private void ApplyProviderMetadata(ProviderGameMetadata? metadata)
+    {
+        if (metadata is null) return;
+        if (!HasDeveloper && metadata.Developers is { Count: > 0 })
+        {
+            DeveloperDisplay = string.Join(", ", metadata.Developers);
+            OnPropertyChanged(nameof(DeveloperDisplay));
+            OnPropertyChanged(nameof(HasDeveloper));
+        }
+        if (!HasPublisher && metadata.Publishers is { Count: > 0 })
+        {
+            PublisherDisplay = string.Join(", ", metadata.Publishers);
+            OnPropertyChanged(nameof(PublisherDisplay));
+            OnPropertyChanged(nameof(HasPublisher));
+        }
+        if (!HasReleaseDate && metadata.ReleaseDate is DateOnly releaseDate)
+        {
+            ReleaseDateDisplay = releaseDate.ToString("d MMMM yyyy", CultureInfo.CurrentCulture);
+            OnPropertyChanged(nameof(ReleaseDateDisplay));
+            OnPropertyChanged(nameof(HasReleaseDate));
+        }
+        Genres = metadata.Genres ?? [];
+        GameModes = BuildGameModes(metadata);
+        OnPropertyChanged(nameof(Genres));
+        OnPropertyChanged(nameof(GameModes));
+        OnPropertyChanged(nameof(HasGenres));
+        OnPropertyChanged(nameof(HasGameModes));
+        OnPropertyChanged(nameof(HasGeneralInfo));
+    }
+
+    private static IReadOnlyList<string> BuildGameModes(ProviderGameMetadata metadata)
+    {
+        var modes = new List<string>();
+        if (metadata.SinglePlayer is true) modes.Add("Solo");
+        if (metadata.MultiPlayer is true) modes.Add("Multijoueur");
+        if (metadata.OnlineCoop is true) modes.Add("Coop en ligne");
+        if (metadata.LocalCoop is true) modes.Add("Coop locale");
+        return modes;
+    }
 
     private static string GetDriveLabel(string path)
     {

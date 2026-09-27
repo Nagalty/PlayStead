@@ -22,6 +22,14 @@ public sealed class HomeViewModelTests :
             Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public void Build_change_copy_uses_zero_hidden_singular_and_plural_forms()
+    {
+        Assert.Null(HomeViewModel.FormatBuildChangeText(0));
+        Assert.Equal("1 mise à jour depuis ta dernière partie", HomeViewModel.FormatBuildChangeText(1));
+        Assert.Equal("3 mises à jour depuis ta dernière partie", HomeViewModel.FormatBuildChangeText(3));
+    }
+
+    [Fact]
     public void Recently_played_card_metadata_uses_humanized_existing_display_formatters()
     {
         var now = DateTimeOffset.Now;
@@ -115,7 +123,7 @@ public sealed class HomeViewModelTests :
         var command =
             FindCommand(
                 sut,
-                "Library");
+                nameof(HomeViewModel.NavigateLibraryCommand));
 
         command.Execute(
             null);
@@ -144,7 +152,7 @@ public sealed class HomeViewModelTests :
         var command =
             FindCommand(
                 sut,
-                "Session");
+                nameof(HomeViewModel.NavigateSessionsCommand));
 
         command.Execute(
             null);
@@ -227,7 +235,7 @@ public sealed class HomeViewModelTests :
 
     private static ICommand FindCommand(
         HomeViewModel viewModel,
-        string nameFragment)
+        string propertyName)
     {
         var property =
             typeof(HomeViewModel)
@@ -239,9 +247,9 @@ public sealed class HomeViewModelTests :
                         typeof(ICommand)
                             .IsAssignableFrom(
                                 candidate.PropertyType) &&
-                        candidate.Name.Contains(
-                            nameFragment,
-                            StringComparison.OrdinalIgnoreCase));
+                        candidate.Name.Equals(
+                            propertyName,
+                            StringComparison.Ordinal));
 
         Assert.NotNull(
             property);

@@ -6,4 +6,5 @@ public sealed record UiPreferences(
     bool ReduceMotion = false,
     LibraryViewMode LibraryViewMode = LibraryViewMode.Grid,
     string LibrarySortKey = "Title",
-    string? LibraryFilterKey = null);
+    string? LibraryFilterKey = null,
+    Guid? LastDormantGameId = null);

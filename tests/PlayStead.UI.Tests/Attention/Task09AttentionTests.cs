@@ -6,6 +6,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Data.Sqlite;
 using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
@@ -110,11 +112,12 @@ public sealed class Task09AttentionTests
         {
             var root = Path.Combine(Path.GetTempPath(), "PlayStead.Tests",
                 nameof(Task09AttentionTests), Guid.NewGuid().ToString("N"));
+            IHost? host = null;
             try
             {
                 var layout = UserDataLayout.FromRoot(root);
                 layout.EnsureDirectoriesExist();
-                using var host = PlaySteadHost.Build(layout);
+                host = PlaySteadHost.Build(layout);
                 var services = host.Services;
                 services.GetRequiredService<DatabaseInitializer>()
                     .InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
@@ -160,6 +163,9 @@ public sealed class Task09AttentionTests
             }
             finally
             {
+                host?.StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+                host?.Dispose();
+                SqliteConnection.ClearAllPools();
                 if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
             }
         });

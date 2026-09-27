@@ -47,8 +47,11 @@
     <StreamGeometry x:Key="PlayStead.Icon.List">M 3,3 H 5 V 5 H 3 Z M 8,4 H 18 M 3,9 H 5 V 11 H 3 Z M 8,10 H 18 M 3,15 H 5 V 17 H 3 Z M 8,16 H 18</StreamGeometry>
     <StreamGeometry x:Key="PlayStead.Icon.Verify">M 17,7 A 7,7 0 0 0 5,5 L 3,8 M 3,4 V 8 H 7 M 7,17 A 7,7 0 0 0 19,19 L 21,16 M 21,20 V 16 H 17</StreamGeometry>
     <StreamGeometry x:Key="PlayStead.Icon.History">M 3,10 A 9,9 0 1 1 5,17 M 3,10 H 8 M 12,6 V 12 L 16,14</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.Star">M 10,1 L 12.1,7.1 L 18.5,7.3 L 13.5,11.3 L 15.2,17.5 L 10,14 L 4.8,17.5 L 6.5,11.3 L 1.5,7.3 L 7.9,7.1 Z</StreamGeometry>
     <StreamGeometry x:Key="PlayStead.Icon.Gamepad">M 6,4 C 3,4 2,6 1.5,9 L 0.7,14 C 0.4,16.5 2.5,18 4.2,16.5 L 7,14 H 17 L 19.8,16.5 C 21.5,18 23.6,16.5 23.3,14 L 22.5,9 C 22,6 21,4 18,4 Z M 5,7 V 11 M 3,9 H 7 M 16,8 A 1,1 0 1 0 18,8 A 1,1 0 1 0 16,8 M 19,11 A 1,1 0 1 0 21,11 A 1,1 0 1 0 19,11</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.People">M 7,10 A 3,3 0 1 0 7,4 A 3,3 0 1 0 7,10 M 15,9 A 2.5,2.5 0 1 0 15,4 M 2,18 C 2,14 4,12 7,12 C 10,12 12,14 12,18 M 12,13 C 16,11 19,13 20,17</StreamGeometry>
     <StreamGeometry x:Key="PlayStead.Icon.ChevronRight">M 8,4 L 14,10 L 8,16</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.ChevronLeft">M 12,4 L 6,10 L 12,16</StreamGeometry>
     <!-- Microsoft Fluent System Icons (MIT), semantic mappings for PlayStead Shell. -->
     <StreamGeometry x:Key="PlayStead.Icon.Home">M 10,2 L 2,8 V 18 H 7 V 12 H 13 V 18 H 18 V 8 Z M 10,4.5 L 16,9 V 16 H 14 V 10 H 6 V 16 H 4 V 9 Z</StreamGeometry>
     <StreamGeometry x:Key="PlayStead.Icon.Library">M 2,4 C 5,3 8,3 10,5 V 18 C 8,16 5,16 2,17 Z M 18,4 C 15,3 12,3 10,5 V 18 C 12,16 15,16 18,17 Z M 4,7 C 6,7 8,7 10,8 M 16,7 C 14,7 12,7 10,8</StreamGeometry>
@@ -58,6 +61,7 @@
     <StreamGeometry x:Key="PlayStead.Icon.Settings">M 8,1 H 12 L 13,4 A 7,7 0 0 1 15,5 L 18,4 L 20,8 L 17,10 A 7,7 0 0 1 17,12 L 20,14 L 18,18 L 15,17 A 7,7 0 0 1 13,18 L 12,21 H 8 L 7,18 A 7,7 0 0 1 5,17 L 2,18 L 0,14 L 3,12 A 7,7 0 0 1 3,10 L 0,8 L 2,4 L 5,5 A 7,7 0 0 1 7,4 Z M 8,8 A 3,3 0 1 0 14,8 A 3,3 0 1 0 8,8</StreamGeometry>
     <StreamGeometry x:Key="PlayStead.Icon.Search">M 9,2 A 7,7 0 1 0 9,16 A 7,7 0 1 0 9,2 M 14,14 L 19,19</StreamGeometry>
     <StreamGeometry x:Key="PlayStead.Icon.Info">M 10,2 A 8,8 0 1 0 10,18 A 8,8 0 1 0 10,2 M 10,8 V 14 M 10,5 V 6</StreamGeometry>
+    <StreamGeometry x:Key="PlayStead.Icon.Close">M 4,4 L 16,16 M 16,4 L 4,16</StreamGeometry>
 
     <Style x:Key="PlayStead.Icon.Navigation" TargetType="Path">
         <Setter Property="Fill" Value="{DynamicResource PlayStead.Brush.IconPrimary}"/>

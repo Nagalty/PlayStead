@@ -7,6 +7,25 @@
              FontFamily="{DynamicResource PlayStead.Font.Body}">
     <StackPanel Margin="{DynamicResource PlayStead.Spacing.4}">
         <TextBlock Text="À signaler" FontSize="26" FontWeight="SemiBold"/>
-        <controls:EmptyState Message="{Binding EmptyMessage}" Margin="0,24,0,0"/>
+        <controls:EmptyState Message="{Binding EmptyMessage}" Margin="0,24,0,0">
+            <controls:EmptyState.Style>
+                <Style TargetType="controls:EmptyState">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers><DataTrigger Binding="{Binding HasItems}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+                </Style>
+            </controls:EmptyState.Style>
+        </controls:EmptyState>
+        <ItemsControl ItemsSource="{Binding Items}" Margin="0,16,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{DynamicResource PlayStead.Surface.Card}" Padding="{DynamicResource PlayStead.Spacing.2}" Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}" Style="{DynamicResource PlayStead.Text.CardTitle}" />
+                            <TextBlock Text="{Binding Message}" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </StackPanel>
 </UserControl>

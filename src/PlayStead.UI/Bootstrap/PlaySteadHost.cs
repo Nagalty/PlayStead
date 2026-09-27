@@ -263,9 +263,12 @@ public static class PlaySteadHost
             ISteamMediaTransport,
             HttpSteamMediaTransport>();
 
-        builder.Services.AddSingleton<
-            IGameMediaProvider,
-            SteamMediaProvider>();
+        builder.Services.AddSingleton<IGameMediaProvider>(services =>
+            new SteamMediaProvider(
+                services.GetRequiredService<WindowsSteamRootLocator>(),
+                services.GetRequiredService<SteamLocalMediaLocator>(),
+                services.GetRequiredService<ISteamMediaTransport>(),
+                storeClient: services.GetRequiredService<ISteamStoreAppDetailsClient>()));
 
         builder.Services.AddSingleton<
             IGameMediaResolver,
@@ -280,6 +283,55 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             ILocalLibrarySource,
             SteamLocalLibrarySource>();
+        builder.Services.AddSingleton<
+            IProviderActivityMetadataStore,
+            SqliteProviderActivityMetadataStore>();
+        builder.Services.AddSingleton<SteamLocalProviderActivitySource>();
+        builder.Services.AddSingleton<IProviderActivityMetadataSource>(services =>
+            services.GetRequiredService<SteamLocalProviderActivitySource>());
+        builder.Services.AddSingleton<ProviderActivityReconciliationService>();
+        builder.Services.AddSingleton<IProviderGameMetadataStore, SqliteProviderGameMetadataStore>();
+        builder.Services.AddSingleton<SteamLocalGameMetadataSource>();
+        builder.Services.AddSingleton<HttpClient>(_ =>
+        {
+            var client = new HttpClient
+            {
+                BaseAddress = new Uri("https://store.steampowered.com/"),
+                Timeout = TimeSpan.FromSeconds(7)
+            };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("PlayStead/0.4.3");
+            return client;
+        });
+        builder.Services.AddSingleton<ISteamStoreAppDetailsClient, SteamStoreAppDetailsClient>();
+        builder.Services.AddSingleton<SteamStoreGameMetadataSource>();
+        builder.Services.AddSingleton<ProviderGameMetadataReconciliationService>(services =>
+            new ProviderGameMetadataReconciliationService(
+                services.GetRequiredService<IProviderGameMetadataStore>(),
+                [services.GetRequiredService<SteamLocalGameMetadataSource>()]));
+        builder.Services.AddSingleton<ProviderGameMetadataOnlineReconciliationService>(services =>
+            new ProviderGameMetadataOnlineReconciliationService(
+                services.GetRequiredService<IProviderGameMetadataStore>(),
+                [services.GetRequiredService<SteamStoreGameMetadataSource>()]));
+        builder.Services.AddSingleton<IProviderGameMetadataProgress>(services =>
+            services.GetRequiredService<ProviderGameMetadataOnlineReconciliationService>());
+        builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateStateEvaluator>();
+        builder.Services.AddSingleton<SteamLocalInstallUpdateStateSource>();
+        builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateStateSource>(services =>
+            services.GetRequiredService<SteamLocalInstallUpdateStateSource>());
+        builder.Services.AddSingleton<IGameBuildHistoryStore, SqliteGameBuildHistoryStore>();
+        builder.Services.AddSingleton<GameBuildHistoryService>(services =>
+            new GameBuildHistoryService(
+                services.GetRequiredService<IGameBuildHistoryStore>(),
+                services.GetService<ISessionStore>()));
+        builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateStateReconciliationService>(services =>
+            new PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateStateReconciliationService(
+                services.GetServices<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateStateSource>(),
+                services.GetRequiredService<GameBuildHistoryService>()));
+        builder.Services.AddSingleton<SteamInstallUpdateLiveRefreshService>();
+        builder.Services.AddSingleton<IHomeSuggestionSelectionStore>(_ =>
+            new JsonHomeSuggestionSelectionStore(
+                Path.Combine(dataRoot, "home-suggestion-selection.json")));
+        builder.Services.AddSingleton<HomeSuggestionSelector>();
 
         builder.Services.AddSingleton<
             SteamLocalEvidenceReader>();

@@ -1,4 +1,5 @@
 using PlayStead.Core.Library;
+using PlayStead.Core.GameBuildHistory;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
 using PlayStead.UI.Library;
@@ -122,6 +123,38 @@ public sealed class GameDetailFoundationTests
     }
 
     [Fact]
+    public async Task LoadAsync_projects_build_history_newest_first_and_marks_changes_since_last_play()
+    {
+        var gameId = GameId.New();
+        var first = new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero);
+        var lastPlay = first.AddDays(1);
+        var second = first.AddDays(2);
+        var history = new[]
+        {
+            new GameBuildObservation(gameId, ProviderKind.Steam, "123", "100", first),
+            new GameBuildObservation(gameId, ProviderKind.Steam, "123", "101", second)
+        };
+        var sessions = new[]
+        {
+            new GameSession(Guid.NewGuid(), gameId.Value, lastPlay.AddHours(-1), lastPlay,
+                lastPlay, SessionState.Ended, SessionEndReason.ProcessExited,
+                SessionDetectionSource.ProcessMonitor, lastPlay.AddHours(-1), lastPlay)
+        };
+        var service = new GameBuildHistoryService(new FakeBuildHistoryStore(history), new FakeSessionStore(sessions));
+        var item = new LibraryItemViewModel(gameId, "Game", ProviderKind.Steam, "Steam", string.Empty, null);
+        var viewModel = new GameDetailViewModel(item, null, null, null, null, null, null, service);
+
+        await viewModel.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(2, viewModel.BuildHistory.Count);
+        Assert.Equal("101", viewModel.BuildHistory[0].BuildId);
+        Assert.Equal("100 → 101", viewModel.BuildHistory[0].BuildTransitionLabel);
+        Assert.True(viewModel.BuildHistory[0].IsSinceLastPlay);
+        Assert.Equal(1, viewModel.BuildChangeCountSinceLastPlay);
+        Assert.Contains("depuis ta dernière partie", viewModel.BuildHistorySummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Detail_route_supplies_the_activity_projection()
     {
         var source =
@@ -237,5 +270,19 @@ public sealed class GameDetailFoundationTests
 
         public Task<SessionCorrection?> GetAsync(Guid sessionId, CancellationToken cancellationToken) =>
             Task.FromResult<SessionCorrection?>(null);
+    }
+
+    private sealed class FakeBuildHistoryStore(IReadOnlyList<GameBuildObservation> history) : IGameBuildHistoryStore
+    {
+        public Task<GameBuildObservation?> GetLatestAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) =>
+            Task.FromResult<GameBuildObservation?>(history.Where(x => x.GameId == gameId && x.Provider == provider).OrderByDescending(x => x.ObservedAtUtc).FirstOrDefault());
+
+        public Task<IReadOnlyList<GameBuildObservation>> GetHistoryAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GameBuildObservation>>(history.Where(x => x.GameId == gameId && x.Provider == provider).ToArray());
+
+        public Task<IReadOnlyList<GameBuildObservation>> GetHistoryAsync(IReadOnlyCollection<GameId> gameIds, ProviderKind provider, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GameBuildObservation>>(history.Where(x => gameIds.Contains(x.GameId) && x.Provider == provider).ToArray());
+
+        public Task<bool> AppendIfChangedAsync(GameBuildObservation observation, CancellationToken cancellationToken) => Task.FromResult(false);
     }
 }

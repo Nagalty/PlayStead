@@ -11,6 +11,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Xunit;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Library;
 
@@ -125,18 +126,7 @@ public sealed class GameDetailMetadataProjectionTests
         dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
 
     private static void RunSta(Action action)
-    {
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception exception) { error = exception; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
-    }
+        => PlaySteadWpfTestResources.Run(action);
 
     private sealed class FakeCatalogStore(CatalogContent? content) : ICanonicalCatalogStore
     {

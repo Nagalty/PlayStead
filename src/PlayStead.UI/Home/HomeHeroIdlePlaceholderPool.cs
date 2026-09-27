@@ -6,9 +6,12 @@ namespace PlayStead.UI.Home;
 
 internal static class HomeHeroIdlePlaceholderPool
 {
+    internal const string EditorialPlaceholderResourcePath = "Assets/Home/HomeHeroIdle01.png";
+    internal const string DormantPlaceholderResourcePath = "Assets/Home/HomeHeroIdle02.png";
+
     private static readonly IReadOnlyList<string> ResourcePathsInternal = Array.AsReadOnly(
     [
-        "Assets/Home/HomeHeroIdle01.png",
+        EditorialPlaceholderResourcePath,
         "Assets/Home/HomeHeroIdle02.png",
         "Assets/Home/HomeHeroIdle03.png",
         "Assets/Home/HomeHeroIdle04.png"

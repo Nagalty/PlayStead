@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using System.Reflection;
 using System.Windows.Threading;
 using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
@@ -28,6 +29,7 @@ public sealed class LibraryDispatcherShutdownTests
             using var cancellation = new CancellationTokenSource();
             using var monitor = CreateMonitor(cancellation);
             var library = new LibraryViewModel(new LibraryStore(), monitor);
+            SetDispatcher(library, dispatcher);
             library.RefreshAsync(CancellationToken.None).GetAwaiter().GetResult();
             var originalItems = library.Items;
             var notifications = 0;
@@ -71,6 +73,13 @@ public sealed class LibraryDispatcherShutdownTests
         thread.Start();
         Assert.True(thread.Join(TimeSpan.FromSeconds(15)), "STA test did not complete.");
         if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
+    }
+
+    private static void SetDispatcher(LibraryViewModel library, Dispatcher dispatcher)
+    {
+        typeof(LibraryViewModel)
+            .GetField("_uiDispatcher", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(library, dispatcher);
     }
 
     private sealed class SnapshotRuntime(Queue<SessionRuntimeSnapshot> snapshots) : ISessionRuntime

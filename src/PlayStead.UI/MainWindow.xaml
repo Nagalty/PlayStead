@@ -1,4 +1,5 @@
 <Window x:Class="PlayStead.UI.MainWindow"
+        Icon="/PlayStead.UI;component/Assets/Branding/PlayStead.ico"
         x:Name="RootWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -36,13 +37,12 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock x:Name="PlaySteadWordmark"
-                           Grid.Column="0"
-                           Text="PlayStead"
-                           VerticalAlignment="Center"
-                           FontSize="24"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource PlayStead.Brush.TextPrimary}" />
+                <Image x:Name="PlaySteadWordmark"
+                       Grid.Column="0"
+                       Height="60"
+                       Source="/PlayStead.UI;component/Assets/Branding/playstead-logo-horizontal.png"
+                       Stretch="Uniform"
+                       VerticalAlignment="Center" />
 
                 <StackPanel x:Name="PrimaryNavigation"
                             Grid.Column="1"

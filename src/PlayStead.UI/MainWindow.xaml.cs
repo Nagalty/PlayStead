@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using PlayStead.Core.Library;
+using PlayStead.Core.GameBuildHistory;
 using PlayStead.Core.Media;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Home;
@@ -46,6 +47,7 @@ public partial class MainWindow : Window
     private readonly SessionCorrectionPolicy? _sessionCorrectionPolicy;
     private readonly NotificationCenterViewModel? _notificationCenterViewModel;
     private readonly SessionMonitor? _sessionMonitor;
+    private readonly GameBuildHistoryService? _gameBuildHistoryService;
 
     public MainWindow()
         : this(
@@ -416,6 +418,8 @@ public partial class MainWindow : Window
         IGameMediaResolver gameMediaResolver,
         ILocalGameMediaResolver localGameMediaResolver,
         SessionMonitor sessionMonitor,
+        GameBuildHistoryService? gameBuildHistoryService = null,
+        AppUpdateNotificationViewModel? appUpdateNotificationViewModel = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -427,6 +431,9 @@ public partial class MainWindow : Window
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
+        _gameBuildHistoryService = gameBuildHistoryService;
+        AppUpdateNotificationHost.DataContext = appUpdateNotificationViewModel;
+        Closed += (_, _) => appUpdateNotificationViewModel?.Dispose();
         ApplyCurrentRoute();
     }
 
@@ -725,6 +732,10 @@ public partial class MainWindow : Window
                 _homeView ??=
                     new HomeView(
                         _homeViewModel);
+                _ = _homeViewModel.RefreshGamesDuMomentAsync(CancellationToken.None);
+                _ = _homeViewModel.RefreshWeeklySummaryAsync(CancellationToken.None);
+                _ = _homeViewModel.RefreshHomeAttentionAsync(CancellationToken.None);
+
 
                 MainContent.Content =
                     _homeView;
@@ -760,7 +771,10 @@ public partial class MainWindow : Window
                         CreateLaunchModel(libraryViewModel, gameId),
                         activity,
                         CreateHeroPath(libraryViewModel, game),
-                        libraryViewModel.CanonicalCatalogStore)
+                        libraryViewModel.CanonicalCatalogStore,
+                        libraryViewModel.GamesDuMomentService,
+                        libraryViewModel.ProviderGameMetadataStore,
+                        _gameBuildHistoryService)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -769,7 +783,10 @@ public partial class MainWindow : Window
                         _sessionMonitor,
                         () => activity?.LoadSessionSummaryAsync(CancellationToken.None)
                             ?? Task.CompletedTask,
-                        libraryViewModel.CanonicalCatalogStore);
+                        libraryViewModel.CanonicalCatalogStore,
+                        libraryViewModel.GamesDuMomentService,
+                        libraryViewModel.ProviderGameMetadataStore,
+                        _gameBuildHistoryService);
 
                 MainContent.Content =
                     new GameDetailView(
