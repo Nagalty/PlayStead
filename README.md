@@ -1,6 +1,6 @@
 # PlayStead
 
-**Version actuelle : `0.4.1-dev`**
+**Version actuelle : `0.4.3-alpha1`**
 
 PlayStead est une application Windows locale destinée à construire une bibliothèque de jeux fiable à partir des installations réellement présentes sur la machine, puis à fournir des informations de référence sur leur état sans rendre le démarrage dépendant du réseau.
 
@@ -12,7 +12,7 @@ La version 0.4 modernise l'expérience utilisateur et la direction visuelle sans
 
 ## État du projet
 
-`0.4.1-dev` est une version de développement. La version `1.0` reste réservée à la première release publique complète.
+`0.4.3-alpha1` est une version alpha de développement. La version `1.0` reste réservée à la première release publique complète.
 
 La portée actuelle reste volontairement limitée à **Windows 10/11** et à **Steam**. PlayStead ne remplace pas Steam, n'installe pas de mises à jour et ne télécharge pas SteamCMD automatiquement.
 
