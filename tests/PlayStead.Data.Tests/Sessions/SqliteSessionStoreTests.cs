@@ -122,17 +122,17 @@ public sealed class SqliteSessionStoreTests : IDisposable
     {
         var context = await CreateStoreAsync(GameA);
 
-        var first = ActiveSession(
+        var first = EndedSession(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"),
             GameA,
             T0);
 
-        var second = ActiveSession(
+        var second = EndedSession(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"),
             GameA,
             T0.AddMinutes(10));
 
-        var third = ActiveSession(
+        var third = EndedSession(
             Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3"),
             GameA,
             T0.AddMinutes(20));
@@ -285,6 +285,18 @@ public sealed class SqliteSessionStoreTests : IDisposable
             SessionDetectionSource.ProcessMonitor,
             startedAtUtc,
             startedAtUtc);
+
+    private static GameSession EndedSession(
+        Guid sessionId,
+        Guid gameId,
+        DateTimeOffset startedAtUtc)
+        => ActiveSession(sessionId, gameId, startedAtUtc) with
+        {
+            LastSeenAtUtc = startedAtUtc.AddMinutes(1),
+            ObservedEndedAtUtc = startedAtUtc.AddMinutes(1),
+            State = SessionState.Ended,
+            EndReason = SessionEndReason.ProcessExited
+        };
 
     public void Dispose()
     {

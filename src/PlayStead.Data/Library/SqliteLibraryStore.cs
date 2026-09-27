@@ -447,7 +447,8 @@ public sealed class SqliteLibraryStore : ILibraryStore
                         : reader.GetInt64(5),
                     reader.GetInt64(6) != 0,
                     reader.GetInt64(7) != 0,
-                    ParseUtc(reader.GetString(8))));
+                    ParseUtc(reader.GetString(8)),
+                    InstallationContentKind.Unknown));
         }
 
         return result;

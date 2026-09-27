@@ -201,7 +201,7 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         Assert.Null((await d.LoadAsync())!.Confirmation);
         Assert.Equal(accepted.Discovery, (await d.Signatures.GetAsync(d.Scope.GameId.Value, Ct))!.Discovery);
         Assert.Single(await d.Signatures.GetAllAsync(Ct));
-        Assert.Empty(await d.Sessions.GetRecentAsync(10, Ct));
+        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
     }
 
     [Fact]
@@ -339,8 +339,9 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         await runtime.RefreshAsync(Ct);
         Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
         time.UtcNow = T0.AddHours(1).AddSeconds(2);
-        await runtime.RefreshAsync(Ct);
-        Assert.Equal(2, (await d.Sessions.GetRecentAsync(10, Ct)).Count);
+        var futureSnapshot = await runtime.RefreshAsync(Ct);
+        Assert.Single(futureSnapshot.ActiveSessions);
+        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
         time.UtcNow = T0.AddHours(1).AddSeconds(8);
         await runtime.RefreshAsync(Ct);
         source.Processes = [];
@@ -452,8 +453,9 @@ public sealed class ProcessSignatureDiscoveryPipelineTests
         var runtime = d.Runtime(source, time);
         await runtime.RefreshAsync(Ct);
         time.UtcNow = T0.AddHours(1).AddSeconds(2);
-        await runtime.RefreshAsync(Ct);
-        Assert.Equal(3, (await d.Sessions.GetRecentAsync(10, Ct)).Count);
+        var simultaneousSnapshot = await runtime.RefreshAsync(Ct);
+        Assert.Equal(2, simultaneousSnapshot.ActiveSessions.Count);
+        Assert.Single(await d.Sessions.GetRecentAsync(10, Ct));
         time.UtcNow = T0.AddHours(1).AddSeconds(8);
         await runtime.RefreshAsync(Ct);
         source.Processes = [];
