@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using PlayStead.Core.Sessions;
@@ -15,6 +16,8 @@ public sealed class TrayIconService : IDisposable
     private readonly SessionMonitor _sessionMonitor;
 
     private Forms.NotifyIcon? _notifyIcon;
+    private Icon? _officialIcon;
+    private MemoryStream? _officialIconStream;
     private Forms.ContextMenuStrip? _contextMenu;
     private int _lastSessionCount;
     private bool _started;
@@ -75,11 +78,14 @@ public sealed class TrayIconService : IDisposable
         _contextMenu.Items.Add(
             quitItem);
 
+        _officialIconStream = LoadOfficialIconStream();
+        _officialIcon = new Icon(_officialIconStream);
+
         _notifyIcon =
             new Forms.NotifyIcon
             {
                 ContextMenuStrip = _contextMenu,
-                Icon = SystemIcons.Application,
+                Icon = _officialIcon,
                 Text = TrayStatusText.Format(
                     _lastSessionCount),
                 Visible = true
@@ -274,5 +280,32 @@ public sealed class TrayIconService : IDisposable
 
         _contextMenu?.Dispose();
         _contextMenu = null;
+
+        _officialIcon?.Dispose();
+        _officialIcon = null;
+        _officialIconStream?.Dispose();
+        _officialIconStream = null;
+    }
+
+    private static MemoryStream LoadOfficialIconStream()
+    {
+        var resource = Application.GetResourceStream(
+            new Uri(
+                "/PlayStead.UI;component/Assets/Branding/PlayStead.ico",
+                UriKind.Relative));
+
+        if (resource?.Stream is null)
+        {
+            throw new InvalidOperationException(
+                "The official PlayStead application icon resource could not be loaded.");
+        }
+
+        using (resource.Stream)
+        {
+            var bytes = new MemoryStream();
+            resource.Stream.CopyTo(bytes);
+            bytes.Position = 0;
+            return bytes;
+        }
     }
 }

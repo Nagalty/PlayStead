@@ -4,6 +4,8 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace PlayStead.UI.Tests;
 
@@ -20,7 +22,7 @@ public sealed class MainWindowShellTests
             try
             {
                 var wordmark =
-                    Assert.IsType<TextBlock>(
+                    Assert.IsType<Image>(
                         window.FindName(
                             "PlaySteadWordmark"));
 
@@ -44,9 +46,11 @@ public sealed class MainWindowShellTests
                         window.FindName(
                             "SettingsNavButton"));
 
-                Assert.Equal(
-                    "PlayStead",
-                    wordmark.Text);
+                Assert.True(double.IsNaN(wordmark.Width));
+                Assert.Equal(60, wordmark.Height);
+                Assert.Equal(Stretch.Uniform, wordmark.Stretch);
+                Assert.IsAssignableFrom<BitmapSource>(wordmark.Source);
+                Assert.Contains("playstead-logo-horizontal.png", wordmark.Source.ToString(), StringComparison.OrdinalIgnoreCase);
 
                 Assert.Equal("Accueil", FindText(home));
                 Assert.Equal("Bibliothèque", FindText(library));

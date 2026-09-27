@@ -45,7 +45,7 @@ public sealed class Task02ShellNavigationTests
             try
             {
                 var wordmark =
-                    Assert.IsType<TextBlock>(
+                    Assert.IsType<Image>(
                         window.FindName(
                             "PlaySteadWordmark"));
 
@@ -69,9 +69,11 @@ public sealed class Task02ShellNavigationTests
                         window.FindName(
                             "SettingsNavButton"));
 
-                Assert.Equal(
-                    "PlayStead",
-                    wordmark.Text);
+                Assert.True(double.IsNaN(wordmark.Width));
+                Assert.Equal(60, wordmark.Height);
+                Assert.Equal(System.Windows.Media.Stretch.Uniform, wordmark.Stretch);
+                Assert.IsAssignableFrom<System.Windows.Media.Imaging.BitmapSource>(wordmark.Source);
+                Assert.Contains("playstead-logo-horizontal.png", wordmark.Source.ToString(), StringComparison.OrdinalIgnoreCase);
 
                 Assert.Contains(
                     "Accueil",

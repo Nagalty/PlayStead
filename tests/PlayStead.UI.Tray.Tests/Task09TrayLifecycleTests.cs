@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading;
+using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using PlayStead.Platform.Paths;
 using PlayStead.UI.Bootstrap;
@@ -142,11 +143,10 @@ public sealed class Task09TrayLifecycleTests
         var layout = UserDataLayout.FromRoot(root);
         layout.EnsureDirectoriesExist();
 
-        using var host = PlaySteadHost.Build(layout);
-
         RunSta(
             () =>
             {
+                using var host = PlaySteadHost.Build(layout);
                 var window =
                     host.Services.GetRequiredService<MainWindow>();
 

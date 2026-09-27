@@ -26,6 +26,10 @@
     <Resource Include="Assets\Home\HomeHeroIdle02.png" />
     <Resource Include="Assets\Home\HomeHeroIdle03.png" />
     <Resource Include="Assets\Home\HomeHeroIdle04.png" />
+    <None Remove="Assets\Branding\playstead-logo-horizontal.png" />
+    <Resource Include="Assets\Branding\playstead-logo-horizontal.png" />
+    <None Remove="Assets\Branding\PlayStead.ico" />
+    <Resource Include="Assets\Branding\PlayStead.ico" />
     <None Update="Assets\Fonts\Geist\OFL.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
