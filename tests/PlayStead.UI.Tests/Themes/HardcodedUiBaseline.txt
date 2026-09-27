@@ -6,6 +6,12 @@
 src/PlayStead.UI/App.xaml|CornerRadius|3|2
 src/PlayStead.UI/App.xaml|Spacing|1,2|1
 src/PlayStead.UI/App.xaml|Spacing|2,1|1
+src/PlayStead.UI/About/AboutView.xaml|FontSize|20|1
+src/PlayStead.UI/About/AboutView.xaml|FontSize|24|1
+src/PlayStead.UI/About/AboutView.xaml|FontWeight|SemiBold|2
+src/PlayStead.UI/About/AboutView.xaml|Spacing|0,12,0,0|1
+src/PlayStead.UI/About/AboutView.xaml|Spacing|0,8,0,0|1
+src/PlayStead.UI/About/AboutView.xaml|Spacing|0,8,0,24|1
 src/PlayStead.UI/Attention/AttentionView.xaml|FontSize|26|1
 src/PlayStead.UI/Attention/AttentionView.xaml|FontWeight|SemiBold|1
 src/PlayStead.UI/Attention/AttentionView.xaml|Spacing|0,0,0,8|1

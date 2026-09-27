@@ -110,6 +110,13 @@
                             AutomationProperties.Name="Paramètres">
                         <Path Width="16" Height="16" Data="{DynamicResource PlayStead.Icon.Settings}" Stroke="{DynamicResource PlayStead.Brush.IconPrimary}" StrokeThickness="1.5" Stretch="Uniform"/>
                     </Button>
+                    <Button x:Name="AboutNavButton"
+                            Command="{Binding NavigateAboutCommand}"
+                            Style="{DynamicResource PlayStead.Button.Icon}"
+                            ToolTip="À propos"
+                            AutomationProperties.Name="À propos">
+                        <Path Width="16" Height="16" Data="{DynamicResource PlayStead.Icon.Info}" Stroke="{DynamicResource PlayStead.Brush.IconPrimary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                    </Button>
                     <Button x:Name="NotificationBellButton"
                             Command="{Binding TogglePanelCommand}"
                             Style="{DynamicResource PlayStead.Button.Icon}"

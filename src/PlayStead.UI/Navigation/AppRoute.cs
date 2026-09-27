@@ -6,6 +6,7 @@ public enum AppRoute
     Library,
     Attention,
     Settings,
+    About,
     Sessions,
     GameDetail,
     SessionDetail

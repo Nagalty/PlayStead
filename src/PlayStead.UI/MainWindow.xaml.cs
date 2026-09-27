@@ -19,6 +19,8 @@ using PlayStead.UI.State;
 using PlayStead.UI.Tray;
 using PlayStead.UI.Bootstrap;
 using PlayStead.UI.Updates;
+using PlayStead.UI.About;
+using PlayStead.Core.Updates;
 
 namespace PlayStead.UI;
 
@@ -35,6 +37,8 @@ public partial class MainWindow : Window
     private SessionsView? _sessionsView;
     private readonly SettingsViewModel? _settingsViewModel;
     private SettingsView? _settingsView;
+    private AboutViewModel? _aboutViewModel;
+    private AboutView? _aboutView;
     private readonly UiMotionPreferenceCoordinator? _uiMotionPreferenceCoordinator;
     private readonly HomeViewModel? _homeViewModel;
     private HomeView? _homeView;
@@ -421,6 +425,7 @@ public partial class MainWindow : Window
         SessionMonitor sessionMonitor,
         GameBuildHistoryService? gameBuildHistoryService = null,
         AppUpdateNotificationViewModel? appUpdateNotificationViewModel = null,
+        IDistributionChannelProvider? distributionChannelProvider = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -433,6 +438,9 @@ public partial class MainWindow : Window
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
         _gameBuildHistoryService = gameBuildHistoryService;
+        _aboutViewModel = distributionChannelProvider is null
+            ? null
+            : new AboutViewModel(distributionChannelProvider);
         AppUpdateNotificationHost.DataContext = appUpdateNotificationViewModel;
         Closed += (_, _) => appUpdateNotificationViewModel?.Dispose();
         ApplyCurrentRoute();
@@ -722,6 +730,16 @@ public partial class MainWindow : Window
                 }
 
                 MainContent.Content = _settingsView;
+                break;
+
+            case AppRoute.About:
+                if (_aboutViewModel is null)
+                {
+                    break;
+                }
+
+                _aboutView ??= new AboutView(_aboutViewModel);
+                MainContent.Content = _aboutView;
                 break;
 
             case AppRoute.Home:

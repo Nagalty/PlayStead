@@ -42,6 +42,11 @@ public sealed class ShellViewModel :
                 () => NavigatePrimary(
                     AppRoute.Settings));
 
+        NavigateAboutCommand =
+            new RelayCommand(
+                () => NavigatePrimary(
+                    AppRoute.About));
+
         _goBackCommand =
             new RelayCommand(
                 ExecuteGoBack,
@@ -96,6 +101,9 @@ public sealed class ShellViewModel :
     public bool IsSettingsActive =>
         CurrentRoute == AppRoute.Settings;
 
+    public bool IsAboutActive =>
+        CurrentRoute == AppRoute.About;
+
     public bool CanGoBack =>
         _navigation.CanGoBack;
 
@@ -137,6 +145,11 @@ public sealed class ShellViewModel :
         _navigation.GoBack();
     }
 
+    public ICommand NavigateAboutCommand
+    {
+        get;
+    }
+
     private void ExecuteSearch()
     {
         if (!string.IsNullOrWhiteSpace(SearchQuery))
@@ -163,6 +176,9 @@ public sealed class ShellViewModel :
 
         OnPropertyChanged(
             nameof(IsSettingsActive));
+
+        OnPropertyChanged(
+            nameof(IsAboutActive));
 
         OnPropertyChanged(
             nameof(CanGoBack));

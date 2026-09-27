@@ -1,0 +1,33 @@
+<UserControl x:Class="PlayStead.UI.About.AboutView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource PlayStead.Brush.Background}"
+             Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+             FontFamily="{DynamicResource PlayStead.Font.Body}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="{DynamicResource PlayStead.Spacing.4}">
+            <TextBlock Text="À propos" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock Text="Informations sur cette installation de PlayStead."
+                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                       TextWrapping="Wrap" Margin="0,8,0,24"/>
+            <Border Background="{DynamicResource PlayStead.Brush.Surface}"
+                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
+                    Padding="{DynamicResource PlayStead.Spacing.3}">
+                <StackPanel>
+                    <TextBlock Text="{Binding ProductName}"
+                               FontSize="20"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Margin="0,12,0,0"
+                               Text="{Binding Version, StringFormat=Version {0}}"
+                               Style="{DynamicResource PlayStead.Text.Body}"/>
+                    <TextBlock Margin="0,8,0,0"
+                               Text="{Binding ChannelDisplay, StringFormat=Canal : {0}}"
+                               Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                               Style="{DynamicResource PlayStead.Text.Body}"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
