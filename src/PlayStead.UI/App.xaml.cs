@@ -229,8 +229,8 @@ public partial class App : Application
                 EnsureMainWindowShownAsync,
             InitializeLocalStateAsync:
                 cancellationToken =>
-                    GetRequiredService<LocalStartupPipeline>()
-                        .InitializeAsync(
+                    GetRequiredService<ApplicationRuntime>()
+                        .InitializeLocalStateAsync(
                             cancellationToken),
             StartHostAsync:
                 StartHostAsync,
@@ -242,17 +242,9 @@ public partial class App : Application
                     await RunOnUiAsync(
                         async () =>
                         {
-                            System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN LibraryViewModel.RefreshAsync");
-                            await GetRequiredService<LibraryViewModel>()
-                                .RefreshAsync(
-                                    cancellationToken);
-                            System.Diagnostics.Trace.WriteLine("[STARTUP] END LibraryViewModel.RefreshAsync");
-
-                            System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN SessionViewModel.RefreshAsync");
-                            await GetRequiredService<SessionViewModel>()
-                                .RefreshAsync(
-                                    cancellationToken);
-                            System.Diagnostics.Trace.WriteLine("[STARTUP] END SessionViewModel.RefreshAsync");
+                            await StartupForensicTrace.MeasureAsync("CachedLibraryProjection", () => GetRequiredService<LibraryViewModel>().RefreshAsync(cancellationToken));
+                            await StartupForensicTrace.MeasureAsync("CachedSessionProjection", () => GetRequiredService<SessionViewModel>().RefreshAsync(cancellationToken));
+                            StartupForensicTrace.Write("HomeProjection.DeferredToHomeViewLoaded");
 
                             var window =
                                 GetRequiredService<MainWindow>();
@@ -290,7 +282,7 @@ public partial class App : Application
                             cancellationToken),
             RefreshAsync:
                 cancellationToken =>
-                    GetRequiredService<LocalStartupPipeline>()
+                    GetRequiredService<ApplicationRuntime>()
                         .RefreshAsync(
                             cancellationToken),
             ApplySnapshotOnUiAsync:
@@ -345,9 +337,9 @@ public partial class App : Application
                 "The PlayStead host has already been built.");
         }
 
-        _host =
-            PlaySteadHost.Build(
-                layout);
+        StartupForensicTrace.Write("HostBuild.Start");
+        _host = PlaySteadHost.Build(layout);
+        StartupForensicTrace.Write("HostBuild.End");
 
         var window = GetRequiredService<MainWindow>();
         window.StartupProgress.Begin();
@@ -363,7 +355,7 @@ public partial class App : Application
     private async Task EnsureMainWindowShownAsync(
         CancellationToken cancellationToken)
     {
-        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN EnsureMainWindowShownAsync");
+        StartupForensicTrace.Write("WindowReadiness.Start");
         cancellationToken.ThrowIfCancellationRequested();
         var window = GetRequiredService<MainWindow>();
         MainWindow = window;
@@ -372,13 +364,13 @@ public partial class App : Application
         await Dispatcher.InvokeAsync(() => { },
             System.Windows.Threading.DispatcherPriority.Loaded,
             cancellationToken);
-        System.Diagnostics.Trace.WriteLine("[STARTUP] END EnsureMainWindowShownAsync");
+        StartupForensicTrace.Write("WindowReadiness.End");
     }
 
     private async Task StartHostAsync(
         CancellationToken cancellationToken)
     {
-        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN Host.StartAsync");
+        StartupForensicTrace.Write("HostStart.Start");
         var host =
             _host
             ?? throw new InvalidOperationException(
@@ -386,7 +378,7 @@ public partial class App : Application
 
         await host.StartAsync(
             cancellationToken);
-        System.Diagnostics.Trace.WriteLine("[STARTUP] END Host.StartAsync");
+        StartupForensicTrace.Write("HostStart.End");
 
         _hostStarted =
             true;

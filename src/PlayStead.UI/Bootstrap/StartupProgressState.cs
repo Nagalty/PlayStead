@@ -50,4 +50,19 @@ internal static class StartupForensicTrace
         var totalText = total?.ToString(CultureInfo.InvariantCulture) ?? "null";
         Write($"Progress Stage={stage} Current={currentText} Total={totalText}");
     }
+
+    internal static async Task MeasureAsync(string phase, Func<Task> operation)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        Trace.WriteLine($"[STARTUP-TIMING] START Phase={phase}");
+        try
+        {
+            await operation().ConfigureAwait(false);
+        }
+        finally
+        {
+            stopwatch.Stop();
+            Trace.WriteLine($"[STARTUP-TIMING] END Phase={phase} DurationMs={stopwatch.ElapsedMilliseconds}");
+        }
+    }
 }

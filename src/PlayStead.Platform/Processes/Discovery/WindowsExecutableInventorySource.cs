@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PlayStead.Core.Sessions.Discovery;
 
 namespace PlayStead.Platform.Processes.Discovery;
@@ -30,6 +31,8 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
     public Task<ExecutableInventory> InventoryAsync(
         InstallationScope scope, CancellationToken cancellationToken)
     {
+        var total = Stopwatch.StartNew();
+        var timing = new InventoryTiming();
         ArgumentNullException.ThrowIfNull(scope);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -43,7 +46,8 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
         catch (ArgumentException)
         {
             issues.Add(new InventoryIssue(scope.RootPath, InventoryIssueKind.InvalidRoot));
-            return Task.FromResult(BuildInventory(scope, candidates, issues, cancellationToken));
+            return Task.FromResult(Complete(scope, candidates, issues, timing, total,
+                cancellationToken));
         }
 
         var canonicalScope = new InstallationScope(scope.GameId, scope.InstallationId,
@@ -51,10 +55,12 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
         if (!scope.IsPresent)
         {
             issues.Add(new InventoryIssue(root, InventoryIssueKind.MissingRoot));
-            return Task.FromResult(BuildInventory(canonicalScope, candidates, issues, cancellationToken));
+            return Task.FromResult(Complete(canonicalScope, candidates, issues, timing, total,
+                cancellationToken));
         }
         if (!CheckDirectoryComponents(root, root, issues, cancellationToken))
-            return Task.FromResult(BuildInventory(canonicalScope, candidates, issues, cancellationToken));
+            return Task.FromResult(Complete(canonicalScope, candidates, issues, timing, total,
+                cancellationToken));
 
         var pending = new Stack<string>();
         var traversedDirectories = new List<string>();
@@ -66,15 +72,19 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
             var directory = pending.Pop();
             if (!CheckDirectoryComponents(directory, root, issues, cancellationToken))
                 continue;
+            timing.Directories++;
             traversedDirectories.Add(directory);
             try
             {
+                var enumeration = Stopwatch.StartNew();
                 foreach (var rawEntry in _enumerateEntries(directory))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    timing.Entries++;
                     ReadEntry(root, directory, rawEntry, seenEntries, pending, candidates, issues,
                         cancellationToken);
                 }
+                timing.DirectoryEnumerationMilliseconds += enumeration.ElapsedMilliseconds;
             }
             catch (Exception error) when (IsExpectedIoError(error))
             {
@@ -82,8 +92,26 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
             }
         }
 
+        var revalidation = Stopwatch.StartNew();
         RevalidateKnownPaths(root, traversedDirectories, candidates, issues, cancellationToken);
-        return Task.FromResult(BuildInventory(canonicalScope, candidates, issues, cancellationToken));
+        timing.RevalidationMilliseconds = revalidation.ElapsedMilliseconds;
+        timing.Executables = candidates.Count;
+        return Task.FromResult(Complete(canonicalScope, candidates, issues, timing, total,
+            cancellationToken));
+    }
+
+    private static ExecutableInventory Complete(InstallationScope scope,
+        List<ExecutableCandidate> candidates, List<InventoryIssue> issues,
+        InventoryTiming timing, Stopwatch total, CancellationToken cancellationToken)
+    {
+        var build = Stopwatch.StartNew();
+        var inventory = BuildInventory(scope, candidates, issues, cancellationToken);
+        timing.BuildMilliseconds = build.ElapsedMilliseconds;
+        Trace.WriteLine($"[DISCOVERY-TIMING] root=\"{scope.RootPath}\" totalMs={total.ElapsedMilliseconds} " +
+            $"directories={timing.Directories} entries={timing.Entries} executables={timing.Executables} " +
+            $"issues={inventory.Issues.Count} enumerateMs={timing.DirectoryEnumerationMilliseconds} " +
+            $"revalidateMs={timing.RevalidationMilliseconds} buildMs={timing.BuildMilliseconds}");
+        return inventory;
     }
 
     private void RevalidateKnownPaths(string root, List<string> traversedDirectories,
@@ -292,5 +320,15 @@ public sealed class WindowsExecutableInventorySource : IExecutableInventorySourc
             throw new FileNotFoundException("Executable disappeared.", path);
         return new FileRevision(stream.Length,
             new DateTimeOffset(info.LastWriteTimeUtc));
+    }
+
+    private sealed class InventoryTiming
+    {
+        public int Directories { get; set; }
+        public int Entries { get; set; }
+        public int Executables { get; set; }
+        public long DirectoryEnumerationMilliseconds { get; set; }
+        public long RevalidationMilliseconds { get; set; }
+        public long BuildMilliseconds { get; set; }
     }
 }

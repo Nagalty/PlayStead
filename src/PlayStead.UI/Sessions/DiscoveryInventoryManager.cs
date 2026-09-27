@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Data.Common;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
@@ -357,12 +358,15 @@ public sealed class DiscoveryInventoryManager
         PreparedInstallation installation, long revision, CancellationToken cancellationToken,
         bool prepareEpisode, InstallationId? requestId = null, long scopeRevision = 0)
     {
+        var total = Stopwatch.StartNew();
         var id = installation.Installation.Id;
         if (installation.Root is null) return null;
         var knownGeneration = Guid.Empty;
         try
         {
+            var persistence = Stopwatch.StartNew();
             var persisted = await _learningStore.LoadAsync(id, cancellationToken);
+            var persistenceMilliseconds = persistence.ElapsedMilliseconds;
             if (!IsCurrent(revision, cancellationToken, requestId, scopeRevision)) return null;
             bool reappeared;
             lock (_gate) reappeared = _removed.Contains(id);
@@ -375,9 +379,12 @@ public sealed class DiscoveryInventoryManager
             var scope = new InstallationScope(installation.Installation.GameId, id,
                 installation.Root, generation, true);
             ExecutableInventory inventory;
+            long inventoryMilliseconds = 0;
             try
             {
+                var inventoryStopwatch = Stopwatch.StartNew();
                 inventory = await _inventorySource.InventoryAsync(scope, cancellationToken);
+                inventoryMilliseconds = inventoryStopwatch.ElapsedMilliseconds;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -394,6 +401,7 @@ public sealed class DiscoveryInventoryManager
             if (!IsCurrent(revision, cancellationToken, requestId, scopeRevision)) return null;
             var incoming = new DiscoveryInventoryContext(inventory, installation.Ambiguous);
             ProcessSignatureLearningState state;
+            var learningStopwatch = Stopwatch.StartNew();
             if (prepareEpisode)
             {
                 var current = _coordinator.GetState(id);
@@ -407,6 +415,10 @@ public sealed class DiscoveryInventoryManager
                 }
             }
             else state = await _coordinator.InitializeAsync(incoming, cancellationToken);
+            Trace.WriteLine($"[DISCOVERY-TIMING] installation={id} totalMs={total.ElapsedMilliseconds} " +
+                $"persistenceMs={persistenceMilliseconds} inventoryMs={inventoryMilliseconds} " +
+                $"learningMs={learningStopwatch.ElapsedMilliseconds} candidates={inventory.Candidates.Count} " +
+                $"issues={inventory.Issues.Count} prepareEpisode={prepareEpisode}");
             lock (_gate)
             {
                 if (!IsCurrentLocked(revision, cancellationToken, requestId, scopeRevision))

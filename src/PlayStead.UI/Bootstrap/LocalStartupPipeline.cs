@@ -197,16 +197,11 @@ public sealed class LocalStartupPipeline
     public async Task<LocalStartupState> InitializeAsync(
         CancellationToken cancellationToken)
     {
-        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN DatabaseInitializer.InitializeAsync");
-        await _databaseInitializer.InitializeAsync(
-            cancellationToken);
-        System.Diagnostics.Trace.WriteLine("[STARTUP] END DatabaseInitializer.InitializeAsync");
+        await StartupForensicTrace.MeasureAsync("Database", () => _databaseInitializer.InitializeAsync(cancellationToken));
 
         if (_catalogDatabaseInitializer is not null)
         {
-            System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN CatalogDatabaseInitializer.InitializeAsync");
-            await _catalogDatabaseInitializer.InitializeAsync(cancellationToken);
-            System.Diagnostics.Trace.WriteLine("[STARTUP] END CatalogDatabaseInitializer.InitializeAsync");
+            await StartupForensicTrace.MeasureAsync("CatalogDatabase", () => _catalogDatabaseInitializer.InitializeAsync(cancellationToken));
         }
 
         if (_notificationRetentionStartup is not null)
@@ -216,36 +211,36 @@ public sealed class LocalStartupPipeline
             System.Diagnostics.Trace.WriteLine("[STARTUP] END NotificationRetentionStartup.InitializeAsync");
         }
 
-        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN DatabaseHealthChecker.QuickCheckAsync");
-        var health =
-            await _databaseHealthChecker.QuickCheckAsync(
-                cancellationToken);
-        System.Diagnostics.Trace.WriteLine("[STARTUP] END DatabaseHealthChecker.QuickCheckAsync");
-
-        System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN ILibraryStore.LoadSnapshotAsync");
-        var snapshot =
-            await _libraryStore.LoadSnapshotAsync(
-                cancellationToken);
-        System.Diagnostics.Trace.WriteLine("[STARTUP] END ILibraryStore.LoadSnapshotAsync");
-
-        if (health.IsHealthy && _discoveryInventory is { } discoveryInventory)
+        DatabaseHealthResult? health = null;
+        await StartupForensicTrace.MeasureAsync("DatabaseHealth", async () =>
         {
-            discoveryInventory.Schedule(snapshot, cancellationToken);
-            await discoveryInventory.AwaitIdleAsync(cancellationToken);
+            health = await _databaseHealthChecker.QuickCheckAsync(cancellationToken);
+        });
+
+        LibrarySnapshot? snapshot = null;
+        await StartupForensicTrace.MeasureAsync("CachedSnapshot", async () =>
+        {
+            snapshot = await _libraryStore.LoadSnapshotAsync(cancellationToken);
+        });
+
+        if (health!.IsHealthy && _discoveryInventory is { } discoveryInventory)
+        {
+            await StartupForensicTrace.MeasureAsync("DiscoveryInventory", async () =>
+            {
+                discoveryInventory.Schedule(snapshot!, cancellationToken);
+                await discoveryInventory.AwaitIdleAsync(cancellationToken);
+            });
             var contexts = discoveryInventory.GetCurrentContexts();
         }
 
         if (_steamReferenceRuntime is not null)
         {
-            System.Diagnostics.Trace.WriteLine("[STARTUP] BEGIN ISteamReferenceRuntime.LoadCachedAsync");
-            await _steamReferenceRuntime.LoadCachedAsync(
-                cancellationToken);
-            System.Diagnostics.Trace.WriteLine("[STARTUP] END ISteamReferenceRuntime.LoadCachedAsync");
+            await StartupForensicTrace.MeasureAsync("SteamReferenceCache", () => _steamReferenceRuntime.LoadCachedAsync(cancellationToken));
         }
 
         return new LocalStartupState(
-            health,
-            snapshot);
+            health!,
+            snapshot!);
     }
 
     public async Task<LibrarySnapshot> RefreshAsync(
@@ -262,26 +257,25 @@ public sealed class LocalStartupPipeline
         await _refreshSemaphore.WaitAsync(cancellationToken);
         try
         {
-            var results =
-                await _scanCoordinator.ScanAllAsync(
-                    cancellationToken);
+            IReadOnlyList<SourceScanResult>? results = null;
+            await StartupForensicTrace.MeasureAsync("LibraryDiscovery", async () =>
+            {
+                results = await _scanCoordinator.ScanAllAsync(cancellationToken);
+            });
 
-            foreach (var result in results)
+            foreach (var result in results!)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                await _libraryStore.ApplySourceScanAsync(
-                    result,
-                    cancellationToken);
+                await StartupForensicTrace.MeasureAsync($"LibraryReconciliation.{result.Provider}",
+                    () => _libraryStore.ApplySourceScanAsync(result, cancellationToken));
 
                 if (_identityResolutionCoordinator is not null)
                 {
                     try
                     {
-                        await _identityResolutionCoordinator
-                            .ResolveAfterScanAsync(
-                                result,
-                                cancellationToken);
+                        await StartupForensicTrace.MeasureAsync($"IdentityResolution.{result.Provider}",
+                            () => _identityResolutionCoordinator.ResolveAfterScanAsync(result, cancellationToken));
                     }
                     catch (OperationCanceledException)
                         when (cancellationToken.IsCancellationRequested)
@@ -330,8 +324,7 @@ public sealed class LocalStartupPipeline
 
             if (_steamReferenceRuntime is not null)
             {
-                await _steamReferenceRuntime.RefreshStaleAsync(
-                    cancellationToken);
+                await StartupForensicTrace.MeasureAsync("SteamReferenceRefresh", () => _steamReferenceRuntime.RefreshStaleAsync(cancellationToken));
             }
 
             var snapshot = await _libraryStore.LoadSnapshotAsync(

@@ -16,6 +16,15 @@ public sealed class ApplicationRuntime
     private readonly LocalStartupPipeline _startupPipeline;
     private readonly LibraryViewModel _libraryViewModel;
     private readonly IAppInvocationHandler _invocationHandler;
+    private readonly ProviderActivityReconciliationService? _providerActivity;
+    private readonly ILibraryStore? _libraryStore;
+    private readonly ProviderGameMetadataReconciliationService? _providerGameMetadata;
+    private readonly ProviderGameMetadataOnlineReconciliationService? _onlineProviderGameMetadata;
+    private readonly ProviderInstallUpdateStateReconciliationService? _providerInstallUpdates;
+    private readonly SteamInstallUpdateLiveRefreshService? _steamLiveRefresh;
+    private readonly object _onlineRefreshGate = new();
+    private Task? _onlineRefreshTask;
+    private CancellationToken _postReadyCancellationToken;
 
     public ApplicationRuntime(
         LocalStartupPipeline startupPipeline,
