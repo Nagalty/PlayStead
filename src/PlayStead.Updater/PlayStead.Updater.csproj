@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <PlaySteadProductVersion Condition="'$(PlaySteadProductVersion)' == ''">0.4.1-dev</PlaySteadProductVersion>
+    <AssemblyInformationalVersion>$(PlaySteadProductVersion)</AssemblyInformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Version Condition="'$(Version)' == ''">$(PlaySteadProductVersion)</Version>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>PlayStead.Updater</AssemblyName>
+  </PropertyGroup>
+</Project>

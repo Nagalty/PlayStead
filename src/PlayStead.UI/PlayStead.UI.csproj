@@ -7,6 +7,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>PlaySteadDistributionChannel</_Parameter1>
+      <_Parameter2>$(PlaySteadDistributionChannel)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <Target Name="CopyUpdater" AfterTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)\..\PlayStead.Updater\bin\$(Configuration)\net10.0\PlayStead.Updater.exe')">
+    <ItemGroup>
+      <UpdaterPayload Include="$(MSBuildProjectDirectory)\..\PlayStead.Updater\bin\$(Configuration)\net10.0\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UpdaterPayload)" DestinationFiles="@(UpdaterPayload->'$(TargetDir)UpdaterHost\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
+
+  <ItemGroup>
     <Using Remove="System.Drawing" />
     <Using Remove="System.Windows.Forms" />
   </ItemGroup>
