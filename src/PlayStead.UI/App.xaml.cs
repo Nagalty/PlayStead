@@ -318,7 +318,14 @@ public partial class App : Application
                     return Task.CompletedTask;
                 },
             SignalStartupReady:
-                () => GetRequiredService<StartupProgressState>().Ready(),
+                () =>
+                {
+                    GetRequiredService<StartupProgressState>().Ready();
+                    GetRequiredService<ApplicationRuntime>()
+                        .StartPostReadyEnrichment(_lifetime.Token);
+                    GetRequiredService<AppUpdateCoordinator>()
+                        .StartPostReadyCheck(_lifetime.Token);
+                },
             StopDiscoveryAsync:
                 cancellationToken =>
                     GetRequiredService<DiscoveryInventoryManager>()

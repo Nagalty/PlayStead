@@ -18,6 +18,7 @@ using PlayStead.UI.Shell;
 using PlayStead.UI.State;
 using PlayStead.UI.Tray;
 using PlayStead.UI.Bootstrap;
+using PlayStead.UI.Updates;
 
 namespace PlayStead.UI;
 
@@ -798,6 +799,8 @@ public partial class MainWindow : Window
                 {
                     break;
                 }
+
+                _ = _attentionViewModel.RefreshAsync(CancellationToken.None);
 
                 _attentionView ??= new AttentionView(_attentionViewModel);
                 MainContent.Content = _attentionView;

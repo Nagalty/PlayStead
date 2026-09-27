@@ -48,6 +48,9 @@ using PlayStead.UI.SingleInstance;
 using PlayStead.UI.State;
 using PlayStead.UI.Steam;
 using PlayStead.UI.Tray;
+using PlayStead.UI.Updates;
+using PlayStead.Core.Updates;
+using PlayStead.Providers.Updates;
 
 namespace PlayStead.UI.Bootstrap;
 
@@ -74,6 +77,7 @@ public static class PlaySteadHost
 
         var dataRoot = Path.GetDirectoryName(layout.DatabasePath)
             ?? throw new InvalidOperationException("PlayStead database path has no parent directory.");
+        builder.Services.AddSingleton(new AppUpdatePaths(Path.Combine(dataRoot, "Updates")));
         builder.Services.AddSingleton(new CatalogDatabaseOptions(
             Path.Combine(dataRoot, "catalog.db"),
             Path.Combine(layout.BackupsDirectory, "Catalog")));
@@ -431,16 +435,30 @@ public static class PlaySteadHost
                         UiPreferencesStore>(),
                     services.GetRequiredService<
                         IGameMediaResolver>(),
-                    services.GetRequiredService<ICanonicalCatalogStore>()));
+                    services.GetRequiredService<ICanonicalCatalogStore>(),
+                    services.GetRequiredService<PlayStead.Core.Shortlist.IGamesDuMomentService>(),
+                    services.GetRequiredService<IProviderGameMetadataStore>()));
 
         builder.Services.AddSingleton<
             SessionViewModel>();
 
         builder.Services.AddSingleton<
-            HomeViewModel>();
+            PlayStead.Core.Shortlist.IGamesDuMomentService,
+            PlayStead.Data.Shortlist.SqliteGamesDuMomentService>();
+        builder.Services.AddSingleton<
+            PlayStead.Core.Sessions.IWeeklyActivitySummaryService,
+            PlayStead.Data.Sessions.SqliteWeeklyActivitySummaryService>();
 
         builder.Services.AddSingleton<
-            AttentionViewModel>();
+            HomeViewModel>();
+
+        builder.Services.AddSingleton<PlayStead.Core.Notifications.IAttentionService>(services =>
+            new PlayStead.Core.Notifications.NotificationAttentionService(
+                services.GetRequiredService<PlayStead.Core.Notifications.INotificationCenterService>(),
+                services.GetRequiredService<PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateStateReconciliationService>(),
+                services.GetRequiredService<PlayStead.Core.Persistence.ILibraryStore>()));
+        builder.Services.AddSingleton<AttentionViewModel>(services =>
+            new AttentionViewModel(services.GetRequiredService<PlayStead.Core.Notifications.IAttentionService>()));
 
         builder.Services.AddSingleton<
             NotificationCenterViewModel>();
@@ -465,6 +483,54 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<
             TrayIconService>();
+
+        builder.Services.AddSingleton<IDistributionChannelProvider>(_ =>
+            new BuildDistributionChannelProvider(typeof(PlaySteadHost).Assembly));
+        builder.Services.AddSingleton(new GitHubUpdateOptions(
+            ManifestUrl: Environment.GetEnvironmentVariable("PLAYSTEAD_GITHUB_UPDATE_MANIFEST_URL")));
+        builder.Services.AddSingleton(new MicrosoftStoreUpdateOptions());
+        builder.Services.AddSingleton<IGitHubUpdateManifestClient>(services =>
+        {
+            var options = services.GetRequiredService<GitHubUpdateOptions>();
+            var client = new HttpClient
+            {
+                Timeout = options.Timeout ?? TimeSpan.FromSeconds(5)
+            };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("PlayStead/0.4.3");
+            return new HttpGitHubUpdateManifestClient(client);
+        });
+        builder.Services.AddSingleton<IAppUpdatePackageDownloader>(services =>
+        {
+            var client = new HttpClient
+            {
+                Timeout = Timeout.InfiniteTimeSpan
+            };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("PlayStead/0.4.3");
+            return new GitHubAppUpdatePackageDownloader(
+                client,
+                services.GetRequiredService<AppUpdatePaths>().UpdatesRoot);
+        });
+        builder.Services.AddSingleton<IMicrosoftStoreUpdateProbe, ReflectionMicrosoftStoreUpdateProbe>();
+        builder.Services.AddSingleton<IAppUpdateService>(services =>
+        {
+            var channel = services.GetRequiredService<IDistributionChannelProvider>().Current;
+            return channel switch
+            {
+                DistributionChannel.MicrosoftStore =>
+                    new MicrosoftStoreAppUpdateService(
+                        PlayStead.Core.Product.ProductVersion.Current,
+                        services.GetRequiredService<MicrosoftStoreUpdateOptions>(),
+                        services.GetRequiredService<IMicrosoftStoreUpdateProbe>()),
+                _ => new GitHubAppUpdateService(
+                    PlayStead.Core.Product.ProductVersion.Current,
+                    options: services.GetRequiredService<GitHubUpdateOptions>(),
+                    client: services.GetRequiredService<IGitHubUpdateManifestClient>())
+            };
+        });
+          builder.Services.AddSingleton<AppUpdateCoordinator>();
+          builder.Services.AddSingleton<IAppUpdateInstaller>(services =>
+              new ExternalAppUpdateInstaller(services.GetRequiredService<AppUpdatePaths>()));
+        builder.Services.AddSingleton<AppUpdateNotificationViewModel>();
 
         return builder.Build();
     }

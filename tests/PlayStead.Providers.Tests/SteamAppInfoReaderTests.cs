@@ -75,7 +75,6 @@ public sealed class SteamAppInfoReaderTests
         Assert.Equal("Tool", result.Type);
     }
 
-
     [Fact]
     public void Real_appinfo_classifies_Oasis_driver_as_application_when_present()
     {
@@ -84,6 +83,19 @@ public sealed class SteamAppInfoReaderTests
         var result = new SteamAppInfoReader().Find(path, 3824490);
         Assert.NotNull(result);
         Assert.Equal("Application", result!.Type);
+    }
+
+    [Fact]
+    public void Real_appinfo_exposes_public_build_and_depot_manifest_evidence_when_present()
+    {
+        var path = @"C:\Program Files (x86)\Steam\appcache\appinfo.vdf";
+        if (!File.Exists(path)) return;
+
+        var result = new SteamAppInfoReader().Find(path, 553850);
+
+        Assert.NotNull(result);
+        Assert.Equal("25480438", result!.PublicBuildId);
+        Assert.Equal("9065746766815828060", result.PublicDepotManifests!["553854"]);
     }
 
     [Fact]

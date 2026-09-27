@@ -141,6 +141,48 @@
                 <notifications:NotificationPanel />
         </Border>
 
+        <Border x:Name="AppUpdateNotificationHost"
+                Grid.Row="1"
+                Panel.ZIndex="40"
+                Width="340"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,12,24,0"
+                Padding="16"
+                Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource PlayStead.Radius.Small}"
+                Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                AutomationProperties.Name="Notification de mise à jour PlayStead">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Path Width="18"
+                          Height="18"
+                          VerticalAlignment="Center"
+                          Data="{DynamicResource PlayStead.Icon.Verify}"
+                          Stroke="{DynamicResource PlayStead.Brush.Copper}"
+                          StrokeThickness="1.5"
+                          Stretch="Uniform" />
+                    <TextBlock Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Text="{Binding Title}"
+                               Style="{DynamicResource PlayStead.Text.Body}"
+                               Foreground="{DynamicResource PlayStead.Brush.Copper}"
+                               FontWeight="SemiBold" />
+                </StackPanel>
+                <TextBlock Margin="0,6,0,12"
+                           Text="{Binding Detail}"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource PlayStead.Brush.TextSecondary}" />
+                <Button Content="{Binding ActionLabel}"
+                        Command="{Binding ActionCommand}"
+                        AutomationProperties.Name="{Binding ActionLabel}"
+                        HorizontalAlignment="Left"
+                        Style="{DynamicResource PlayStead.Button.Primary}" />
+            </StackPanel>
+        </Border>
+
         <Border x:Name="StartupOverlay" Grid.RowSpan="2" Panel.ZIndex="100"
                 IsHitTestVisible="{Binding StartupProgress.IsBusy, ElementName=RootWindow}"
                 Background="{DynamicResource PlayStead.Brush.Background}"
