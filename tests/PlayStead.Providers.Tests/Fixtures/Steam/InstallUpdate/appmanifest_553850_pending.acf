@@ -1,0 +1,25 @@
+"AppState"
+{
+    "appid" "553850"
+    "name" "HELLDIVERS™ 2"
+    "StateFlags" "6"
+    "installdir" "Helldivers 2"
+    "buildid" "25327279"
+    "BytesToDownload" "86653644"
+    "BytesDownloaded" "0"
+    "BytesToStage" "0"
+    "BytesStaged" "0"
+    "StagingSize" "0"
+    "TargetBuildID" "25480438"
+    "InstalledDepots"
+    {
+        "553851"
+        {
+            "manifest" "4376562253430864477"
+        }
+        "553853"
+        {
+            "manifest" "3808327898058099648"
+        }
+    }
+}

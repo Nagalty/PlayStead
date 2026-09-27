@@ -1,11 +1,35 @@
 using PlayStead.Core.Library;
 using PlayStead.Core.ProviderActivity;
+using PlayStead.Core.ProviderInstallUpdate;
 using PlayStead.Providers.Steam.ValveText;
 
 namespace PlayStead.Providers.Steam;
 
 public sealed class SteamAppManifestReader
 {
+    public ProviderInstallUpdateEvidence ReadInstallUpdateEvidence(string manifestPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(manifestPath);
+
+        var root = ValveTextParser.Parse(File.ReadAllText(manifestPath));
+        if (!root.TryGetValue("AppState", out var raw) || raw is not IReadOnlyDictionary<string, object> app)
+        {
+            throw new FormatException($"Steam manifest '{manifestPath}' has no AppState block.");
+        }
+
+        return new ProviderInstallUpdateEvidence(
+            OptionalString(app, "buildid"),
+            OptionalString(app, "TargetBuildID"),
+            OptionalString(app, "BytesToDownload"),
+            OptionalString(app, "BytesDownloaded"),
+            OptionalString(app, "BytesToStage"),
+            OptionalString(app, "BytesStaged"),
+            OptionalString(app, "StagingSize"),
+            ParseInt(app, "StateFlags"),
+            null,
+            InstalledDepotManifests(app));
+    }
+
     public ProviderActivityMetadata ReadActivity(
         string manifestPath,
         GameId gameId,
@@ -107,5 +131,45 @@ public sealed class SteamAppManifestReader
 
         throw new FormatException(
             $"Steam manifest '{manifestPath}' is missing '{key}'.");
+    }
+
+    private static string? OptionalString(
+        IReadOnlyDictionary<string, object> block,
+        string key) =>
+        block.TryGetValue(key, out var value) &&
+        value is string text &&
+        !string.IsNullOrWhiteSpace(text)
+            ? text
+            : null;
+
+    private static int? ParseInt(
+        IReadOnlyDictionary<string, object> block,
+        string key) =>
+        int.TryParse(OptionalString(block, key), out var value)
+            ? value
+            : null;
+
+    private static IReadOnlyDictionary<string, string>? InstalledDepotManifests(
+        IReadOnlyDictionary<string, object> app)
+    {
+        if (!app.TryGetValue("InstalledDepots", out var raw) ||
+            raw is not IReadOnlyDictionary<string, object> depots)
+        {
+            return null;
+        }
+
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var depot in depots)
+        {
+            if (depot.Value is IReadOnlyDictionary<string, object> values &&
+                values.TryGetValue("manifest", out var manifest) &&
+                manifest is string text &&
+                !string.IsNullOrWhiteSpace(text))
+            {
+                result[depot.Key] = text.Trim();
+            }
+        }
+
+        return result;
     }
 }

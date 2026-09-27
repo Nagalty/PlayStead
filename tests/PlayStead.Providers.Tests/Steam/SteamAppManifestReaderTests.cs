@@ -69,6 +69,38 @@ public sealed class SteamAppManifestReaderTests
         }
     }
 
+    [Fact]
+    public void ReadInstallUpdateEvidence_maps_the_real_Helldivers_pending_update_fixture()
+    {
+        var fixture = FixturePath(Path.Combine("InstallUpdate", "appmanifest_553850_pending.acf"));
+
+        var result = new SteamAppManifestReader().ReadInstallUpdateEvidence(fixture);
+
+        Assert.Equal("25327279", result.InstalledBuildId);
+        Assert.Equal("25480438", result.TargetBuildId);
+        Assert.Equal("86653644", result.BytesToDownload);
+        Assert.Equal("0", result.BytesDownloaded);
+        Assert.Equal("0", result.BytesToStage);
+        Assert.Equal("0", result.BytesStaged);
+        Assert.Equal("0", result.StagingSize);
+        Assert.Equal(6, result.StateFlags);
+        Assert.Equal("4376562253430864477", result.InstalledDepotManifests!["553851"]);
+    }
+
+    [Fact]
+    public void ReadInstallUpdateEvidence_maps_captured_completed_counters_and_depots()
+    {
+        var fixture = FixturePath(Path.Combine("InstallUpdate", "appmanifest_1172710_completed.acf"));
+
+        var result = new SteamAppManifestReader().ReadInstallUpdateEvidence(fixture);
+
+        Assert.Equal("25486029", result.InstalledBuildId);
+        Assert.Equal("25486029", result.TargetBuildId);
+        Assert.Equal("37375447382", result.BytesToStage);
+        Assert.Equal("37375447382", result.BytesStaged);
+        Assert.Equal("8673686202082408760", result.InstalledDepotManifests!["1172711"]);
+    }
+
     private static string FixturePath(string name) =>
         Path.Combine(
             AppContext.BaseDirectory,

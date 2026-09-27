@@ -6,6 +6,7 @@ using PlayStead.UI.Bootstrap;
 using PlayStead.UI.Library;
 using PlayStead.UI.Sessions;
 using PlayStead.UI.Tray;
+using PlayStead.Providers.Steam;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -29,6 +30,8 @@ public partial class App : Application
     private TrayIconService? _trayIconService;
     private IHost? _host;
     private bool _hostStarted;
+    private MainWindow? _focusRefreshWindow;
+    private SteamInstallUpdateLiveRefreshService? _steamLiveRefresh;
 
     protected override async void OnStartup(
         StartupEventArgs e)
@@ -98,6 +101,13 @@ public partial class App : Application
     {
         _lifetime.Cancel();
 
+        if (_focusRefreshWindow is not null)
+        {
+            _focusRefreshWindow.Activated -= MainWindowOnActivated;
+            _focusRefreshWindow.Deactivated -= MainWindowOnDeactivated;
+            _focusRefreshWindow = null;
+        }
+
         if (_trayIconService is not null)
         {
             _trayIconService.ExitRequested -=
@@ -139,6 +149,27 @@ public partial class App : Application
             base.OnExit(e);
         }
     }
+
+    private void AttachSteamFocusRefresh(MainWindow window)
+    {
+        if (ReferenceEquals(_focusRefreshWindow, window))
+            return;
+        if (_focusRefreshWindow is not null)
+        {
+            _focusRefreshWindow.Activated -= MainWindowOnActivated;
+            _focusRefreshWindow.Deactivated -= MainWindowOnDeactivated;
+        }
+        _focusRefreshWindow = window;
+        _steamLiveRefresh = GetRequiredService<SteamInstallUpdateLiveRefreshService>();
+        window.Activated += MainWindowOnActivated;
+        window.Deactivated += MainWindowOnDeactivated;
+    }
+
+    private void MainWindowOnActivated(object? sender, EventArgs e) =>
+        _steamLiveRefresh?.NotifyActivated(DateTimeOffset.UtcNow);
+
+    private void MainWindowOnDeactivated(object? sender, EventArgs e) =>
+        _steamLiveRefresh?.NotifyDeactivated(DateTimeOffset.UtcNow);
 
     private void JoinShutdownOnDispatcher(Task shutdown)
     {
@@ -227,6 +258,7 @@ public partial class App : Application
                                 GetRequiredService<MainWindow>();
 
                             MainWindow = window;
+                            AttachSteamFocusRefresh(window);
 
                             if (!window.IsVisible) window.Show();
                         },

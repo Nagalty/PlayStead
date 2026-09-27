@@ -3,7 +3,7 @@ using PlayStead.Core.Scanning;
 
 namespace PlayStead.Providers.Steam;
 
-public sealed class SteamLocalLibrarySource : ILocalLibrarySource
+public sealed class SteamLocalLibrarySource : ILocalLibrarySource, ISteamEligibleInstallationSnapshot
 {
     private readonly WindowsSteamRootLocator _rootLocator;
     private readonly SteamLibraryFoldersReader _foldersReader;
@@ -23,6 +23,7 @@ public sealed class SteamLocalLibrarySource : ILocalLibrarySource
     }
 
     public ProviderKind Provider => ProviderKind.Steam;
+    public IReadOnlySet<string>? EligibleExternalIds { get; private set; }
 
     public Task<SourceScanResult> ScanAsync(
         CancellationToken cancellationToken)
@@ -32,6 +33,7 @@ public sealed class SteamLocalLibrarySource : ILocalLibrarySource
 
         if (root is null)
         {
+            EligibleExternalIds = new HashSet<string>(StringComparer.Ordinal);
             return Task.FromResult(
                 SourceScanResult.Success(
                     Provider,
@@ -122,6 +124,10 @@ public sealed class SteamLocalLibrarySource : ILocalLibrarySource
                 x => x.ExternalId,
                 StringComparer.Ordinal)
             .ToArray();
+
+        EligibleExternalIds = ordered
+            .Select(x => x.ExternalId)
+            .ToHashSet(StringComparer.Ordinal);
 
         return Task.FromResult(
             SourceScanResult.Success(

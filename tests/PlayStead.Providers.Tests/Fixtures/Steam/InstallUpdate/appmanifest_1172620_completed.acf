@@ -1,0 +1,56 @@
+"AppState"
+{
+	"appid"		"1172620"
+	"universe"		"1"
+	"LauncherPath"		"C:\\Program Files (x86)\\Steam\\steam.exe"
+	"name"		"Sea of Thieves"
+	"StateFlags"		"4"
+	"installdir"		"Sea of Thieves"
+	"lastupdated"		"1790254411"
+	"LastPlayed"		"1790090991"
+	"SizeOnDisk"		"144939998368"
+	"StagingSize"		"0"
+	"buildid"		"25454928"
+	"LastOwner"		"76561198242151672"
+	"DownloadType"		"1"
+	"UpdateResult"		"0"
+	"BytesToDownload"		"2055196848"
+	"BytesDownloaded"		"2055196848"
+	"BytesToStage"		"5909258418"
+	"BytesStaged"		"5909258418"
+	"TargetBuildID"		"25454928"
+	"AutoUpdateBehavior"		"0"
+	"AllowOtherDownloadsWhileRunning"		"0"
+	"ScheduledAutoUpdate"		"0"
+	"InstalledDepots"
+	{
+		"1172621"
+		{
+			"manifest"		"3846670688435861410"
+			"size"		"144910355801"
+		}
+		"2838640"
+		{
+			"manifest"		"502403447961499835"
+			"size"		"29642567"
+			"dlcappid"		"2838640"
+		}
+	}
+	"InstallScripts"
+	{
+		"1172621"		"installScript.vdf"
+	}
+	"SharedDepots"
+	{
+		"228988"		"228980"
+		"228989"		"228980"
+	}
+	"UserConfig"
+	{
+		"language"		"french"
+	}
+	"MountedConfig"
+	{
+		"language"		"french"
+	}
+}
