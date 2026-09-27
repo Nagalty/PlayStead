@@ -134,6 +134,73 @@
             </Grid>
         </Border>
 
+        <Popup x:Name="GlobalSearchPopup"
+               PlacementTarget="{Binding ElementName=ShellSearchBox}"
+               Placement="Bottom"
+               StaysOpen="False"
+               AllowsTransparency="True"
+               IsOpen="{Binding Search.IsOpen, Mode=OneWay}"
+               Closed="GlobalSearchPopup_OnClosed"
+               DataContext="{Binding ElementName=PrimaryNavigation, Path=DataContext}">
+            <Border x:Name="GlobalSearchView"
+                    Width="360"
+                    MaxHeight="420"
+                    Padding="{DynamicResource PlayStead.Spacing.1}"
+                    Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource PlayStead.Radius.Small}">
+                <Grid>
+                    <ItemsControl ItemsSource="{Binding Search.Results}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Padding="{DynamicResource PlayStead.Spacing.1}"
+                                        HorizontalContentAlignment="Stretch"
+                                        Command="{Binding DataContext.Search.SelectResultCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{Binding Title}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Image Grid.Column="0"
+                                               Width="40"
+                                               Height="40"
+                                               Source="{Binding CoverPath}"
+                                               Stretch="UniformToFill" />
+                                        <StackPanel Grid.Column="1" Margin="{DynamicResource PlayStead.Gap.Inline.ButtonIcon}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}"
+                                                       Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                       Text="{Binding ProviderLabel}"
+                                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                                       Style="{DynamicResource PlayStead.Text.Caption}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="Aucun jeu trouvé"
+                               Padding="{DynamicResource PlayStead.Spacing.1}"
+                               Foreground="{DynamicResource PlayStead.Brush.TextSecondary}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Search.Results.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Border>
+        </Popup>
+
         <ContentControl x:Name="MainContent"
                         Grid.Row="1">
             <library:LibraryView

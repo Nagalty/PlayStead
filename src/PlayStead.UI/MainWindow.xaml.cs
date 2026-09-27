@@ -115,6 +115,7 @@ public partial class MainWindow : Window
 
         DataContext =
             viewModel;
+        _shellViewModel.SetSearchItems(viewModel.Items);
     }
 
     public MainWindow(
@@ -188,6 +189,7 @@ public partial class MainWindow : Window
 
         DataContext =
             viewModel;
+        _shellViewModel.SetSearchItems(viewModel.Items);
 
         _windowPlacementService =
             windowPlacementService;
@@ -389,11 +391,26 @@ public partial class MainWindow : Window
                 : Visibility.Collapsed;
     }
 
+    private void GlobalSearchPopup_OnClosed(
+        object? sender,
+        EventArgs e)
+    {
+        _shellViewModel.Search.Close();
+        _shellViewModel.SetSearchQuery(string.Empty);
+    }
+
     private void ShellViewModel_OnSearchRequested(
         object? sender,
         string query)
     {
         if (string.IsNullOrWhiteSpace(query)) return;
+
+        if (_shellViewModel.Search.Results.Count > 0)
+        {
+            _shellViewModel.Search.SelectResultCommand.Execute(
+                _shellViewModel.Search.Results[0]);
+            return;
+        }
 
         _navigationService.Navigate(
             new NavigationRequest(AppRoute.Library));
@@ -522,6 +539,12 @@ public partial class MainWindow : Window
 
     private void LibraryViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (sender is LibraryViewModel library &&
+            e.PropertyName == nameof(LibraryViewModel.Items))
+        {
+            _shellViewModel.SetSearchItems(library.Items);
+        }
+
         if (e.PropertyName == nameof(LibraryViewModel.SelectedItem))
         {
             UpdateQuickPanel();

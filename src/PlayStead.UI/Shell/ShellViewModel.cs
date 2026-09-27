@@ -22,6 +22,10 @@ public sealed class ShellViewModel :
         _navigation =
             navigation;
 
+        Search =
+            new GlobalSearchViewModel(
+                navigation);
+
         NavigateHomeCommand =
             new RelayCommand(
                 () => NavigatePrimary(
@@ -69,6 +73,8 @@ public sealed class ShellViewModel :
 
     public event EventHandler<string>? SearchRequested;
 
+    public GlobalSearchViewModel Search { get; }
+
     public string SearchQuery
     {
         get => _searchQuery;
@@ -82,9 +88,13 @@ public sealed class ShellViewModel :
         ArgumentNullException.ThrowIfNull(query);
         if (_searchQuery == query) return;
         _searchQuery = query;
+        Search.SetQuery(query);
         OnPropertyChanged(nameof(SearchQuery));
         ((RelayCommand)SearchCommand).NotifyCanExecuteChanged();
     }
+
+    public void SetSearchItems(IEnumerable<PlayStead.UI.Library.LibraryItemViewModel> items) =>
+        Search.SetItems(items);
 
     public AppRoute CurrentRoute =>
         _navigation.CurrentRoute;
