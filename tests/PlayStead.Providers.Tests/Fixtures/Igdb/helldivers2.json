@@ -1,0 +1,9 @@
+{
+  "id": 9000001,
+  "external_games": [
+    { "uid": "553850", "external_game_source": { "name": "Steam" } }
+  ],
+  "multiplayer_modes": [
+    { "onlinecoop": true, "onlinecoopmax": 4 }
+  ]
+}

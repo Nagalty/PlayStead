@@ -38,10 +38,12 @@ public sealed class SteamMediaArchitectureTests
                 typeof(WindowsSteamRootLocator),
                 localLocatorType,
                 transportType,
-                typeof(IMediaDiagnostics)
+                typeof(IMediaDiagnostics),
+                typeof(ISteamStoreAppDetailsClient)
             ]);
 
         Assert.NotNull(constructor);
         Assert.True(constructor!.GetParameters()[3].IsOptional);
+        Assert.True(constructor.GetParameters()[4].IsOptional);
     }
 }

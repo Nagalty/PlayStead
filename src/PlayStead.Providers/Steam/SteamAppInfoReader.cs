@@ -100,14 +100,34 @@ public sealed class SteamAppInfoReader
     {
         var root = document.Root;
         if (root.TryGetValue("appinfo", out var nested)) root = nested;
+        var genres = FindCollection(root, "genres");
+        var categories = FindCollection(root, "categories");
         var type = FindCommonValue(root, "type");
         var launchConfigurations = FindLaunchConfigurations(root);
+        var releaseDate = FindValue(root, "date");
+        var releaseReported = FindNode(root, "release_date") is not null;
+        var isFreeText = FindValue(root, "is_free");
+        bool? isFree = isFreeText switch
+        {
+            "1" or "true" => true,
+            "0" or "false" => false,
+            _ => null
+        };
         return new SteamAppInfoEntry(
             appId,
             FindValue(root, "developer"),
             FindValue(root, "publisher"),
-            Type: type,
-            LaunchConfigurations: launchConfigurations);
+            genres,
+            categories,
+            releaseDate,
+            releaseReported,
+            isFree,
+            FindCollection(root, "developers"),
+            FindCollection(root, "publishers"),
+            FindPathValue(root, "branches", "public", "buildid"),
+            FindPublicDepotManifests(root),
+            type,
+            launchConfigurations);
     }
 
     private static string? Read(KVObject root, string key) =>
@@ -170,6 +190,90 @@ public sealed class SteamAppInfoReader
         return result;
     }
 
+    private static string? FindPathValue(KVObject root, params string[] path)
+    {
+        if (TryFindPathValue(root, path, 0, out var value))
+        {
+            return value;
+        }
+
+        return null;
+    }
+
+    private static bool TryFindPathValue(
+        KVObject node,
+        IReadOnlyList<string> path,
+        int index,
+        out string? value)
+    {
+        if (index >= path.Count)
+        {
+            value = null;
+            return false;
+        }
+
+        if (index == path.Count - 1 && node.TryGetValue(path[index], out var leaf))
+        {
+            value = leaf.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        if (index < path.Count &&
+            node.TryGetValue(path[index], out var child) &&
+            child.ValueType == KVValueType.Collection &&
+            TryFindPathValue(child, path, index + 1, out value))
+        {
+            return true;
+        }
+
+        foreach (var pair in node)
+        {
+            if (pair.Value.ValueType == KVValueType.Collection &&
+                TryFindPathValue(pair.Value, path, index, out value))
+            {
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static IReadOnlyDictionary<string, string>? FindPublicDepotManifests(KVObject root)
+    {
+        if (!root.TryGetValue("depots", out var rawDepots) ||
+            rawDepots.ValueType != KVValueType.Collection)
+        {
+            return null;
+        }
+
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var depot in rawDepots)
+        {
+            if (depot.Value.ValueType != KVValueType.Collection ||
+                !depot.Value.TryGetValue("manifests", out var rawManifests) ||
+                rawManifests.ValueType != KVValueType.Collection ||
+                !rawManifests.TryGetValue("public", out var rawPublic) ||
+                rawPublic.ValueType != KVValueType.Collection)
+            {
+                continue;
+            }
+
+            var gid = ReadAny(rawPublic, "gid");
+            if (!string.IsNullOrWhiteSpace(gid))
+            {
+                result[depot.Key] = gid.Trim();
+            }
+        }
+
+        return result;
+    }
+
+    private static string? ReadAny(KVObject root, string key) =>
+        root.TryGetValue(key, out var value)
+            ? value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : null;
+
     private static KVObject? FindNode(KVObject node, string key)
     {
         if (node.TryGetValue(key, out var value) && value.ValueType == KVValueType.Collection)
@@ -180,6 +284,19 @@ public sealed class SteamAppInfoReader
             if (found is not null) return found;
         }
         return null;
+    }
+
+    private static IReadOnlyList<string>? FindCollection(KVObject root, string key)
+    {
+        var node = FindNode(root, key);
+        if (node is null) return null;
+        var values = new List<string>();
+        foreach (var pair in node)
+        {
+            var description = FindValue(pair.Value, "description") ?? Read(pair.Value, "value");
+            if (!string.IsNullOrWhiteSpace(description)) values.Add(description.Trim());
+        }
+        return values.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static string ReadCString(BinaryReader reader)

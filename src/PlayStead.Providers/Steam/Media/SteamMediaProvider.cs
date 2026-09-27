@@ -8,13 +8,15 @@ public sealed class SteamMediaProvider : IGameMediaProvider
     private readonly WindowsSteamRootLocator _rootLocator;
     private readonly SteamLocalMediaLocator _localLocator;
     private readonly ISteamMediaTransport _transport;
+    private readonly ISteamStoreAppDetailsClient? _storeClient;
     private readonly IMediaDiagnostics _diagnostics;
 
     public SteamMediaProvider(
         WindowsSteamRootLocator rootLocator,
         SteamLocalMediaLocator localLocator,
         ISteamMediaTransport transport,
-        IMediaDiagnostics? diagnostics = null)
+        IMediaDiagnostics? diagnostics = null,
+        ISteamStoreAppDetailsClient? storeClient = null)
     {
         ArgumentNullException.ThrowIfNull(rootLocator);
         ArgumentNullException.ThrowIfNull(localLocator);
@@ -23,6 +25,7 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         _rootLocator = rootLocator;
         _localLocator = localLocator;
         _transport = transport;
+        _storeClient = storeClient;
         _diagnostics = diagnostics ?? NoOpMediaDiagnostics.Instance;
     }
 
@@ -84,6 +87,12 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         var remoteCandidates = SteamMediaUriFactory.CreateCandidates(
             identity.ProviderGameId,
             assetType);
+        if (assetType == GameMediaAssetType.Header && _storeClient is not null)
+        {
+            var details = await _storeClient.GetAsync(identity.ProviderGameId, cancellationToken).ConfigureAwait(false);
+            if (details?.HeaderImageUri is { } header)
+                remoteCandidates = new[] { header }.Concat(remoteCandidates).ToArray();
+        }
 
         GameMediaPayload? payload;
         try

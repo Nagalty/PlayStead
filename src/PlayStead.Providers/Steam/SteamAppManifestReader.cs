@@ -1,10 +1,40 @@
 using PlayStead.Core.Library;
+using PlayStead.Core.ProviderActivity;
 using PlayStead.Providers.Steam.ValveText;
 
 namespace PlayStead.Providers.Steam;
 
 public sealed class SteamAppManifestReader
 {
+    public ProviderActivityMetadata ReadActivity(
+        string manifestPath,
+        GameId gameId,
+        DateTimeOffset observedAtUtc)
+    {
+        var root = ValveTextParser.Parse(File.ReadAllText(manifestPath));
+        if (!root.TryGetValue("AppState", out var raw) || raw is not IReadOnlyDictionary<string, object> app)
+        {
+            throw new FormatException($"Steam manifest '{manifestPath}' has no AppState block.");
+        }
+        var appId = Required(app, "appid", manifestPath);
+        long? minutes = null;
+        if (app.TryGetValue("playtime_forever", out var rawMinutes) && rawMinutes is string text && long.TryParse(text, out var parsed) && parsed >= 0)
+        {
+            minutes = parsed;
+        }
+        DateTimeOffset? lastPlayed = null;
+        if (app.TryGetValue("LastPlayed", out var rawLast) && rawLast is string lastText && long.TryParse(lastText, out var unix) && unix > 0)
+        {
+            lastPlayed = DateTimeOffset.FromUnixTimeSeconds(unix);
+        }
+        var availability = minutes.HasValue || lastPlayed.HasValue
+            ? ProviderActivityAvailability.Complete
+            : ProviderActivityAvailability.Unknown;
+        return new ProviderActivityMetadata(gameId, ProviderKind.Steam, appId,
+            minutes.HasValue ? TimeSpan.FromMinutes(minutes.Value) : null,
+            lastPlayed, observedAtUtc, availability);
+    }
+
     public DiscoveredInstallation Read(
         string manifestPath,
         string libraryRoot,

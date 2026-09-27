@@ -22,9 +22,11 @@ public sealed class SteamMediaProviderDependencyTests
                 typeof(WindowsSteamRootLocator),
                 typeof(SteamLocalMediaLocator),
                 typeof(ISteamMediaTransport),
-                typeof(IMediaDiagnostics)
+                typeof(IMediaDiagnostics),
+                typeof(ISteamStoreAppDetailsClient)
             ],
             parameterTypes);
         Assert.True(constructor.GetParameters()[3].IsOptional);
+        Assert.True(constructor.GetParameters()[4].IsOptional);
     }
 }

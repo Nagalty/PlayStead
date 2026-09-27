@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
+using PlayStead.Core.ProviderActivity;
 using PlayStead.Data.Database;
 using PlayStead.Data.Library;
 using PlayStead.Platform.SingleInstance;
@@ -133,6 +134,42 @@ public sealed class ApplicationRuntimeTests : IDisposable
         Assert.Equal(invocation, handler.LastInvocation);
     }
 
+    [Fact]
+    public async Task Initialize_and_refresh_reconcile_provider_activity()
+    {
+        Directory.CreateDirectory(_root);
+        var options = new DatabaseOptions(
+            Path.Combine(_root, "playstead.db"),
+            Path.Combine(_root, "Backups"));
+        var initializer = new DatabaseInitializer(options);
+        await initializer.InitializeAsync(CancellationToken.None);
+        ILibraryStore library = new SqliteLibraryStore(options);
+        var observed = DateTimeOffset.UtcNow;
+        await library.ApplySourceScanAsync(SourceScanResult.Success(
+            ProviderKind.Steam,
+            observed,
+            [DiscoveredInstallation.Create(ProviderKind.Steam, "42", "Game", "G:\\Game", null, observed)]),
+            CancellationToken.None);
+
+        var activityStore = new MemoryActivityStore();
+        var source = new RecordingActivitySource();
+        var reconciliation = new ProviderActivityReconciliationService(activityStore, [source]);
+        var runtime = new ApplicationRuntime(
+            new LocalStartupPipeline(initializer, new DatabaseHealthChecker(options), library,
+                new LocalScanCoordinator(Array.Empty<ILocalLibrarySource>())),
+            new LibraryViewModel(library),
+            new RecordingInvocationHandler(),
+            reconciliation,
+            library);
+
+        await runtime.InitializeAsync(CancellationToken.None);
+        Assert.Equal(1, source.Calls);
+        Assert.Single(await activityStore.GetAllAsync(CancellationToken.None));
+
+        await runtime.RefreshAsync(CancellationToken.None);
+        Assert.Equal(2, source.Calls);
+    }
+
     private sealed class StubSource(
         SourceScanResult result) : ILocalLibrarySource
     {
@@ -160,6 +197,36 @@ public sealed class ApplicationRuntimeTests : IDisposable
         {
             Count++;
             LastInvocation = invocation;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingActivitySource : IProviderActivityMetadataSource
+    {
+        public ProviderKind Provider => ProviderKind.Steam;
+        public int Calls { get; private set; }
+        public Task<IReadOnlyList<ProviderActivityMetadata>> GetAsync(
+            IReadOnlyCollection<GameInstallation> installations,
+            CancellationToken cancellationToken)
+        {
+            Calls++;
+            var installation = Assert.Single(installations);
+            return Task.FromResult<IReadOnlyList<ProviderActivityMetadata>>([
+                new ProviderActivityMetadata(installation.GameId, ProviderKind.Steam, installation.ExternalId,
+                    null, DateTimeOffset.UtcNow.AddDays(-60), DateTimeOffset.UtcNow,
+                    ProviderActivityAvailability.Complete)]);
+        }
+    }
+
+    private sealed class MemoryActivityStore : IProviderActivityMetadataStore
+    {
+        private readonly List<ProviderActivityMetadata> _values = [];
+        public Task<IReadOnlyList<ProviderActivityMetadata>> GetAllAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ProviderActivityMetadata>>(_values.ToArray());
+        public Task UpsertAsync(ProviderActivityMetadata metadata, CancellationToken cancellationToken)
+        {
+            _values.RemoveAll(value => value.GameId == metadata.GameId && value.Provider == metadata.Provider);
+            _values.Add(metadata);
             return Task.CompletedTask;
         }
     }

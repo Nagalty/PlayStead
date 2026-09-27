@@ -1,0 +1,18 @@
+{
+  "captured_appdetails": {
+    "success": true,
+    "data": {
+      "steam_appid": 1284210,
+      "name": "Guild Wars 2",
+      "header_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/1284210/header.jpg",
+      "capsule_image": "https://cdn.cloudflare.steamstatic.com/steam/apps/1284210/capsule_231x87.jpg",
+      "capsule_imagev5": "https://cdn.cloudflare.steamstatic.com/steam/apps/1284210/capsule_231x87.jpg",
+      "genres": [{"id": "1", "description": "Action"}],
+      "categories": [{"id": "1", "description": "Multi-player"}],
+      "developers": ["ArenaNet"],
+      "publishers": ["ArenaNet"],
+      "release_date": {"date": "28 août 2012"},
+      "short_description": "Guild Wars 2"
+    }
+  }
+}
