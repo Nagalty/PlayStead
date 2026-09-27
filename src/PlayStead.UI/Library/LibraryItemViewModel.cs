@@ -20,9 +20,6 @@ public sealed record LibraryItemViewModel(
 {
     private string? _coverPath;
     private string? _logoPath;
-    private static readonly CultureInfo DisplayCulture =
-        CultureInfo.GetCultureInfo("fr-FR");
-
     public string? CoverPath =>
         _coverPath;
 
@@ -81,7 +78,7 @@ public sealed record LibraryItemViewModel(
 
     public string InstalledSizeLabel =>
         InstalledSizeBytes is long bytes
-            ? $"{bytes / 1_000_000_000d:N1} Go".Replace(
+            ? $"{(bytes / 1_000_000_000d).ToString("N1", UiDisplayCulture.Current)} Go".Replace(
                 '\u00A0',
                 ' ')
             : "Taille inconnue";

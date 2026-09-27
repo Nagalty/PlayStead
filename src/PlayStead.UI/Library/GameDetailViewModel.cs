@@ -5,7 +5,6 @@ using System.IO;
 using PlayStead.Core.Library;
 using PlayStead.Core.Catalog;
 using PlayStead.Core.Persistence;
-using System.Globalization;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Launching;
 using PlayStead.UI.Sessions;
@@ -13,6 +12,7 @@ using PlayStead.Core.Shortlist;
 using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.Core.GameBuildHistory;
 using CommunityToolkit.Mvvm.Input;
+using System.Globalization;
 
 namespace PlayStead.UI.Library;
 
@@ -177,7 +177,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         var content = await _catalogStore.GetByIdAsync(contentId, cancellationToken);
         DeveloperDisplay = content?.Developer;
         PublisherDisplay = content?.Publisher;
-        ReleaseDateDisplay = content?.ReleaseDate?.ToString("d MMMM yyyy", CultureInfo.CurrentCulture);
+        ReleaseDateDisplay = content?.ReleaseDate?.ToString("d MMMM yyyy", UiDisplayCulture.Current);
         OnPropertyChanged(nameof(DeveloperDisplay));
         OnPropertyChanged(nameof(PublisherDisplay));
         OnPropertyChanged(nameof(ReleaseDateDisplay));
@@ -323,7 +323,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         }
         if (!HasReleaseDate && metadata.ReleaseDate is DateOnly releaseDate)
         {
-            ReleaseDateDisplay = releaseDate.ToString("d MMMM yyyy", CultureInfo.CurrentCulture);
+            ReleaseDateDisplay = releaseDate.ToString("d MMMM yyyy", UiDisplayCulture.Current);
             OnPropertyChanged(nameof(ReleaseDateDisplay));
             OnPropertyChanged(nameof(HasReleaseDate));
         }

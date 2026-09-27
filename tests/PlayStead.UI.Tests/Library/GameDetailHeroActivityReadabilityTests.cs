@@ -33,6 +33,17 @@ public sealed class GameDetailHeroActivityReadabilityTests
     [Fact]
     public void Active_status_remains_primary_semibold()
     {
-        Assert.Contains("Text=\"{Binding SessionStatusLabel}\"\n                                       Foreground=\"{DynamicResource PlayStead.Brush.TextPrimary}\"\n                                       FontSize=\"14\"\n                                       FontWeight=\"SemiBold\"", Hero, StringComparison.Ordinal);
+        Assert.Contains(
+            "PlayLabel=\"{Binding DataContext.SessionStatusLabel,",
+            Hero,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "TargetNullValue=Jouer",
+            Hero,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "controls:PlaySplitButton",
+            Hero,
+            StringComparison.Ordinal);
     }
 }

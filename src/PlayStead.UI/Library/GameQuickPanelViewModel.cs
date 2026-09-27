@@ -275,7 +275,7 @@ public sealed class GameQuickPanelViewModel :
 
         return localTimestamp.ToString(
             format,
-            CultureInfo.GetCultureInfo("fr-FR"));
+            UiDisplayCulture.Current);
     }
 
     private void SetRecentActivitySessions(IReadOnlyList<RecentActivitySessionItemViewModel> value)
