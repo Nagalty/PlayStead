@@ -248,12 +248,14 @@
                             <TextBlock Margin="0,4,0,0"
                                        Text="{Binding Activity.ProviderActivitySourceLabel}"
                                        Style="{DynamicResource PlayStead.Text.BodySecondary}"/>
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="Temps provider"
-                                       Style="{DynamicResource PlayStead.Text.Caption}"/>
-                            <TextBlock Margin="0,4,0,0"
-                                       Text="{Binding Activity.ProviderPlayTimeLabel, TargetNullValue=Inconnu}"
-                                       Style="{DynamicResource PlayStead.Text.Body}"/>
+                            <StackPanel Margin="0,6,0,0"
+                                        Visibility="{Binding Activity.HasProviderPlayTime, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="Temps provider"
+                                           Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                <TextBlock Margin="0,4,0,0"
+                                           Text="{Binding Activity.ProviderPlayTimeLabel}"
+                                           Style="{DynamicResource PlayStead.Text.Body}"/>
+                            </StackPanel>
                             <TextBlock Margin="0,6,0,0"
                                        Text="Dernière activité provider"
                                        Style="{DynamicResource PlayStead.Text.Caption}"/>

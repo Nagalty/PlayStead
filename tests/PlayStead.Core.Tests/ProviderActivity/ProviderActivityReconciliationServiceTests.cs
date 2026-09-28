@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text;
 using PlayStead.Core.Library;
 using PlayStead.Core.ProviderActivity;
 
@@ -53,6 +55,41 @@ public sealed class ProviderActivityReconciliationServiceTests
         Assert.Equal(complete.LastPlayedAtUtc, persisted.LastPlayedAtUtc);
     }
 
+    [Fact]
+    public async Task Source_exception_is_logged_and_next_source_still_runs()
+    {
+        var output = new StringBuilder();
+        using var listener = new TextWriterTraceListener(new StringWriter(output));
+        Trace.Listeners.Add(listener);
+        try
+        {
+            var game = GameId.New();
+            var store = new Store();
+            var failing = new ThrowingSource(ProviderKind.Steam);
+            var succeeding = new Source(new ProviderActivityMetadata(
+                game, ProviderKind.Epic, "epic-1", null, null, DateTimeOffset.UtcNow,
+                ProviderActivityAvailability.Unknown));
+            var sut = new ProviderActivityReconciliationService(store, [failing, succeeding]);
+            var snapshot = new LibrarySnapshot([], [
+                new GameInstallation(InstallationId.New(), game, ProviderKind.Steam, "123", "C:\\Game", null, true, true, DateTimeOffset.UtcNow),
+                new GameInstallation(InstallationId.New(), game, ProviderKind.Epic, "epic-1", "C:\\Game", null, true, true, DateTimeOffset.UtcNow)]);
+
+            await sut.RefreshAsync(snapshot, CancellationToken.None);
+
+            Assert.Single(await store.GetAllAsync(CancellationToken.None));
+            listener.Flush();
+            var trace = output.ToString();
+            Assert.Contains("[PROVIDER-ACTIVITY-ERROR]", trace, StringComparison.Ordinal);
+            Assert.Contains("Source=", trace, StringComparison.Ordinal);
+            Assert.Contains("Exception=System.InvalidOperationException", trace, StringComparison.Ordinal);
+            Assert.Contains("Message=synthetic provider failure", trace, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Trace.Listeners.Remove(listener);
+        }
+    }
+
     private sealed class Store : IProviderActivityMetadataStore
     {
         private readonly List<ProviderActivityMetadata> _items = [];
@@ -76,5 +113,12 @@ public sealed class ProviderActivityReconciliationServiceTests
             var value = values[Math.Min(_index++, values.Length - 1)];
             return Task.FromResult<IReadOnlyList<ProviderActivityMetadata>>([value]);
         }
+    }
+
+    private sealed class ThrowingSource(ProviderKind provider) : IProviderActivityMetadataSource
+    {
+        public ProviderKind Provider => provider;
+        public Task<IReadOnlyList<ProviderActivityMetadata>> GetAsync(IReadOnlyCollection<GameInstallation> _, CancellationToken __) =>
+            throw new InvalidOperationException("synthetic provider failure");
     }
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PlayStead.Core.Library;
 
 namespace PlayStead.Core.ProviderActivity;
@@ -33,8 +34,14 @@ public sealed class ProviderActivityReconciliationService
             {
                 values = await source.GetAsync(installations, cancellationToken);
             }
-            catch
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                Trace.WriteLine(
+                    $"[PROVIDER-ACTIVITY-ERROR] Source={source.GetType().FullName} " +
+                    $"Provider={source.Provider} Stage=GetAsync " +
+                    $"Exception={exception.GetType().FullName} " +
+                    $"Message={exception.Message} " +
+                    $"Details={exception}");
                 continue;
             }
 

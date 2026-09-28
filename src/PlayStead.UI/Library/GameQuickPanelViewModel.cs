@@ -17,6 +17,7 @@ public sealed class GameQuickPanelViewModel :
     private readonly ISessionCorrectionStore? _sessionCorrectionStore;
     private readonly SessionCorrectionPolicy? _sessionCorrectionPolicy;
     private IProviderActivityMetadataStore? _providerActivityStore;
+    private IProviderObservedSessionStore? _providerSessionStore;
     private GameBuildHistoryService? _gameBuildHistoryService;
 
     private bool _hasSessionHistory;
@@ -55,11 +56,13 @@ public sealed class GameQuickPanelViewModel :
         NavigationService navigationService,
         GameLaunchViewModel? launch,
         IProviderActivityMetadataStore? providerActivityStore,
-        GameBuildHistoryService? gameBuildHistoryService = null)
+        GameBuildHistoryService? gameBuildHistoryService = null,
+        IProviderObservedSessionStore? providerSessionStore = null)
         : this(game, navigationService, launch)
     {
         _providerActivityStore = providerActivityStore;
         _gameBuildHistoryService = gameBuildHistoryService;
+        _providerSessionStore = providerSessionStore;
     }
 
     public GameQuickPanelViewModel(
@@ -70,7 +73,8 @@ public sealed class GameQuickPanelViewModel :
         ISessionCorrectionStore sessionCorrectionStore,
         SessionCorrectionPolicy sessionCorrectionPolicy,
         IProviderActivityMetadataStore? providerActivityStore = null,
-        GameBuildHistoryService? gameBuildHistoryService = null)
+        GameBuildHistoryService? gameBuildHistoryService = null,
+        IProviderObservedSessionStore? providerSessionStore = null)
         : this(game, navigationService, launch)
     {
         ArgumentNullException.ThrowIfNull(sessionStore);
@@ -82,6 +86,7 @@ public sealed class GameQuickPanelViewModel :
         _sessionCorrectionPolicy = sessionCorrectionPolicy;
         _providerActivityStore = providerActivityStore;
         _gameBuildHistoryService = gameBuildHistoryService;
+        _providerSessionStore = providerSessionStore;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -143,6 +148,8 @@ public sealed class GameQuickPanelViewModel :
 
     public string? ProviderPlayTimeLabel { get; private set; }
 
+    public bool HasProviderPlayTime => ProviderPlayTimeLabel is not null;
+
     public string? ProviderLastPlayedLabel { get; private set; }
 
     public string? ProviderActivitySourceLabel { get; private set; }
@@ -168,19 +175,20 @@ public sealed class GameQuickPanelViewModel :
         await LoadProviderActivityAsync(cancellationToken);
         await LoadSinceLastPlaySummaryAsync(cancellationToken);
 
-        if (_sessionStore is null ||
-            _sessionCorrectionStore is null ||
-            _sessionCorrectionPolicy is null)
-        {
-            return;
-        }
+        var sessions = _sessionStore is null
+            ? Array.Empty<GameSession>()
+            : await _sessionStore.GetByGameAsync(Game.GameId.Value, cancellationToken);
+        var providerSessions = _providerSessionStore is null
+            ? Array.Empty<ProviderObservedSession>()
+            : (await _providerSessionStore.GetByPeriodAsync(
+                DateTimeOffset.UtcNow.AddYears(-10), DateTimeOffset.UtcNow, cancellationToken))
+                .Where(item => item.GameId == Game.GameId &&
+                    item.StartedAtUtc is not null &&
+                    item.EndedAtUtc is not null &&
+                    item.Completeness == ProviderObservedSessionCompleteness.Complete)
+                .ToArray();
 
-        var sessions =
-            await _sessionStore.GetByGameAsync(
-                Game.GameId.Value,
-                cancellationToken);
-
-        if (sessions.Count == 0)
+        if (sessions.Count == 0 && providerSessions.Length == 0)
         {
             SetRecentActivitySessions(Array.Empty<RecentActivitySessionItemViewModel>());
             HasSessionHistory = false;
@@ -194,105 +202,78 @@ public sealed class GameQuickPanelViewModel :
             return;
         }
 
-        var resolved =
-            new List<ResolvedSession>(
-                sessions.Count);
+        var resolved = new List<ResolvedSession>(sessions.Count);
 
-        foreach (var session in sessions)
+        if (_sessionCorrectionStore is not null && _sessionCorrectionPolicy is not null)
         {
-            var correction =
-                await _sessionCorrectionStore.GetAsync(
-                    session.SessionId,
-                    cancellationToken);
-
-            var effective =
-                _sessionCorrectionPolicy.Resolve(
-                    session,
-                    correction);
-
-            resolved.Add(
-                new ResolvedSession(
-                    session,
-                    effective));
+            foreach (var session in sessions)
+            {
+                var correction = await _sessionCorrectionStore.GetAsync(session.SessionId, cancellationToken);
+                var effective = _sessionCorrectionPolicy.Resolve(session, correction);
+                resolved.Add(new ResolvedSession(session, effective));
+            }
         }
 
-        var recentActivity = resolved
+        var playSteadSegments = resolved
             .Where(item =>
                 item.Session.GameId == Game.GameId.Value &&
                 item.Session.State is SessionState.Ended or SessionState.Recovered &&
                 item.Effective.EndedAtUtc is DateTimeOffset endedAt &&
                 endedAt > item.Effective.StartedAtUtc)
-            .GroupBy(item => item.Session.SessionId)
-            .Select(group => group
-                .OrderByDescending(item => item.Effective.StartedAtUtc)
-                .First())
-            .OrderByDescending(item => item.Effective.StartedAtUtc)
-            .ThenByDescending(item => item.Session.SessionId)
+            .Select(item => new ActivitySegment(item.Session.SessionId, item.Effective.StartedAtUtc, item.Effective.EndedAtUtc!.Value))
+            .ToArray();
+        var providerSegments = providerSessions
+            .Select(item => new ActivitySegment(item.SessionId, item.StartedAtUtc!.Value, item.EndedAtUtc!.Value))
+            .ToArray();
+        var segments = MergeSegments(playSteadSegments.Concat(providerSegments));
+        if (segments.Count == 0)
+        {
+            SetRecentActivitySessions(Array.Empty<RecentActivitySessionItemViewModel>());
+            HasSessionHistory = false;
+            LastActivityLabel = "Aucune activité PlayStead";
+            LastSessionDateLabel = "—";
+            LastSessionDurationLabel = "—";
+            PlaySteadTotalPlayTimeLabel = "0 min";
+            TotalPlayTimeLabel = ProviderPlayTimeLabel ?? PlaySteadTotalPlayTimeLabel;
+            OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
+            SessionCountLabel = "0 session";
+            return;
+        }
+        var recentActivity = segments
+            .OrderByDescending(item => item.StartedAtUtc)
+            .ThenByDescending(item => item.SessionId)
             .Take(5)
-            .Select(item => new RecentActivitySessionItemViewModel(
-                item.Session.SessionId,
-                FormatTimestamp(item.Effective.StartedAtUtc),
-                FormatDuration(item.Effective.EndedAtUtc!.Value - item.Effective.StartedAtUtc)))
+            .Select(item => new RecentActivitySessionItemViewModel(item.SessionId, FormatTimestamp(item.StartedAtUtc), FormatDuration(item.EndedAtUtc - item.StartedAtUtc)))
             .ToArray();
         SetRecentActivitySessions(Array.AsReadOnly(recentActivity));
 
-        var completed =
-            resolved
-                .Where(item =>
-                    item.Effective.EndedAtUtc is not null &&
-                    item.Effective.EndedAtUtc.Value >
-                    item.Effective.StartedAtUtc)
-                .ToArray();
+        var lastActivity = segments.Max(item => item.EndedAtUtc);
+        var lastCompleted = segments.OrderByDescending(item => item.EndedAtUtc).ThenByDescending(item => item.SessionId).First();
 
-        var lastActivity =
-            resolved
-                .Select(item =>
-                    item.Effective.EndedAtUtc
-                    ?? item.Session.LastSeenAtUtc)
-                .Max();
-
-        var lastCompleted =
-            completed
-                .OrderByDescending(item =>
-                    item.Effective.EndedAtUtc)
-                .ThenByDescending(item =>
-                    item.Session.SessionId)
-                .FirstOrDefault();
-
-        var total =
-            completed.Aggregate(
-                TimeSpan.Zero,
-                (current, item) =>
-                    current +
-                    (item.Effective.EndedAtUtc!.Value -
-                     item.Effective.StartedAtUtc));
+        var total = segments.Aggregate(TimeSpan.Zero, (current, item) => current + (item.EndedAtUtc - item.StartedAtUtc));
 
         HasSessionHistory = true;
         LastActivityLabel =
             FormatTimestamp(
                 lastActivity);
 
-        LastSessionDateLabel =
-            lastCompleted is null
-                ? "Aucune session terminée"
-                : FormatTimestamp(
-                    lastCompleted.Effective.EndedAtUtc!.Value);
+        LastSessionDateLabel = FormatTimestamp(lastCompleted.EndedAtUtc);
 
-        LastSessionDurationLabel =
-            lastCompleted is null
-                ? "—"
-                : FormatDuration(
-                    lastCompleted.Effective.EndedAtUtc!.Value -
-                    lastCompleted.Effective.StartedAtUtc);
+        LastSessionDurationLabel = FormatDuration(lastCompleted.EndedAtUtc - lastCompleted.StartedAtUtc);
 
-        PlaySteadTotalPlayTimeLabel = FormatDuration(total);
-        TotalPlayTimeLabel = ProviderPlayTimeLabel ?? PlaySteadTotalPlayTimeLabel;
+        // Recovered provider sessions contribute to the activity timeline and
+        // fallback total, but are not sessions observed directly by PlayStead.
+        var playSteadTotal = playSteadSegments.Aggregate(
+                TimeSpan.Zero,
+                (current, item) => current + (item.EndedAtUtc - item.StartedAtUtc));
+        PlaySteadTotalPlayTimeLabel = FormatDuration(playSteadTotal);
+        TotalPlayTimeLabel = ProviderPlayTimeLabel ?? FormatDuration(total);
         OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
 
         SessionCountLabel =
-            sessions.Count == 1
+            segments.Count == 1
                 ? "1 session"
-                : $"{sessions.Count} sessions";
+                : $"{segments.Count} sessions";
     }
 
     public void SetAttentionState(bool hasAttention)
@@ -335,6 +316,7 @@ public sealed class GameQuickPanelViewModel :
             : null;
         ProviderActivitySourceLabel = metadata?.Source.ToString();
         OnPropertyChanged(nameof(ProviderPlayTimeLabel));
+        OnPropertyChanged(nameof(HasProviderPlayTime));
         OnPropertyChanged(nameof(ProviderLastPlayedLabel));
         OnPropertyChanged(nameof(ProviderActivitySourceLabel));
         OnPropertyChanged(nameof(HasProviderActivity));
@@ -454,6 +436,29 @@ public sealed class GameQuickPanelViewModel :
     private sealed record ResolvedSession(
         GameSession Session,
         EffectiveSessionTime Effective);
+
+    private sealed record ActivitySegment(Guid SessionId, DateTimeOffset StartedAtUtc, DateTimeOffset EndedAtUtc);
+
+    private static IReadOnlyList<ActivitySegment> MergeSegments(IEnumerable<ActivitySegment> source)
+    {
+        var merged = new List<ActivitySegment>();
+        foreach (var segment in source.Where(item => item.EndedAtUtc > item.StartedAtUtc).OrderBy(item => item.StartedAtUtc))
+        {
+            if (merged.Count > 0 && segment.StartedAtUtc <= merged[^1].EndedAtUtc)
+            {
+                var previous = merged[^1];
+                merged[^1] = previous with
+                {
+                    EndedAtUtc = previous.EndedAtUtc >= segment.EndedAtUtc ? previous.EndedAtUtc : segment.EndedAtUtc
+                };
+            }
+            else
+            {
+                merged.Add(segment);
+            }
+        }
+        return merged;
+    }
 }
 
 public sealed record RecentActivitySessionItemViewModel(

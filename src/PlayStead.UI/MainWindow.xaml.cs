@@ -56,6 +56,7 @@ public partial class MainWindow : Window
     private readonly SessionMonitor? _sessionMonitor;
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
     private readonly IProviderActivityMetadataStore? _providerActivityStore;
+    private readonly IProviderObservedSessionStore? _providerObservedSessionStore;
     private readonly IGameLocalArtifactDiscoveryService? _localArtifactDiscoveryService;
     private readonly IArtifactFingerprintService? _artifactFingerprintService;
     private readonly ILocalArtifactBaselineStore? _artifactBaselineStore;
@@ -454,6 +455,7 @@ public partial class MainWindow : Window
         IGameLocalArtifactDiscoveryService? localArtifactDiscoveryService = null,
         IArtifactFingerprintService? artifactFingerprintService = null,
         ILocalArtifactBaselineStore? artifactBaselineStore = null,
+        IProviderObservedSessionStore? providerObservedSessionStore = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -467,6 +469,7 @@ public partial class MainWindow : Window
         _sessionMonitor = sessionMonitor;
         _gameBuildHistoryService = gameBuildHistoryService;
         _providerActivityStore = providerActivityStore;
+        _providerObservedSessionStore = providerObservedSessionStore;
         _localArtifactDiscoveryService = localArtifactDiscoveryService;
         _artifactFingerprintService = artifactFingerprintService;
         _artifactBaselineStore = artifactBaselineStore;
@@ -547,13 +550,15 @@ public partial class MainWindow : Window
                     _sessionCorrectionStore,
                     _sessionCorrectionPolicy,
                     _providerActivityStore,
-                    _gameBuildHistoryService)
+                    _gameBuildHistoryService,
+                    _providerObservedSessionStore)
                 : new GameQuickPanelViewModel(
                     game,
                     _navigationService,
                     launch,
                     _providerActivityStore,
-                    _gameBuildHistoryService);
+                    _gameBuildHistoryService,
+                    _providerObservedSessionStore);
 
         quickPanel.SetAttentionState(libraryViewModel.AttentionGameIds.Contains(gameId));
         return quickPanel;

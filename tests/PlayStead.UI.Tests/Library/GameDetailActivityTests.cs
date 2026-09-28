@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using PlayStead.Core.Library;
 using PlayStead.Core.Sessions;
+using PlayStead.Core.ProviderActivity;
 using PlayStead.Core.Steam;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
@@ -123,6 +124,30 @@ public sealed class GameDetailActivityTests
         Assert.False(activity.HasSessionHistory);
         Assert.Equal("0 session", activity.SessionCountLabel);
         Assert.Equal("0 min", activity.TotalPlayTimeLabel);
+    }
+
+    [Fact]
+    public async Task LoadAsync_projects_complete_provider_observed_session_when_playstead_was_closed()
+    {
+        var gameId = Guid.NewGuid();
+        var started = new DateTimeOffset(2026, 9, 28, 7, 52, 13, TimeSpan.Zero);
+        var ended = new DateTimeOffset(2026, 9, 28, 9, 51, 27, TimeSpan.Zero);
+        var observed = new ProviderObservedSession(
+            Guid.NewGuid(), new GameId(gameId), ProviderKind.Steam, "1172710",
+            started, ended, "SteamProcessLog", ProviderObservedSessionCompleteness.Complete);
+        var item = Item(gameId);
+        var activity = new GameQuickPanelViewModel(
+            item, new NavigationService(), launch: null,
+            new FakeSessionStore([]), new FakeCorrectionStore(), new SessionCorrectionPolicy(),
+            providerSessionStore: new FakeProviderObservedSessionStore([observed]));
+
+        await new GameDetailViewModel(item, launch: null, activity).LoadAsync(CancellationToken.None);
+
+        Assert.True(activity.HasRecentActivity);
+        Assert.Equal("1 session", activity.SessionCountLabel);
+        Assert.Equal("0 min", activity.PlaySteadTotalPlayTimeLabel);
+        Assert.Equal("1 h 59 min", activity.TotalPlayTimeLabel);
+        Assert.Single(activity.RecentActivitySessions);
     }
 
     [Fact]
@@ -353,6 +378,16 @@ public sealed class GameDetailActivityTests
 
         public Task<SessionCorrection?> GetAsync(Guid sessionId, CancellationToken cancellationToken) =>
             Task.FromResult<SessionCorrection?>(corrections.FirstOrDefault(item => item.SessionId == sessionId));
+    }
+
+    private sealed class FakeProviderObservedSessionStore(IReadOnlyList<ProviderObservedSession> sessions) : IProviderObservedSessionStore
+    {
+        public Task UpsertAsync(ProviderObservedSession session, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ProviderObservedSession>> GetByPeriodAsync(
+            DateTimeOffset startUtc,
+            DateTimeOffset endUtc,
+            CancellationToken cancellationToken) => Task.FromResult(sessions);
     }
 
     private sealed class NoopRuntime : ISessionRuntime

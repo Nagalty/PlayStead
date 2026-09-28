@@ -2,6 +2,7 @@ using PlayStead.Core.Library;
 using PlayStead.Core.ProviderActivity;
 using PlayStead.Core.ProviderInstallUpdate;
 using PlayStead.Providers.Steam.ValveText;
+using System.Diagnostics;
 
 namespace PlayStead.Providers.Steam;
 
@@ -54,6 +55,9 @@ public sealed class SteamAppManifestReader
         var availability = minutes.HasValue || lastPlayed.HasValue
             ? ProviderActivityAvailability.Complete
             : ProviderActivityAvailability.Unknown;
+        Trace.WriteLine(
+            $"[STEAM-PLAYTIME] AppId={appId} ManifestPlaytime={(minutes is { } value ? value.ToString() : "<none>")} " +
+            $"LocalConfigPlaytime=<not-read> Selected={(minutes is { } selected ? selected.ToString() : "<none>")} ");
         return new ProviderActivityMetadata(gameId, ProviderKind.Steam, appId,
             minutes.HasValue ? TimeSpan.FromMinutes(minutes.Value) : null,
             lastPlayed, observedAtUtc, availability);

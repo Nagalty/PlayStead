@@ -49,24 +49,35 @@ public sealed class SqliteWeeklyActivitySummaryService : IWeeklyActivitySummaryS
             .ToArray();
 
         var merged = new List<ActivityInterval>();
-        foreach (var interval in intervals)
+        foreach (var gameIntervals in intervals.GroupBy(value => value.GameId))
         {
-            if (merged.Count > 0 && merged[^1].GameId == interval.GameId && interval.StartedAtUtc <= merged[^1].EndedAtUtc)
+            ActivityInterval? current = null;
+            foreach (var interval in gameIntervals)
             {
-                var previous = merged[^1];
-                merged[^1] = previous with
+                if (current is not null && interval.StartedAtUtc <= current.EndedAtUtc)
                 {
-                    EndedAtUtc = previous.EndedAtUtc >= interval.EndedAtUtc ? previous.EndedAtUtc : interval.EndedAtUtc,
-                    IsComplete = previous.IsComplete && interval.IsComplete
-                };
+                    current = current with
+                    {
+                        EndedAtUtc = current.EndedAtUtc >= interval.EndedAtUtc ? current.EndedAtUtc : interval.EndedAtUtc,
+                        IsComplete = current.IsComplete && interval.IsComplete
+                    };
+                }
+                else
+                {
+                    if (current is not null)
+                        merged.Add(current);
+                    current = interval;
+                }
             }
-            else
-            {
-                merged.Add(interval);
-            }
+            if (current is not null)
+                merged.Add(current);
         }
 
-        var coverage = provider.Count == 0 ? WeeklyActivityCoverage.ObservedOnly : WeeklyActivityCoverage.Partial;
+        var coverage = provider.Count == 0
+            ? WeeklyActivityCoverage.ObservedOnly
+            : provider.All(session => session.Completeness == ProviderObservedSessionCompleteness.Complete)
+                ? WeeklyActivityCoverage.Complete
+                : WeeklyActivityCoverage.Partial;
         var mergedTotal = merged.Where(value => value.IsComplete)
             .Aggregate(TimeSpan.Zero, (sum, value) => sum + (value.EndedAtUtc - value.StartedAtUtc));
         return new WeeklyActivitySummary(mergedTotal, merged.Count, merged.Select(value => value.GameId).Distinct().Count(), coverage);
