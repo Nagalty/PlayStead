@@ -11,8 +11,11 @@ using PlayStead.UI.Sessions;
 using PlayStead.Core.Shortlist;
 using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.Core.GameBuildHistory;
+using PlayStead.Core.LocalArtifacts;
 using CommunityToolkit.Mvvm.Input;
 using System.Globalization;
+using System.Diagnostics;
+using System.Windows.Input;
 
 namespace PlayStead.UI.Library;
 
@@ -25,6 +28,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly IGamesDuMomentService? _gamesDuMomentService;
     private readonly IProviderGameMetadataStore? _providerGameMetadataStore;
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
+    private readonly IGameLocalArtifactDiscoveryService? _localArtifactDiscoveryService;
     private bool _isShortlistOperationInProgress;
     public GameDetailViewModel(
         LibraryItemViewModel game)
@@ -55,7 +59,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ICanonicalCatalogStore? catalogStore = null,
         IGamesDuMomentService? gamesDuMomentService = null,
         IProviderGameMetadataStore? providerGameMetadataStore = null,
-        GameBuildHistoryService? gameBuildHistoryService = null)
+        GameBuildHistoryService? gameBuildHistoryService = null,
+        IGameLocalArtifactDiscoveryService? localArtifactDiscoveryService = null)
     {
         ArgumentNullException.ThrowIfNull(
             game);
@@ -100,6 +105,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         _gamesDuMomentService = gamesDuMomentService;
         _providerGameMetadataStore = providerGameMetadataStore;
         _gameBuildHistoryService = gameBuildHistoryService;
+        _localArtifactDiscoveryService = localArtifactDiscoveryService;
+        _openLocalArtifactFolderCommand = new RelayCommand<GameLocalArtifact>(OpenLocalArtifactFolder,
+            artifact => artifact?.Exists == true && Directory.Exists(artifact.Path));
         AddToGamesDuMomentCommand = new AsyncRelayCommand(AddToGamesDuMomentAsync, () => CanChangeGamesDuMoment);
         RemoveFromGamesDuMomentCommand = new AsyncRelayCommand(RemoveFromGamesDuMomentAsync, () => CanChangeGamesDuMoment);
     }
@@ -114,8 +122,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ICanonicalCatalogStore? catalogStore = null,
         IGamesDuMomentService? gamesDuMomentService = null,
         IProviderGameMetadataStore? providerGameMetadataStore = null,
-        GameBuildHistoryService? gameBuildHistoryService = null)
-        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService)
+        GameBuildHistoryService? gameBuildHistoryService = null,
+        IGameLocalArtifactDiscoveryService? localArtifactDiscoveryService = null)
+        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -170,6 +179,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             ApplyProviderMetadata(await _providerGameMetadataStore.GetAsync(GameId, Game.Provider, cancellationToken));
 
         await LoadBuildHistoryAsync(cancellationToken);
+        await LoadLocalArtifactsAsync(cancellationToken);
 
         if (_catalogStore is null || Game.CanonicalContentId is not CatalogContentId contentId)
             return;
@@ -240,6 +250,11 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             ? $"{BuildChangeCountSinceLastPlay} changement{(BuildChangeCountSinceLastPlay == 1 ? string.Empty : "s")} observé{(BuildChangeCountSinceLastPlay == 1 ? string.Empty : "s")} depuis ta dernière partie"
             : HasBuildChanges ? "Historique des versions observées" : "Pas encore de changement observé.";
 
+    public IReadOnlyList<GameLocalArtifact> LocalArtifacts { get; private set; } = [];
+    public bool HasLocalArtifacts => LocalArtifacts.Count > 0;
+    public ICommand OpenLocalArtifactFolderCommand => _openLocalArtifactFolderCommand;
+    private readonly RelayCommand<GameLocalArtifact> _openLocalArtifactFolderCommand;
+
     private async Task LoadBuildHistoryAsync(CancellationToken cancellationToken)
     {
         if (_gameBuildHistoryService is null)
@@ -268,6 +283,28 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasBuildChanges));
         OnPropertyChanged(nameof(BuildChangeCountSinceLastPlay));
         OnPropertyChanged(nameof(BuildHistorySummary));
+    }
+
+    private async Task LoadLocalArtifactsAsync(CancellationToken cancellationToken)
+    {
+        LocalArtifacts = _localArtifactDiscoveryService is null
+            ? []
+            : await _localArtifactDiscoveryService.DiscoverAsync(GameId, cancellationToken);
+        OnPropertyChanged(nameof(LocalArtifacts));
+        OnPropertyChanged(nameof(HasLocalArtifacts));
+    }
+
+    private static void OpenLocalArtifactFolder(GameLocalArtifact? artifact)
+    {
+        if (artifact?.Exists != true || !Directory.Exists(artifact.Path))
+            return;
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = $"\"{artifact.Path}\"",
+            UseShellExecute = true
+        });
     }
 
     private Task AddToGamesDuMomentAsync() => ChangeGamesDuMomentAsync(true);

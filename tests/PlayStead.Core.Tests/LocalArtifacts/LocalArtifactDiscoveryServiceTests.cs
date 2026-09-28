@@ -1,0 +1,76 @@
+using PlayStead.Core.Library;
+using PlayStead.Core.LocalArtifacts;
+
+namespace PlayStead.Core.Tests.LocalArtifacts;
+
+public sealed class LocalArtifactDiscoveryServiceTests
+{
+    [Fact]
+    public async Task Explicit_rules_resolve_config_save_and_log_paths()
+    {
+        var gameId = GameId.New();
+        var root = Path.Combine(Path.GetTempPath(), $"playstead-artifacts-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(root, "config"));
+        Directory.CreateDirectory(Path.Combine(root, "saves"));
+        Directory.CreateDirectory(Path.Combine(root, "logs"));
+        try
+        {
+            var service = new LocalArtifactDiscoveryService([
+                new(gameId, GameLocalArtifactKind.Configuration, Path.Combine(root, "config")),
+                new(gameId, GameLocalArtifactKind.SaveData, Path.Combine(root, "saves")),
+                new(gameId, GameLocalArtifactKind.Log, Path.Combine(root, "logs"))]);
+
+            var artifacts = await service.DiscoverAsync(gameId, CancellationToken.None);
+
+            Assert.Equal(3, artifacts.Count);
+            Assert.All(artifacts, artifact => Assert.Equal(GameLocalArtifactStatus.KnownAndExists, artifact.Status));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Environment_variables_expand_and_missing_paths_remain_known()
+    {
+        var gameId = GameId.New();
+        var root = Path.Combine(Path.GetTempPath(), $"playstead-artifacts-{Guid.NewGuid():N}");
+        var variable = $"PLAYSTEAD_ARTIFACT_ROOT_{Guid.NewGuid():N}";
+        Environment.SetEnvironmentVariable(variable, root);
+        try
+        {
+            var service = new LocalArtifactDiscoveryService([
+                new(gameId, GameLocalArtifactKind.SaveData, $"%{variable}%\\missing")]);
+
+            var artifact = Assert.Single(await service.DiscoverAsync(gameId, CancellationToken.None));
+
+            Assert.Equal(Path.GetFullPath(Path.Combine(root, "missing")), artifact.Path);
+            Assert.Equal(GameLocalArtifactStatus.KnownButMissing, artifact.Status);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, null);
+        }
+    }
+
+    [Fact]
+    public async Task Invalid_relative_or_empty_rules_are_ignored_safely()
+    {
+        var gameId = GameId.New();
+        var service = new LocalArtifactDiscoveryService([
+            new(gameId, GameLocalArtifactKind.Configuration, "relative\\config"),
+            new(gameId, GameLocalArtifactKind.Log, "")]);
+
+        Assert.Empty(await service.DiscoverAsync(gameId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Unknown_game_has_no_artifacts_and_discovery_is_bounded()
+    {
+        var service = new LocalArtifactDiscoveryService([
+            new(GameId.New(), GameLocalArtifactKind.Log, Path.GetTempPath())]);
+
+        Assert.Empty(await service.DiscoverAsync(GameId.New(), CancellationToken.None));
+    }
+}

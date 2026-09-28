@@ -7,6 +7,7 @@ using PlayStead.Core.GameBuildHistory;
 using PlayStead.Core.Media;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.ProviderActivity;
+using PlayStead.Core.LocalArtifacts;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
@@ -55,6 +56,7 @@ public partial class MainWindow : Window
     private readonly SessionMonitor? _sessionMonitor;
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
     private readonly IProviderActivityMetadataStore? _providerActivityStore;
+    private readonly IGameLocalArtifactDiscoveryService? _localArtifactDiscoveryService;
     private LibraryUiState? _libraryStateBeforeGameDetail;
 
     public MainWindow()
@@ -447,6 +449,7 @@ public partial class MainWindow : Window
         AppUpdateNotificationViewModel? appUpdateNotificationViewModel = null,
         IDistributionChannelProvider? distributionChannelProvider = null,
         IProviderActivityMetadataStore? providerActivityStore = null,
+        IGameLocalArtifactDiscoveryService? localArtifactDiscoveryService = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -460,6 +463,7 @@ public partial class MainWindow : Window
         _sessionMonitor = sessionMonitor;
         _gameBuildHistoryService = gameBuildHistoryService;
         _providerActivityStore = providerActivityStore;
+        _localArtifactDiscoveryService = localArtifactDiscoveryService;
         _aboutViewModel = distributionChannelProvider is null
             ? null
             : new AboutViewModel(distributionChannelProvider);
@@ -844,7 +848,8 @@ public partial class MainWindow : Window
                         libraryViewModel.CanonicalCatalogStore,
                         libraryViewModel.GamesDuMomentService,
                         libraryViewModel.ProviderGameMetadataStore,
-                        _gameBuildHistoryService)
+                        _gameBuildHistoryService,
+                        _localArtifactDiscoveryService)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -856,7 +861,8 @@ public partial class MainWindow : Window
                         libraryViewModel.CanonicalCatalogStore,
                         libraryViewModel.GamesDuMomentService,
                         libraryViewModel.ProviderGameMetadataStore,
-                        _gameBuildHistoryService);
+                        _gameBuildHistoryService,
+                        _localArtifactDiscoveryService);
 
                 MainContent.Content =
                     new GameDetailView(

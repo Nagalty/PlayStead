@@ -50,6 +50,7 @@ using PlayStead.UI.Steam;
 using PlayStead.UI.Tray;
 using PlayStead.UI.Updates;
 using PlayStead.Core.Updates;
+using PlayStead.Core.LocalArtifacts;
 using PlayStead.Providers.Updates;
 
 namespace PlayStead.UI.Bootstrap;
@@ -420,6 +421,9 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<
             ShellViewModel>();
+
+        builder.Services.AddSingleton<IGameLocalArtifactDiscoveryService>(
+            _ => new LocalArtifactDiscoveryService());
 
         builder.Services.AddSingleton<
             PlayStead.Core.Collections.IGameCollectionStore,
