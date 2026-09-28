@@ -1354,7 +1354,8 @@ public sealed class LibraryViewModel :
                             steamState,
                             activeGameIds.Contains(
                                 game.Id),
-                            game.CanonicalContentId);
+                            game.CanonicalContentId,
+                            installation.ExternalId);
 
                     ApplyCachedCover(
                         item,

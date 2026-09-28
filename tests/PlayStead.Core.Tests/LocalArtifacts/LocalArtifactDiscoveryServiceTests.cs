@@ -73,4 +73,62 @@ public sealed class LocalArtifactDiscoveryServiceTests
 
         Assert.Empty(await service.DiscoverAsync(GameId.New(), CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Provider_rules_require_stable_provider_identity_and_do_not_match_title()
+    {
+        var gameId = GameId.New();
+        var root = Path.Combine(Path.GetTempPath(), $"playstead-provider-artifacts-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var service = new LocalArtifactDiscoveryService([
+                new(
+                    GameId: null,
+                    GameLocalArtifactKind.Configuration,
+                    root,
+                    GameLocalArtifactSource.KnownConvention,
+                    ProviderKind.Steam,
+                    "1284210")]);
+
+            var match = await service.DiscoverAsync(gameId, ProviderKind.Steam, "1284210", CancellationToken.None);
+            var wrongProviderId = await service.DiscoverAsync(gameId, ProviderKind.Steam, "different-title", CancellationToken.None);
+
+            Assert.Single(match);
+            Assert.Equal(GameLocalArtifactStatus.KnownAndExists, match[0].Status);
+            Assert.Empty(wrongProviderId);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Catalog_contains_only_evidence_backed_steam_app_rules()
+    {
+        Assert.Contains(LocalArtifactRuleCatalog.Rules, rule =>
+            rule.Provider == ProviderKind.Steam && rule.ProviderGameId == "1284210" &&
+            rule.Kind == GameLocalArtifactKind.Configuration);
+        Assert.Contains(LocalArtifactRuleCatalog.Rules, rule =>
+            rule.Provider == ProviderKind.Steam && rule.ProviderGameId == "1203620" &&
+            rule.Kind == GameLocalArtifactKind.SaveData);
+        Assert.DoesNotContain(LocalArtifactRuleCatalog.Rules, rule =>
+            rule.ProviderGameId == "223850");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task Catalog_does_not_match_unknown_app_id_or_display_title()
+    {
+        var service = new LocalArtifactDiscoveryService(LocalArtifactRuleCatalog.Rules);
+
+        var unknown = await service.DiscoverAsync(
+            GameId.New(),
+            ProviderKind.Steam,
+            "Guild Wars 2",
+            CancellationToken.None);
+
+        Assert.Empty(unknown);
+    }
 }

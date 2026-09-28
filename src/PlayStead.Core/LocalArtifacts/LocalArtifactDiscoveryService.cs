@@ -14,11 +14,21 @@ public sealed class LocalArtifactDiscoveryService : IGameLocalArtifactDiscoveryS
     public Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(
         GameId gameId,
         CancellationToken cancellationToken)
+        => DiscoverAsync(gameId, provider: null, providerGameId: null, cancellationToken);
+
+    public Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(
+        GameId gameId,
+        ProviderKind? provider,
+        string? providerGameId,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var artifacts = new List<GameLocalArtifact>();
 
-        foreach (var rule in _rules.Where(rule => rule.GameId == gameId))
+        foreach (var rule in _rules.Where(rule =>
+                     (rule.GameId is null || rule.GameId == gameId) &&
+                     (rule.Provider is null || rule.Provider == provider) &&
+                     (rule.ProviderGameId is null || string.Equals(rule.ProviderGameId, providerGameId, StringComparison.Ordinal))))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!TryNormalizePath(rule.PathTemplate, out var path))

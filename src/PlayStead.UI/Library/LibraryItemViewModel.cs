@@ -15,7 +15,8 @@ public sealed record LibraryItemViewModel(
     long? InstalledSizeBytes,
     SteamUpdateState? SteamState = null,
     bool IsSessionActive = false,
-    CatalogContentId? CanonicalContentId = null)
+    CatalogContentId? CanonicalContentId = null,
+    string? ProviderGameId = null)
     : INotifyPropertyChanged
 {
     private string? _coverPath;

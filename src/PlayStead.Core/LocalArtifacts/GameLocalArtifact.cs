@@ -24,10 +24,12 @@ public enum GameLocalArtifactSource
 }
 
 public sealed record GameLocalArtifactRule(
-    GameId GameId,
+    GameId? GameId,
     GameLocalArtifactKind Kind,
     string PathTemplate,
-    GameLocalArtifactSource Source = GameLocalArtifactSource.ExplicitRule);
+    GameLocalArtifactSource Source = GameLocalArtifactSource.ExplicitRule,
+    ProviderKind? Provider = null,
+    string? ProviderGameId = null);
 
 public sealed record GameLocalArtifact(
     GameId GameId,
@@ -52,4 +54,11 @@ public interface IGameLocalArtifactDiscoveryService
     Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(
         GameId gameId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(
+        GameId gameId,
+        ProviderKind? provider,
+        string? providerGameId,
+        CancellationToken cancellationToken)
+        => DiscoverAsync(gameId, cancellationToken);
 }

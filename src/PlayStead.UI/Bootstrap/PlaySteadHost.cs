@@ -423,7 +423,7 @@ public static class PlaySteadHost
             ShellViewModel>();
 
         builder.Services.AddSingleton<IGameLocalArtifactDiscoveryService>(
-            _ => new LocalArtifactDiscoveryService());
+            _ => new LocalArtifactDiscoveryService(LocalArtifactRuleCatalog.Rules));
 
         builder.Services.AddSingleton<
             PlayStead.Core.Collections.IGameCollectionStore,

@@ -289,7 +289,11 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     {
         LocalArtifacts = _localArtifactDiscoveryService is null
             ? []
-            : await _localArtifactDiscoveryService.DiscoverAsync(GameId, cancellationToken);
+            : await _localArtifactDiscoveryService.DiscoverAsync(
+                GameId,
+                Game.Provider,
+                Game.ProviderGameId,
+                cancellationToken);
         OnPropertyChanged(nameof(LocalArtifacts));
         OnPropertyChanged(nameof(HasLocalArtifacts));
     }
