@@ -441,13 +441,16 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding KindLabel}"
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{Binding KindLabel}"
                                                    Style="{DynamicResource PlayStead.Text.Caption}" />
-                                        <StackPanel Grid.Column="1" Margin="16,0,12,0">
+                                        <StackPanel Grid.Row="1" Margin="16,0,12,0">
                                             <TextBlock Text="{Binding Path}"
                                                        Style="{DynamicResource PlayStead.Text.Body}"
                                                        TextWrapping="Wrap" />
@@ -465,16 +468,15 @@
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
-                                            <StackPanel>
-                                                <TextBlock Text="Référence"
-                                                           Style="{DynamicResource PlayStead.Text.Caption}" />
-                                                <TextBlock Text="{Binding BaselineStatusLabel}"
-                                                           Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                                           FontSize="13"
-                                                           Margin="0,4,0,0" />
-                                            </StackPanel>
                                         </StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,6,0,0">
+                                        <StackPanel Grid.Row="2" Margin="0,4,0,0">
+                                            <TextBlock Text="Référence"
+                                                       Style="{DynamicResource PlayStead.Text.Caption}" />
+                                            <TextBlock Text="{Binding BaselineStatusLabel}"
+                                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                                       FontSize="13" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,6,0,0">
                                             <Button Content="Ouvrir le dossier"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.OpenLocalArtifactFolderCommand, ElementName=GameDetailRoot}"
