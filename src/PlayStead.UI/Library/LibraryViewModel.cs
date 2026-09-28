@@ -77,7 +77,11 @@ public sealed class LibraryViewModel :
         new Dictionary<GameId, LibraryActivityProjection>();
     private IReadOnlyList<LibraryFilterOption> _providerFilterOptions = [];
     private IReadOnlyList<LibraryFilterOption> _driveFilterOptions = [];
+    private IReadOnlyList<LibraryFilterOption> _capabilityFilterOptions = [];
+    private IReadOnlyList<LibraryFilterOption> _genreFilterOptions = [];
     private IReadOnlyList<LibraryCollectionOption> _collectionOptions = [];
+    private IReadOnlyDictionary<GameId, ProviderGameMetadata> _providerMetadataByGame =
+        new Dictionary<GameId, ProviderGameMetadata>();
     private IReadOnlySet<GameCollectionMembership> _collectionMemberships = new HashSet<GameCollectionMembership>();
     private bool _updatingCollectionOption;
     private bool _isAdvancedFiltersOpen;
@@ -180,6 +184,15 @@ public sealed class LibraryViewModel :
     {
         _providerActivityStore = providerActivityStore;
         _sessionStore = sessionStore;
+    }
+
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
+        IProviderGameMetadataStore providerGameMetadataStore)
+        : this(libraryStore)
+    {
+        ArgumentNullException.ThrowIfNull(providerGameMetadataStore);
+        ProviderGameMetadataStore = providerGameMetadataStore;
     }
 
     public LibraryViewModel(
@@ -354,6 +367,10 @@ public sealed class LibraryViewModel :
 
     public IReadOnlyList<LibraryFilterOption> DriveFilterOptions => _driveFilterOptions;
 
+    public IReadOnlyList<LibraryFilterOption> CapabilityFilterOptions => _capabilityFilterOptions;
+
+    public IReadOnlyList<LibraryFilterOption> GenreFilterOptions => _genreFilterOptions;
+
     public IReadOnlyList<LibraryCollectionOption> CollectionOptions => _collectionOptions;
 
     public IReadOnlyDictionary<GameId, IReadOnlyList<string>> CollectionNamesByGame =>
@@ -386,6 +403,8 @@ public sealed class LibraryViewModel :
     public int ActiveAdvancedFilterCategoryCount =>
         (_providerFilterOptions.Any(option => option.IsSelected) ? 1 : 0) +
         (_driveFilterOptions.Any(option => option.IsSelected) ? 1 : 0) +
+        (_capabilityFilterOptions.Any(option => option.IsSelected) ? 1 : 0) +
+        (_genreFilterOptions.Any(option => option.IsSelected) ? 1 : 0) +
         (_collectionOptions.Any(option => option.IsFilterSelected) ? 1 : 0);
 
     public string AdvancedFilterButtonLabel =>
@@ -491,6 +510,8 @@ public sealed class LibraryViewModel :
     public void ResetAdvancedFilters()
     {
         foreach (var option in _providerFilterOptions.Concat(_driveFilterOptions))
+            option.IsSelected = false;
+        foreach (var option in _capabilityFilterOptions.Concat(_genreFilterOptions))
             option.IsSelected = false;
         foreach (var option in _collectionOptions)
             option.IsFilterSelected = false;
@@ -742,6 +763,8 @@ public sealed class LibraryViewModel :
             QuickFilter = QuickFilter,
             ProviderFilters = _providerFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToArray(),
             DriveFilters = _driveFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToArray(),
+            SelectedCapabilities = _capabilityFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToArray(),
+            SelectedGenres = _genreFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToArray(),
             CollectionFilters = _collectionOptions.Where(option => option.IsFilterSelected).Select(option => option.Id).ToArray(),
             SearchText = SearchQuery
         };
@@ -785,6 +808,14 @@ public sealed class LibraryViewModel :
         var driveFilters = state.DriveFilters.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var option in _driveFilterOptions)
             option.IsSelected = driveFilters.Contains(option.Key);
+
+        var capabilities = state.SelectedCapabilities.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var option in _capabilityFilterOptions)
+            option.IsSelected = capabilities.Contains(option.Key);
+
+        var genres = state.SelectedGenres.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var option in _genreFilterOptions)
+            option.IsSelected = genres.Contains(option.Key);
 
         var collectionFilters = state.CollectionFilters.ToHashSet();
         foreach (var option in _collectionOptions)
@@ -1132,6 +1163,8 @@ public sealed class LibraryViewModel :
                 cancellationToken);
 
         await RefreshActivityProjectionAsync(snapshot.Installations, cancellationToken);
+
+        await RefreshProviderMetadataProjectionAsync(cancellationToken);
 
         _installations =
             snapshot.Installations.ToArray();
@@ -1526,6 +1559,20 @@ public sealed class LibraryViewModel :
                 var drive = installation is null ? null : Path.GetPathRoot(installation.InstallPath)?.TrimEnd('\\');
                 return drive is not null && selectedDrives.Contains(drive);
             });
+        var selectedCapabilities = _capabilityFilterOptions
+            .Where(option => option.IsSelected)
+            .Select(option => option.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (selectedCapabilities.Count > 0)
+            filtered = filtered.Where(item => MatchesCapability(item.GameId, selectedCapabilities));
+
+        var selectedGenres = _genreFilterOptions
+            .Where(option => option.IsSelected)
+            .Select(option => option.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (selectedGenres.Count > 0)
+            filtered = filtered.Where(item => _providerMetadataByGame.TryGetValue(item.GameId, out var metadata) &&
+                metadata.Genres?.Any(genre => selectedGenres.Contains(genre)) == true);
         var selectedCollections = _collectionOptions
             .Where(option => option.IsFilterSelected)
             .Select(option => option.Id)
@@ -1596,13 +1643,34 @@ public sealed class LibraryViewModel :
     {
         var selectedProviders = _providerFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToHashSet(StringComparer.Ordinal);
         var selectedDrives = _driveFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var selectedCapabilities = _capabilityFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var selectedGenres = _genreFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         _providerFilterOptions = Items.Select(item => item.Provider).Distinct().OrderBy(value => value)
             .Select(value => CreateFilterOption(value.ToString(), value.ToString(), selectedProviders.Contains(value.ToString()))).ToArray();
         _driveFilterOptions = _installations.Select(value => Path.GetPathRoot(value.InstallPath)?.TrimEnd('\\'))
             .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .Select(value => CreateFilterOption(value!, value!, selectedDrives.Contains(value!))).ToArray();
+        _capabilityFilterOptions = [
+            CreateFilterOption("SinglePlayer", "Solo", selectedCapabilities.Contains("SinglePlayer")),
+            CreateFilterOption("Coop", "Coop", selectedCapabilities.Contains("Coop")),
+            CreateFilterOption("MultiPlayer", "Multijoueur", selectedCapabilities.Contains("MultiPlayer"))];
+        var libraryGameIds = Items.Select(item => item.GameId).ToHashSet();
+        var genres = _providerMetadataByGame
+            .Where(pair => libraryGameIds.Contains(pair.Key))
+            .Select(pair => pair.Value)
+            .SelectMany(metadata => metadata.Genres ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+        _genreFilterOptions = genres
+            .Select(value => CreateFilterOption(value, value, selectedGenres.Contains(value)))
+            .ToArray();
         OnPropertyChanged(nameof(ProviderFilterOptions));
         OnPropertyChanged(nameof(DriveFilterOptions));
+        OnPropertyChanged(nameof(CapabilityFilterOptions));
+        OnPropertyChanged(nameof(GenreFilterOptions));
         OnPropertyChanged(nameof(HasDriveFilterOptions));
         NotifyAdvancedFilterProjectionChanged();
     }
@@ -1648,6 +1716,29 @@ public sealed class LibraryViewModel :
         OnPropertyChanged(nameof(VisibleItems));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
+    }
+
+    private async Task RefreshProviderMetadataProjectionAsync(CancellationToken cancellationToken)
+    {
+        _providerMetadataByGame = ProviderGameMetadataStore is null
+            ? new Dictionary<GameId, ProviderGameMetadata>()
+            : (await ProviderGameMetadataStore.GetAllAsync(cancellationToken))
+                .GroupBy(metadata => metadata.GameId)
+                .ToDictionary(group => group.Key, group => group.OrderByDescending(metadata => metadata.RefreshedAtUtc).First());
+        RefreshAdvancedFilterOptions();
+    }
+
+    private bool MatchesCapability(GameId gameId, IReadOnlySet<string> selectedCapabilities)
+    {
+        if (!_providerMetadataByGame.TryGetValue(gameId, out var metadata))
+            return false;
+        return selectedCapabilities.Any(capability => capability switch
+        {
+            "SinglePlayer" => metadata.SinglePlayer is true,
+            "Coop" => metadata.SupportsCoop is true,
+            "MultiPlayer" => metadata.MultiPlayer is true,
+            _ => false
+        });
     }
 
     private void RefreshAttentionGameIds()

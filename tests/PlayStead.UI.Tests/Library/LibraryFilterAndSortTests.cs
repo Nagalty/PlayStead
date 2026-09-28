@@ -4,6 +4,7 @@ using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.ProviderActivity;
 using PlayStead.Core.Collections;
+using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Library;
 
@@ -160,6 +161,84 @@ public sealed class LibraryFilterAndSortTests
         Assert.Equal(["First", "Second"], library.VisibleItems.Select(item => item.Title));
     }
 
+    [Fact]
+    public async Task Genre_filter_uses_or_and_combines_with_existing_filters()
+    {
+        var action = GameId.New();
+        var rpg = GameId.New();
+        var other = GameId.New();
+        var metadata = new FakeProviderMetadataStore(
+            Metadata(action, ["Action"]),
+            Metadata(rpg, ["RPG"]),
+            Metadata(other, ["Simulation"]));
+        var library = await LoadWithMetadata(
+            [(action, "Action", "Steam", @"D:\Games"), (rpg, "RPG", "Steam", @"C:\Games"), (other, "Other", "Epic", @"D:\Games")],
+            metadata);
+
+        library.GenreFilterOptions.Single(option => option.Key == "Action").IsSelected = true;
+        library.GenreFilterOptions.Single(option => option.Key == "RPG").IsSelected = true;
+        library.ProviderFilterOptions.Single(option => option.Key == "Steam").IsSelected = true;
+        library.DriveFilterOptions.Single(option => option.Key == "D:").IsSelected = true;
+
+        Assert.Equal(["Action"], library.VisibleItems.Select(item => item.Title));
+    }
+
+    [Fact]
+    public async Task Capability_filters_use_or_and_unknown_capabilities_do_not_match()
+    {
+        var solo = GameId.New();
+        var coop = GameId.New();
+        var unknown = GameId.New();
+        var metadata = new FakeProviderMetadataStore(
+            Metadata(solo, [], singlePlayer: true),
+            Metadata(coop, [], onlineCoop: true),
+            Metadata(unknown, []));
+        var library = await LoadWithMetadata(
+            [(solo, "Solo", "Steam", @"C:\Games"), (coop, "Coop", "Steam", @"C:\Games"), (unknown, "Unknown", "Steam", @"C:\Games")],
+            metadata);
+
+        library.CapabilityFilterOptions.Single(option => option.Key == "SinglePlayer").IsSelected = true;
+        library.CapabilityFilterOptions.Single(option => option.Key == "Coop").IsSelected = true;
+
+        Assert.Equal(["Coop", "Solo"], library.VisibleItems.Select(item => item.Title).OrderBy(value => value));
+        Assert.Equal(1, library.ActiveAdvancedFilterCategoryCount);
+    }
+
+    [Fact]
+    public async Task Reset_clears_genre_and_capability_filters_and_unknown_games_remain_without_filters()
+    {
+        var game = GameId.New();
+        var library = await LoadWithMetadata(
+            [(game, "Unknown", "Steam", @"C:\Games")],
+            new FakeProviderMetadataStore(Metadata(game, [])));
+
+        Assert.Empty(library.GenreFilterOptions);
+        Assert.Contains(library.CapabilityFilterOptions, option => option.Key == "Coop");
+        library.CapabilityFilterOptions.Single(option => option.Key == "Coop").IsSelected = true;
+        Assert.Empty(library.VisibleItems);
+        library.ResetAdvancedFilters();
+        Assert.Single(library.VisibleItems);
+    }
+
+    [Fact]
+    public async Task Library_ui_state_restores_genre_and_capability_filters()
+    {
+        var game = GameId.New();
+        var library = await LoadWithMetadata(
+            [(game, "Coop RPG", "Steam", @"C:\Games")],
+            new FakeProviderMetadataStore(Metadata(game, ["RPG"], onlineCoop: true)));
+        var state = library.CaptureUiState();
+        library.GenreFilterOptions.Single(option => option.Key == "RPG").IsSelected = true;
+        library.CapabilityFilterOptions.Single(option => option.Key == "Coop").IsSelected = true;
+        state = library.CaptureUiState();
+
+        library.ResetAdvancedFilters();
+        library.RestoreUiState(state);
+
+        Assert.True(library.GenreFilterOptions.Single(option => option.Key == "RPG").IsSelected);
+        Assert.True(library.CapabilityFilterOptions.Single(option => option.Key == "Coop").IsSelected);
+    }
+
     private static Task<LibraryViewModel> LoadAsync(
         params (string Title, long? Size)[] games) =>
         LoadAsync(games.Select(game => (GameId.New(), game.Title, game.Size)).ToArray(), null);
@@ -227,6 +306,29 @@ public sealed class LibraryFilterAndSortTests
         return library;
     }
 
+    private static async Task<LibraryViewModel> LoadWithMetadata(
+        (GameId Id, string Title, string Provider, string Path)[] games,
+        FakeProviderMetadataStore metadataStore)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = new LibrarySnapshot(
+            games.Select(game => new LogicalGame(game.Id, game.Title, false, now, now)).ToArray(),
+            games.Select(game => new GameInstallation(InstallationId.New(), game.Id, Enum.Parse<ProviderKind>(game.Provider), "123456", game.Path, null, true, true, now)).ToArray());
+        var library = new LibraryViewModel(new StubLibraryStore(snapshot), metadataStore);
+        await library.RefreshAsync(CancellationToken.None);
+        return library;
+    }
+
+    private static ProviderGameMetadata Metadata(
+        GameId gameId,
+        IReadOnlyList<string> genres,
+        bool? singlePlayer = null,
+        bool? multiPlayer = null,
+        bool? onlineCoop = null,
+        bool? localCoop = null) =>
+        ProviderGameMetadata.Create(gameId, ProviderKind.Steam, gameId.Value.ToString(), DateTimeOffset.UtcNow,
+            genres: genres, singlePlayer: singlePlayer, multiPlayer: multiPlayer, onlineCoop: onlineCoop, localCoop: localCoop);
+
     private static GameSession EndedSession(GameId gameId, TimeSpan duration, DateTimeOffset? end = null)
     {
         var ended = end ?? DateTimeOffset.UtcNow;
@@ -287,5 +389,14 @@ public sealed class LibraryFilterAndSortTests
         public Task<IReadOnlyList<GameCollectionMembership>> GetMembershipsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameCollectionMembership>>(_memberships);
         public Task<IReadOnlySet<Guid>> GetMembershipsAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlySet<Guid>>(_memberships.Where(x => x.GameId == gameId).Select(x => x.CollectionId).ToHashSet());
         public Task SetMembershipAsync(Guid collectionId, GameId gameId, bool enabled, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class FakeProviderMetadataStore(params ProviderGameMetadata[] values) : IProviderGameMetadataStore
+    {
+        public Task<IReadOnlyList<ProviderGameMetadata>> GetAllAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ProviderGameMetadata>>(values);
+        public Task<ProviderGameMetadata?> GetAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) =>
+            Task.FromResult<ProviderGameMetadata?>(values.FirstOrDefault(value => value.GameId == gameId && value.Provider == provider));
+        public Task UpsertAsync(ProviderGameMetadata metadata, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

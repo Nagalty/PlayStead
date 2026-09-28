@@ -176,6 +176,19 @@ public sealed class LibraryUiStateTests
         Assert.Equal("stalker", sut.SearchQuery);
     }
 
+    [Fact]
+    public void LibraryUiState_carries_capability_and_genre_selections()
+    {
+        var state = new LibraryUiState(LibraryViewMode.Grid, "Title", null, null, 0)
+        {
+            SelectedCapabilities = ["Coop"],
+            SelectedGenres = ["RPG"]
+        };
+
+        Assert.Equal(["Coop"], state.SelectedCapabilities);
+        Assert.Equal(["RPG"], state.SelectedGenres);
+    }
+
     private sealed class EmptyLibraryStore :
         ILibraryStore
     {

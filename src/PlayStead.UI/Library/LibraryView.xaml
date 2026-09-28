@@ -257,6 +257,22 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <TextBlock Margin="0,12,0,4" Text="Modes de jeu" Style="{DynamicResource PlayStead.Text.Caption}" />
+                    <ItemsControl ItemsSource="{Binding CapabilityFilterOptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,2,0,0" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Margin="0,12,0,4" Text="Genres" Style="{DynamicResource PlayStead.Text.Caption}" />
+                    <ItemsControl ItemsSource="{Binding GenreFilterOptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,2,0,0" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <TextBlock Margin="0,12,0,4" Text="Collections" Style="{DynamicResource PlayStead.Text.Caption}" />
                     <ItemsControl ItemsSource="{Binding CollectionOptions}">
                         <ItemsControl.ItemTemplate>

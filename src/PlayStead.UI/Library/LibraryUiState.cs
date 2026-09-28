@@ -15,6 +15,10 @@ public sealed record LibraryUiState(
 
     public IReadOnlyList<string> DriveFilters { get; init; } = [];
 
+    public IReadOnlyList<string> SelectedCapabilities { get; init; } = [];
+
+    public IReadOnlyList<string> SelectedGenres { get; init; } = [];
+
     public IReadOnlyList<Guid> CollectionFilters { get; init; } = [];
 
     public string SearchText { get; init; } = string.Empty;
