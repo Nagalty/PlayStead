@@ -20,8 +20,7 @@ public sealed class IdentityResolutionDatabaseTests : IDisposable
 
         await using var connection = await OpenAsync(databasePath);
 
-        Assert.Equal(
-19,await ScalarAsync(
+        Assert.Equal(20,await ScalarAsync(
                 connection,
                 "SELECT MAX(version) FROM schema_migrations;"));
         Assert.Equal(
@@ -55,8 +54,7 @@ public sealed class IdentityResolutionDatabaseTests : IDisposable
             .InitializeAsync(CancellationToken.None);
 
         await using var connection = await OpenAsync(databasePath);
-        Assert.Equal(
-19,await ScalarAsync(
+        Assert.Equal(20,await ScalarAsync(
                 connection,
                 "SELECT MAX(version) FROM schema_migrations;"));
         Assert.Equal(

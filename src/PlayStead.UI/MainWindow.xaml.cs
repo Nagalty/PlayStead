@@ -60,6 +60,7 @@ public partial class MainWindow : Window
     private readonly IGameLocalArtifactDiscoveryService? _localArtifactDiscoveryService;
     private readonly IArtifactFingerprintService? _artifactFingerprintService;
     private readonly ILocalArtifactBaselineStore? _artifactBaselineStore;
+    private readonly ILocalArtifactSnapshotService? _artifactSnapshotService;
     private LibraryUiState? _libraryStateBeforeGameDetail;
 
     public MainWindow()
@@ -455,6 +456,7 @@ public partial class MainWindow : Window
         IGameLocalArtifactDiscoveryService? localArtifactDiscoveryService = null,
         IArtifactFingerprintService? artifactFingerprintService = null,
         ILocalArtifactBaselineStore? artifactBaselineStore = null,
+        ILocalArtifactSnapshotService? artifactSnapshotService = null,
         IProviderObservedSessionStore? providerObservedSessionStore = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
@@ -473,6 +475,7 @@ public partial class MainWindow : Window
         _localArtifactDiscoveryService = localArtifactDiscoveryService;
         _artifactFingerprintService = artifactFingerprintService;
         _artifactBaselineStore = artifactBaselineStore;
+        _artifactSnapshotService = artifactSnapshotService;
         _aboutViewModel = distributionChannelProvider is null
             ? null
             : new AboutViewModel(distributionChannelProvider);
@@ -862,7 +865,9 @@ public partial class MainWindow : Window
                         _gameBuildHistoryService,
                         _localArtifactDiscoveryService,
                         _artifactFingerprintService,
-                        _artifactBaselineStore)
+                        _artifactBaselineStore,
+                        null,
+                        _artifactSnapshotService)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -877,7 +882,9 @@ public partial class MainWindow : Window
                         _gameBuildHistoryService,
                         _localArtifactDiscoveryService,
                         _artifactFingerprintService,
-                        _artifactBaselineStore);
+                        _artifactBaselineStore,
+                        null,
+                        _artifactSnapshotService);
 
                 MainContent.Content =
                     new GameDetailView(

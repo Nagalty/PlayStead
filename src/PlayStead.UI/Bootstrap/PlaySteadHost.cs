@@ -433,6 +433,12 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<IArtifactFingerprintService, Sha256ArtifactFingerprintService>();
         builder.Services.AddSingleton<ILocalArtifactBaselineStore, SqliteLocalArtifactBaselineStore>();
         builder.Services.AddSingleton<LocalArtifactBaselineComparisonService>();
+        builder.Services.AddSingleton<ILocalArtifactSnapshotStore, SqliteLocalArtifactSnapshotStore>();
+        builder.Services.AddSingleton<ILocalArtifactSnapshotService>(services =>
+            new LocalArtifactSnapshotService(
+                services.GetRequiredService<IArtifactFingerprintService>(),
+                services.GetRequiredService<ILocalArtifactSnapshotStore>(),
+                Path.Combine(dataRoot, "Snapshots")));
 
         builder.Services.AddSingleton<
             PlayStead.Core.Collections.IGameCollectionStore,

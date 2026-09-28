@@ -25,8 +25,7 @@ public sealed class DatabaseCanonicalCatalogLinkMigrationTests : IDisposable
         await new DatabaseInitializer(options)
             .InitializeAsync(CancellationToken.None);
 
-        Assert.Equal(
-19,
+        Assert.Equal(20,
             await ReadSchemaVersionAsync(databasePath));
 
         Assert.True(

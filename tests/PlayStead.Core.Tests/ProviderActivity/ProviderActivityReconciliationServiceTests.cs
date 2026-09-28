@@ -78,6 +78,7 @@ public sealed class ProviderActivityReconciliationServiceTests
 
             Assert.Single(await store.GetAllAsync(CancellationToken.None));
             listener.Flush();
+            Trace.Listeners.Remove(listener);
             var trace = output.ToString();
             Assert.Contains("[PROVIDER-ACTIVITY-ERROR]", trace, StringComparison.Ordinal);
             Assert.Contains("Source=", trace, StringComparison.Ordinal);

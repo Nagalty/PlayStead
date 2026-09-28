@@ -248,7 +248,7 @@
                             <TextBlock Margin="0,4,0,0"
                                        Text="{Binding Activity.ProviderActivitySourceLabel}"
                                        Style="{DynamicResource PlayStead.Text.BodySecondary}"/>
-                            <StackPanel Margin="0,6,0,0"
+                            <StackPanel
                                         Visibility="{Binding Activity.HasProviderPlayTime, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Text="Temps provider"
                                            Style="{DynamicResource PlayStead.Text.Caption}"/>
@@ -403,6 +403,10 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="0,0,0,10">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -462,12 +466,16 @@
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
-                                            <TextBlock Text="{Binding BaselineStatusLabel}"
-                                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                                       FontSize="13"
-                                                       Margin="0,4,0,0" />
+                                            <StackPanel>
+                                                <TextBlock Text="Référence"
+                                                           Style="{DynamicResource PlayStead.Text.Caption}" />
+                                                <TextBlock Text="{Binding BaselineStatusLabel}"
+                                                           Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                                           FontSize="13"
+                                                           Margin="0,4,0,0" />
+                                            </StackPanel>
                                         </StackPanel>
-                                        <StackPanel Grid.Column="2">
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,6,0,0">
                                             <Button Content="Ouvrir le dossier"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.OpenLocalArtifactFolderCommand, ElementName=GameDetailRoot}"
@@ -475,16 +483,36 @@
                                                     IsEnabled="{Binding Exists}"
                                                     Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <Button Content="Définir comme référence"
-                                                    Margin="0,6,0,0"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CaptureLocalArtifactBaselineCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding CanCaptureBaseline}" />
+                                            <Button Content="Créer un snapshot"
+                                                    Style="{DynamicResource PlayStead.Button.Secondary}"
+                                                    Command="{Binding DataContext.CreateLocalArtifactSnapshotCommand, ElementName=GameDetailRoot}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding Exists}" />
                                         </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <StackPanel Margin="0,6,0,0"
+                                    Visibility="{Binding HasLocalArtifactSnapshots, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="Snapshots récents" Style="{DynamicResource PlayStead.Text.Caption}" />
+                            <ItemsControl ItemsSource="{Binding LocalArtifactSnapshots}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="Supprimer" Style="{DynamicResource PlayStead.Button.Secondary}"
+                                                    Command="{Binding DataContext.DeleteLocalArtifactSnapshotCommand, ElementName=GameDetailRoot}"
+                                                    CommandParameter="{Binding}" />
+                                            <TextBlock Text="{Binding CreatedAtUtc, StringFormat=dd MMM yyyy · HH:mm}" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
