@@ -257,6 +257,42 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <TextBlock Margin="0,12,0,4" Text="Collections" Style="{DynamicResource PlayStead.Text.Caption}" />
+                    <ItemsControl ItemsSource="{Binding CollectionOptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox Content="{Binding Name}" IsChecked="{Binding IsFilterSelected, Mode=TwoWay}" />
+                                    <Button Grid.Column="1" Content="Renommer" Tag="{Binding Id}" Click="RenameCollectionButton_OnClick" Margin="6,0,0,0" Style="{DynamicResource PlayStead.Button.Secondary}" />
+                                    <Button Grid.Column="2" Content="Supprimer" Tag="{Binding Id}" Click="DeleteCollectionButton_OnClick" Margin="6,0,0,0" Style="{DynamicResource PlayStead.Button.Secondary}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="Aucune collection&#xA;Créez-en une pour organiser vos jeux."
+                               Margin="0,4,0,0"
+                               Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                               FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasCollections}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Button Content="+ Nouvelle collection"
+                            Margin="0,12,0,0"
+                            Click="CreateCollectionButton_OnClick"
+                            Style="{DynamicResource PlayStead.Button.Secondary}" />
                     <Button Content="Réinitialiser"
                             Margin="0,12,0,0"
                             Click="ResetAdvancedFiltersButton_OnClick"
@@ -501,6 +537,7 @@
 
 <Grid>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -850,8 +887,34 @@
                                 </Grid>
                             </Border>
 
+                            <!-- Collections -->
+                            <Border Grid.Row="4"
+                                    Margin="0,10,0,0"
+                                    Padding="12"
+                                    Background="{DynamicResource PlayStead.Brush.Surface}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <StackPanel>
+                                    <TextBlock Text="Collections"
+                                               Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold" />
+                                    <ItemsControl Margin="0,8,0,0"
+                                                  ItemsSource="{Binding CollectionOptions, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Content="{Binding Name}"
+                                                          IsChecked="{Binding IsMember, Mode=TwoWay}"
+                                                          Margin="0,2,0,0" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
                             <!-- Actions -->
-                            <controls:PlaySplitButton Grid.Row="4"
+                            <controls:PlaySplitButton Grid.Row="5"
                                                       Height="42"
                                                       MaxHeight="42"
                                                       Margin="0,16,0,0"
@@ -860,7 +923,7 @@
                                                       DataContext="{Binding QuickPanelViewModel.Launch, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}"/>
 
                             <Button x:Name="OpenGameDetailButton"
-                                    Grid.Row="5"
+                                    Grid.Row="6"
                                     Height="42"
                                     Content="Voir la fiche"
                                     Click="OpenGameDetailButton_OnClick"

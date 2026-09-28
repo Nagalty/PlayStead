@@ -422,6 +422,10 @@ public static class PlaySteadHost
             ShellViewModel>();
 
         builder.Services.AddSingleton<
+            PlayStead.Core.Collections.IGameCollectionStore,
+            PlayStead.Data.Collections.SqliteGameCollectionStore>();
+
+        builder.Services.AddSingleton<
             LibraryViewModel>(
             services =>
             {
@@ -436,6 +440,8 @@ public static class PlaySteadHost
                     services.GetRequiredService<IProviderGameMetadataStore>(),
                     services.GetRequiredService<IProviderActivityMetadataStore>(),
                     services.GetRequiredService<ISessionStore>());
+                viewModel.AttachCollectionStore(
+                    services.GetRequiredService<PlayStead.Core.Collections.IGameCollectionStore>());
                 viewModel.AttachAttentionService(
                     services.GetRequiredService<PlayStead.Core.Notifications.IAttentionService>());
                 return viewModel;

@@ -16,6 +16,7 @@ using PlayStead.Core.Shortlist;
 using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.Core.Notifications;
 using PlayStead.Core.ProviderActivity;
+using PlayStead.Core.Collections;
 
 namespace PlayStead.UI.Library;
 
@@ -31,6 +32,7 @@ public sealed class LibraryViewModel :
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly IProviderActivityMetadataStore? _providerActivityStore;
     private readonly ISessionStore? _sessionStore;
+    private IGameCollectionStore? _collectionStore;
     private readonly object _verifySteamGate = new();
     private readonly Dispatcher? _uiDispatcher =
         Application.Current?.Dispatcher
@@ -75,6 +77,9 @@ public sealed class LibraryViewModel :
         new Dictionary<GameId, LibraryActivityProjection>();
     private IReadOnlyList<LibraryFilterOption> _providerFilterOptions = [];
     private IReadOnlyList<LibraryFilterOption> _driveFilterOptions = [];
+    private IReadOnlyList<LibraryCollectionOption> _collectionOptions = [];
+    private IReadOnlySet<GameCollectionMembership> _collectionMemberships = new HashSet<GameCollectionMembership>();
+    private bool _updatingCollectionOption;
     private bool _isAdvancedFiltersOpen;
     private string _searchQuery = string.Empty;
     private GameId? _selectedGameId;
@@ -349,6 +354,10 @@ public sealed class LibraryViewModel :
 
     public IReadOnlyList<LibraryFilterOption> DriveFilterOptions => _driveFilterOptions;
 
+    public IReadOnlyList<LibraryCollectionOption> CollectionOptions => _collectionOptions;
+
+    public bool HasCollections => _collectionOptions.Count > 0;
+
     public bool HasDriveFilterOptions => _driveFilterOptions.Count > 0;
 
     public bool IsAdvancedFiltersOpen
@@ -365,7 +374,8 @@ public sealed class LibraryViewModel :
 
     public int ActiveAdvancedFilterCategoryCount =>
         (_providerFilterOptions.Any(option => option.IsSelected) ? 1 : 0) +
-        (_driveFilterOptions.Any(option => option.IsSelected) ? 1 : 0);
+        (_driveFilterOptions.Any(option => option.IsSelected) ? 1 : 0) +
+        (_collectionOptions.Any(option => option.IsFilterSelected) ? 1 : 0);
 
     public string AdvancedFilterButtonLabel =>
         ActiveAdvancedFilterCategoryCount == 0
@@ -471,7 +481,65 @@ public sealed class LibraryViewModel :
     {
         foreach (var option in _providerFilterOptions.Concat(_driveFilterOptions))
             option.IsSelected = false;
+        foreach (var option in _collectionOptions)
+            option.IsFilterSelected = false;
         NotifyAdvancedFilterProjectionChanged();
+    }
+
+    public void AttachCollectionStore(IGameCollectionStore collectionStore)
+    {
+        ArgumentNullException.ThrowIfNull(collectionStore);
+        _collectionStore = collectionStore;
+    }
+
+    public async Task RefreshCollectionsAsync(CancellationToken cancellationToken)
+    {
+        if (_collectionStore is null)
+            return;
+
+        var collections = await _collectionStore.GetCollectionsAsync(cancellationToken);
+        _collectionMemberships = (await _collectionStore.GetMembershipsAsync(cancellationToken)).ToHashSet();
+        var selectedFilters = _collectionOptions.Where(option => option.IsFilterSelected).Select(option => option.Id).ToHashSet();
+        var selectedGame = SelectedGameId;
+        var previous = _collectionOptions.ToDictionary(option => option.Id);
+        _collectionOptions = collections.Select(collection =>
+        {
+            var option = previous.GetValueOrDefault(collection.Id) ?? new LibraryCollectionOption(collection);
+            if (!previous.ContainsKey(collection.Id))
+            {
+                option.FilterChanged += CollectionFilterChanged;
+                option.MembershipChanged += CollectionMembershipChanged;
+            }
+            option.Update(collection, selectedFilters.Contains(collection.Id), selectedGame is not null && _collectionMemberships.Contains(new GameCollectionMembership(collection.Id, selectedGame.Value)));
+            return option;
+        }).ToArray();
+        OnPropertyChanged(nameof(CollectionOptions));
+        OnPropertyChanged(nameof(HasCollections));
+        NotifyAdvancedFilterProjectionChanged();
+    }
+
+    public async Task<GameCollection> CreateCollectionAsync(string name, CancellationToken cancellationToken)
+    {
+        if (_collectionStore is null) throw new InvalidOperationException("A collection store is required.");
+        var result = await _collectionStore.CreateCollectionAsync(name, cancellationToken);
+        await RefreshCollectionsAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<GameCollection> RenameCollectionAsync(Guid collectionId, string name, CancellationToken cancellationToken)
+    {
+        if (_collectionStore is null) throw new InvalidOperationException("A collection store is required.");
+        var result = await _collectionStore.RenameCollectionAsync(collectionId, name, cancellationToken);
+        await RefreshCollectionsAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<bool> DeleteCollectionAsync(Guid collectionId, CancellationToken cancellationToken)
+    {
+        if (_collectionStore is null) throw new InvalidOperationException("A collection store is required.");
+        var result = await _collectionStore.DeleteCollectionAsync(collectionId, cancellationToken);
+        await RefreshCollectionsAsync(cancellationToken);
+        return result;
     }
 
     public void AttachAttentionService(IAttentionService attentionService)
@@ -602,6 +670,8 @@ public sealed class LibraryViewModel :
         SetSelectedItem(
             item);
 
+        UpdateCollectionMemberships(item.GameId);
+
         _ = EnsureSelectedLogoAsync(
             item);
     }
@@ -613,6 +683,7 @@ public sealed class LibraryViewModel :
 
         SetSelectedGame(
             null);
+        UpdateCollectionMemberships(null);
     }
 
     public void SetSelectedGame(
@@ -1032,6 +1103,7 @@ public sealed class LibraryViewModel :
             BuildItems(
                 snapshot,
                 checking: false);
+        await RefreshCollectionsAsync(cancellationToken);
     }
 
     public Task VerifySteamAsync(
@@ -1417,6 +1489,12 @@ public sealed class LibraryViewModel :
                 var drive = installation is null ? null : Path.GetPathRoot(installation.InstallPath)?.TrimEnd('\\');
                 return drive is not null && selectedDrives.Contains(drive);
             });
+        var selectedCollections = _collectionOptions
+            .Where(option => option.IsFilterSelected)
+            .Select(option => option.Id)
+            .ToHashSet();
+        if (selectedCollections.Count > 0)
+            filtered = filtered.Where(item => _collectionMemberships.Any(membership => membership.GameId == item.GameId && selectedCollections.Contains(membership.CollectionId)));
 
         var searched = LibrarySearchService.Search(filtered.ToArray(), SearchQuery);
         return SortKey switch
@@ -1502,6 +1580,27 @@ public sealed class LibraryViewModel :
     private void AdvancedFilterOptionOnChanged(object? sender, EventArgs e) =>
         NotifyAdvancedFilterProjectionChanged();
 
+    private void CollectionFilterChanged(object? sender, EventArgs e) =>
+        NotifyAdvancedFilterProjectionChanged();
+
+    private async void CollectionMembershipChanged(object? sender, EventArgs e)
+    {
+        if (_updatingCollectionOption || _collectionStore is null || sender is not LibraryCollectionOption option || SelectedGameId is not GameId gameId)
+            return;
+        try
+        {
+            await _collectionStore.SetMembershipAsync(option.Id, gameId, option.IsMember, CancellationToken.None);
+            _collectionMemberships = (await _collectionStore.GetMembershipsAsync(CancellationToken.None)).ToHashSet();
+            NotifyAdvancedFilterProjectionChanged();
+        }
+        catch
+        {
+            _updatingCollectionOption = true;
+            option.IsMember = !option.IsMember;
+            _updatingCollectionOption = false;
+        }
+    }
+
     private void NotifyAdvancedFilterProjectionChanged()
     {
         OnPropertyChanged(nameof(ActiveAdvancedFilterCategoryCount));
@@ -1522,6 +1621,15 @@ public sealed class LibraryViewModel :
         OnPropertyChanged(nameof(VisibleItems));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
+    }
+
+    private void UpdateCollectionMemberships(GameId? gameId)
+    {
+        _updatingCollectionOption = true;
+        foreach (var option in _collectionOptions)
+            option.IsMember = gameId is not null && _collectionMemberships.Contains(new GameCollectionMembership(option.Id, gameId.Value));
+        _updatingCollectionOption = false;
+        OnPropertyChanged(nameof(CollectionOptions));
     }
 
     private void SetSelectedItem(

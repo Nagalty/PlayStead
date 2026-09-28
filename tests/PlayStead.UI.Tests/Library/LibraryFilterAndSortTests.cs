@@ -3,6 +3,7 @@ using PlayStead.Core.Notifications;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.ProviderActivity;
+using PlayStead.Core.Collections;
 using PlayStead.Core.Sessions;
 using PlayStead.UI.Library;
 
@@ -137,6 +138,28 @@ public sealed class LibraryFilterAndSortTests
         Assert.Equal(3, library.VisibleItems.Count);
     }
 
+    [Fact]
+    public async Task Collection_filter_uses_or_and_combines_with_provider_and_drive_filters()
+    {
+        var first = GameId.New();
+        var second = GameId.New();
+        var third = GameId.New();
+        var favorites = new GameCollection(Guid.NewGuid(), "Favoris", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var coop = new GameCollection(Guid.NewGuid(), "Coop", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var store = new FakeCollectionStore(
+            [favorites, coop],
+            [new(favorites.Id, first), new(coop.Id, second), new(coop.Id, third)]);
+        var library = await LoadWithCollections(
+            [(first, "First", @"D:\Games"), (second, "Second", @"D:\Games"), (third, "Third", @"C:\Games")], store);
+
+        library.CollectionOptions.Single(option => option.Name == "Favoris").IsFilterSelected = true;
+        library.CollectionOptions.Single(option => option.Name == "Coop").IsFilterSelected = true;
+        library.ProviderFilterOptions.Single(option => option.Key == "Steam").IsSelected = true;
+        library.DriveFilterOptions.Single(option => option.Key == "D:").IsSelected = true;
+
+        Assert.Equal(["First", "Second"], library.VisibleItems.Select(item => item.Title));
+    }
+
     private static Task<LibraryViewModel> LoadAsync(
         params (string Title, long? Size)[] games) =>
         LoadAsync(games.Select(game => (GameId.New(), game.Title, game.Size)).ToArray(), null);
@@ -190,6 +213,20 @@ public sealed class LibraryFilterAndSortTests
         return library;
     }
 
+    private static async Task<LibraryViewModel> LoadWithCollections(
+        (GameId Id, string Title, string Path)[] games,
+        FakeCollectionStore store)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = new LibrarySnapshot(
+            games.Select(game => new LogicalGame(game.Id, game.Title, false, now, now)).ToArray(),
+            games.Select(game => new GameInstallation(InstallationId.New(), game.Id, ProviderKind.Steam, "123456", game.Path, null, true, true, now)).ToArray());
+        var library = new LibraryViewModel(new StubLibraryStore(snapshot));
+        library.AttachCollectionStore(store);
+        await library.RefreshAsync(CancellationToken.None);
+        return library;
+    }
+
     private static GameSession EndedSession(GameId gameId, TimeSpan duration, DateTimeOffset? end = null)
     {
         var ended = end ?? DateTimeOffset.UtcNow;
@@ -235,5 +272,20 @@ public sealed class LibraryFilterAndSortTests
         public Task<GameSession?> GetAsync(Guid sessionId, CancellationToken cancellationToken) => Task.FromResult<GameSession?>(values.FirstOrDefault(value => value.SessionId == sessionId));
         public Task<IReadOnlyList<GameSession>> GetActiveAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameSession>>(values.Where(value => value.State == SessionState.Active).ToArray());
         public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameSession>>(values.Take(limit).ToArray());
+    }
+
+    private sealed class FakeCollectionStore(
+        IReadOnlyList<GameCollection> collections,
+        IReadOnlyList<GameCollectionMembership> memberships) : IGameCollectionStore
+    {
+        private readonly List<GameCollection> _collections = collections.ToList();
+        private readonly List<GameCollectionMembership> _memberships = memberships.ToList();
+        public Task<IReadOnlyList<GameCollection>> GetCollectionsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameCollection>>(_collections);
+        public Task<GameCollection> CreateCollectionAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<GameCollection> RenameCollectionAsync(Guid collectionId, string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<bool> DeleteCollectionAsync(Guid collectionId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<GameCollectionMembership>> GetMembershipsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameCollectionMembership>>(_memberships);
+        public Task<IReadOnlySet<Guid>> GetMembershipsAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlySet<Guid>>(_memberships.Where(x => x.GameId == gameId).Select(x => x.CollectionId).ToHashSet());
+        public Task SetMembershipAsync(Guid collectionId, GameId gameId, bool enabled, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

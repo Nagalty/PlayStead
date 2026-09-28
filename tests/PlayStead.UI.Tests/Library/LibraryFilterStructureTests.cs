@@ -24,6 +24,12 @@ public sealed class LibraryFilterStructureTests
             (string?)button.Attribute("Content") == "{Binding AdvancedFilterButtonLabel}");
         Assert.True(text.Contains("ProviderFilterOptions", StringComparison.Ordinal));
         Assert.True(text.Contains("DriveFilterOptions", StringComparison.Ordinal));
+        Assert.True(text.Contains("CollectionOptions", StringComparison.Ordinal));
+        Assert.True(text.Contains("IsFilterSelected", StringComparison.Ordinal));
+        Assert.True(text.Contains("IsMember", StringComparison.Ordinal));
+        Assert.True(text.Contains("CreateCollectionButton_OnClick", StringComparison.Ordinal));
+        Assert.True(text.Contains("RenameCollectionButton_OnClick", StringComparison.Ordinal));
+        Assert.True(text.Contains("DeleteCollectionButton_OnClick", StringComparison.Ordinal));
         Assert.True(text.Contains("Aucun jeu ne correspond à ces filtres.", StringComparison.Ordinal));
 
         var sortTags = comboBox.Descendants()

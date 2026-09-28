@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using Microsoft.VisualBasic;
 
 namespace PlayStead.UI.Library;
 
@@ -217,6 +218,37 @@ public partial class LibraryView :
     {
         if (DataContext is LibraryViewModel viewModel)
             viewModel.CloseAdvancedFilters();
+    }
+
+    private async void CreateCollectionButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not LibraryViewModel viewModel)
+            return;
+        var name = Interaction.InputBox("Nom de la collection", "Nouvelle collection", "");
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+        try { await viewModel.CreateCollectionAsync(name, CancellationToken.None); }
+        catch (Exception ex) { MessageBox.Show(ex.Message, "Collection", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
+    private async void RenameCollectionButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not LibraryViewModel viewModel || sender is not Button { Tag: Guid id })
+            return;
+        var current = viewModel.CollectionOptions.FirstOrDefault(option => option.Id == id)?.Name ?? string.Empty;
+        var name = Interaction.InputBox("Nouveau nom", "Renommer la collection", current);
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+        try { await viewModel.RenameCollectionAsync(id, name, CancellationToken.None); }
+        catch (Exception ex) { MessageBox.Show(ex.Message, "Collection", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
+    private async void DeleteCollectionButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not LibraryViewModel viewModel || sender is not Button { Tag: Guid id })
+            return;
+        try { await viewModel.DeleteCollectionAsync(id, CancellationToken.None); }
+        catch (Exception ex) { MessageBox.Show(ex.Message, "Collection", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
 
     private void LibrarySortComboBox_OnSelectionChanged(
