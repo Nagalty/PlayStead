@@ -185,6 +185,36 @@ public partial class LibraryView :
         RestoreVerticalOffset();
     }
 
+    private void InstalledFilterButton_OnClick(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel)
+            viewModel.SetQuickFilter(LibraryQuickFilter.Installed);
+    }
+
+    private void AttentionFilterButton_OnClick(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel)
+            viewModel.SetQuickFilter(LibraryQuickFilter.Attention);
+    }
+
+    private void LibrarySortComboBox_OnSelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (e.AddedItems.Count == 0 ||
+            DataContext is not LibraryViewModel viewModel ||
+            e.AddedItems[0] is not ComboBoxItem { Tag: string sortKey })
+        {
+            return;
+        }
+
+        viewModel.SetSortKey(sortKey);
+    }
+
     private async void ListModeButton_OnClick(
         object sender,
         RoutedEventArgs e)

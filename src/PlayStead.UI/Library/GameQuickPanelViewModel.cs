@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using PlayStead.Core.Sessions;
+using PlayStead.Core.ProviderActivity;
 using PlayStead.UI.Launching;
 using PlayStead.UI.Navigation;
 
@@ -14,6 +15,7 @@ public sealed class GameQuickPanelViewModel :
     private readonly ISessionStore? _sessionStore;
     private readonly ISessionCorrectionStore? _sessionCorrectionStore;
     private readonly SessionCorrectionPolicy? _sessionCorrectionPolicy;
+    private IProviderActivityMetadataStore? _providerActivityStore;
 
     private bool _hasSessionHistory;
     private string _lastActivityLabel = "Aucune activité PlayStead";
@@ -48,9 +50,20 @@ public sealed class GameQuickPanelViewModel :
         LibraryItemViewModel game,
         NavigationService navigationService,
         GameLaunchViewModel? launch,
+        IProviderActivityMetadataStore? providerActivityStore)
+        : this(game, navigationService, launch)
+    {
+        _providerActivityStore = providerActivityStore;
+    }
+
+    public GameQuickPanelViewModel(
+        LibraryItemViewModel game,
+        NavigationService navigationService,
+        GameLaunchViewModel? launch,
         ISessionStore sessionStore,
         ISessionCorrectionStore sessionCorrectionStore,
-        SessionCorrectionPolicy sessionCorrectionPolicy)
+        SessionCorrectionPolicy sessionCorrectionPolicy,
+        IProviderActivityMetadataStore? providerActivityStore = null)
         : this(game, navigationService, launch)
     {
         ArgumentNullException.ThrowIfNull(sessionStore);
@@ -60,6 +73,7 @@ public sealed class GameQuickPanelViewModel :
         _sessionStore = sessionStore;
         _sessionCorrectionStore = sessionCorrectionStore;
         _sessionCorrectionPolicy = sessionCorrectionPolicy;
+        _providerActivityStore = providerActivityStore;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -71,8 +85,17 @@ public sealed class GameQuickPanelViewModel :
     public bool HasSessionHistory
     {
         get => _hasSessionHistory;
-        private set => SetField(ref _hasSessionHistory, value);
+        private set
+        {
+            if (_hasSessionHistory == value)
+                return;
+            _hasSessionHistory = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasAnyActivity));
+        }
     }
+
+    public bool HasAnyActivity => HasSessionHistory || HasProviderActivity;
 
     public string LastActivityLabel
     {
@@ -98,6 +121,17 @@ public sealed class GameQuickPanelViewModel :
         private set => SetField(ref _totalPlayTimeLabel, value);
     }
 
+    public string PlaySteadTotalPlayTimeLabel { get; private set; } = "0 min";
+
+    public string? ProviderPlayTimeLabel { get; private set; }
+
+    public string? ProviderLastPlayedLabel { get; private set; }
+
+    public string? ProviderActivitySourceLabel { get; private set; }
+
+    public bool HasProviderActivity =>
+        ProviderPlayTimeLabel is not null || ProviderLastPlayedLabel is not null;
+
     public string SessionCountLabel
     {
         get => _sessionCountLabel;
@@ -113,6 +147,8 @@ public sealed class GameQuickPanelViewModel :
     public async Task LoadSessionSummaryAsync(
         CancellationToken cancellationToken)
     {
+        await LoadProviderActivityAsync(cancellationToken);
+
         if (_sessionStore is null ||
             _sessionCorrectionStore is null ||
             _sessionCorrectionPolicy is null)
@@ -132,7 +168,9 @@ public sealed class GameQuickPanelViewModel :
             LastActivityLabel = "Aucune activité PlayStead";
             LastSessionDateLabel = "—";
             LastSessionDurationLabel = "—";
-            TotalPlayTimeLabel = "0 min";
+            PlaySteadTotalPlayTimeLabel = "0 min";
+            TotalPlayTimeLabel = ProviderPlayTimeLabel ?? PlaySteadTotalPlayTimeLabel;
+            OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
             SessionCountLabel = "0 session";
             return;
         }
@@ -228,13 +266,38 @@ public sealed class GameQuickPanelViewModel :
                     lastCompleted.Effective.EndedAtUtc!.Value -
                     lastCompleted.Effective.StartedAtUtc);
 
-        TotalPlayTimeLabel =
-            FormatDuration(total);
+        PlaySteadTotalPlayTimeLabel = FormatDuration(total);
+        TotalPlayTimeLabel = ProviderPlayTimeLabel ?? PlaySteadTotalPlayTimeLabel;
+        OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
 
         SessionCountLabel =
             sessions.Count == 1
                 ? "1 session"
                 : $"{sessions.Count} sessions";
+    }
+
+    private async Task LoadProviderActivityAsync(CancellationToken cancellationToken)
+    {
+        if (_providerActivityStore is null)
+        {
+            return;
+        }
+
+        var metadata = (await _providerActivityStore.GetAllAsync(cancellationToken))
+            .FirstOrDefault(item => item.GameId == Game.GameId && item.Provider == Game.Provider);
+
+        ProviderPlayTimeLabel = metadata?.TotalPlaytime is { } playtime
+            ? FormatProviderDuration(playtime)
+            : null;
+        ProviderLastPlayedLabel = metadata?.LastPlayedAtUtc is { } lastPlayed
+            ? FormatTimestamp(lastPlayed)
+            : null;
+        ProviderActivitySourceLabel = metadata?.Source.ToString();
+        OnPropertyChanged(nameof(ProviderPlayTimeLabel));
+        OnPropertyChanged(nameof(ProviderLastPlayedLabel));
+        OnPropertyChanged(nameof(ProviderActivitySourceLabel));
+        OnPropertyChanged(nameof(HasProviderActivity));
+        OnPropertyChanged(nameof(HasAnyActivity));
     }
 
     public void OpenDetails()
@@ -311,6 +374,14 @@ public sealed class GameQuickPanelViewModel :
             : "0 min";
     }
 
+    private static string FormatProviderDuration(TimeSpan duration)
+    {
+        var totalHours = (int)duration.TotalHours;
+        return duration.Minutes == 0
+            ? $"{totalHours} h"
+            : $"{totalHours} h {duration.Minutes:00} min";
+    }
+
     internal static string FormatDurationForDisplay(
         TimeSpan duration) =>
         FormatDuration(duration);
@@ -335,6 +406,9 @@ public sealed class GameQuickPanelViewModel :
             new PropertyChangedEventArgs(
                 propertyName));
     }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     private sealed record ResolvedSession(
         GameSession Session,

@@ -1,6 +1,7 @@
 using PlayStead.Core.Library;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
+using PlayStead.Core.ProviderActivity;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 
@@ -119,6 +120,37 @@ public sealed class GameQuickPanelViewModelTests
         Assert.Equal("—", viewModel.LastSessionDurationLabel);
     }
 
+    [Fact]
+    public async Task Provider_activity_is_primary_but_observed_playtime_remains_separate()
+    {
+        var gameId = new GameId(Guid.Parse("11111111-2222-3333-4444-555555555555"));
+        var game = new LibraryItemViewModel(gameId, "Game", ProviderKind.Steam, "Steam", @"C:\\Game", null);
+        var providerLastPlayed = new DateTimeOffset(2026, 9, 12, 20, 0, 0, TimeSpan.Zero);
+        var providerStore = new FakeProviderActivityStore(new ProviderActivityMetadata(
+            gameId,
+            ProviderKind.Steam,
+            "123",
+            TimeSpan.FromHours(428),
+            providerLastPlayed,
+            DateTimeOffset.UtcNow,
+            ProviderActivityAvailability.Complete));
+        var viewModel = new GameQuickPanelViewModel(
+            game,
+            new NavigationService(),
+            launch: null,
+            new FakeSessionStore([]),
+            new FakeCorrectionStore(new Dictionary<Guid, SessionCorrection>()),
+            new SessionCorrectionPolicy(),
+            providerStore);
+
+        await viewModel.LoadSessionSummaryAsync(CancellationToken.None);
+
+        Assert.Equal("428 h", viewModel.TotalPlayTimeLabel);
+        Assert.Equal("0 min", viewModel.PlaySteadTotalPlayTimeLabel);
+        Assert.Equal("Steam", viewModel.ProviderActivitySourceLabel);
+        Assert.NotNull(viewModel.ProviderLastPlayedLabel);
+    }
+
     private static GameSession EndedSession(
         Guid sessionId,
         Guid gameId,
@@ -200,5 +232,14 @@ public sealed class GameQuickPanelViewModelTests
                     out var correction)
                     ? correction
                     : null);
+    }
+
+    private sealed class FakeProviderActivityStore(ProviderActivityMetadata value) : IProviderActivityMetadataStore
+    {
+        public Task<IReadOnlyList<ProviderActivityMetadata>> GetAllAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ProviderActivityMetadata>>([value]);
+
+        public Task UpsertAsync(ProviderActivityMetadata metadata, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 }

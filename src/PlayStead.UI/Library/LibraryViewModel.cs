@@ -13,11 +13,14 @@ using PlayStead.UI.Settings;
 using PlayStead.UI.Steam;
 using PlayStead.Core.Shortlist;
 using PlayStead.Core.ProviderGameMetadata;
+using PlayStead.Core.Notifications;
+using PlayStead.Core.ProviderActivity;
 
 namespace PlayStead.UI.Library;
 
 public sealed class LibraryViewModel :
-    INotifyPropertyChanged
+    INotifyPropertyChanged,
+    IDisposable
 {
     private readonly ILibraryStore _libraryStore;
     private readonly IGameMediaResolver _gameMediaResolver;
@@ -25,6 +28,8 @@ public sealed class LibraryViewModel :
     public IGamesDuMomentService? GamesDuMomentService { get; }
     private readonly UiPreferencesStore? _uiPreferencesStore;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
+    private readonly IProviderActivityMetadataStore? _providerActivityStore;
+    private readonly ISessionStore? _sessionStore;
     private readonly object _verifySteamGate = new();
     private readonly Dispatcher? _uiDispatcher =
         Application.Current?.Dispatcher
@@ -62,6 +67,11 @@ public sealed class LibraryViewModel :
     private LibraryViewMode _viewMode = LibraryViewMode.Grid;
     private string _sortKey = "Title";
     private string? _filterKey;
+    private LibraryQuickFilter _quickFilter = LibraryQuickFilter.Installed;
+    private IAttentionService? _attentionService;
+    private HashSet<GameId> _attentionGameIds = [];
+    private IReadOnlyDictionary<GameId, LibraryActivityProjection> _activityByGame =
+        new Dictionary<GameId, LibraryActivityProjection>();
     private string _searchQuery = string.Empty;
     private GameId? _selectedGameId;
     private LibraryItemViewModel? _selectedItem;
@@ -133,6 +143,34 @@ public sealed class LibraryViewModel :
         CanonicalCatalogStore = canonicalCatalogStore;
         GamesDuMomentService = gamesDuMomentService;
         ProviderGameMetadataStore = providerGameMetadataStore;
+    }
+
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        SessionMonitor sessionMonitor,
+        UiPreferencesStore uiPreferencesStore,
+        IGameMediaResolver gameMediaResolver,
+        ICanonicalCatalogStore? canonicalCatalogStore,
+        IGamesDuMomentService? gamesDuMomentService,
+        IProviderGameMetadataStore? providerGameMetadataStore,
+        IProviderActivityMetadataStore? providerActivityStore,
+        ISessionStore? sessionStore)
+        : this(libraryStore, steamReferenceRuntime, sessionMonitor, uiPreferencesStore,
+            gameMediaResolver, canonicalCatalogStore, gamesDuMomentService, providerGameMetadataStore)
+    {
+        _providerActivityStore = providerActivityStore;
+        _sessionStore = sessionStore;
+    }
+
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
+        IProviderActivityMetadataStore providerActivityStore,
+        ISessionStore sessionStore)
+        : this(libraryStore)
+    {
+        _providerActivityStore = providerActivityStore;
+        _sessionStore = sessionStore;
     }
 
     public LibraryViewModel(
@@ -293,6 +331,14 @@ public sealed class LibraryViewModel :
 
     public string SortKey => _sortKey;
 
+    public LibraryQuickFilter QuickFilter => _quickFilter;
+
+    public string QuickFilterKey => _quickFilter.ToString();
+
+    public bool IsInstalledQuickFilter => _quickFilter == LibraryQuickFilter.Installed;
+
+    public bool IsAttentionQuickFilter => _quickFilter == LibraryQuickFilter.Attention;
+
     public string? FilterKey => _filterKey;
 
     public string SearchQuery =>
@@ -303,9 +349,7 @@ public sealed class LibraryViewModel :
             SearchQuery);
 
     public IReadOnlyList<LibraryItemViewModel> VisibleItems =>
-        LibrarySearchService.Search(
-            Items,
-            SearchQuery);
+        ApplyProjection();
 
     public GameId? SelectedGameId =>
         _selectedGameId;
@@ -343,7 +387,7 @@ public sealed class LibraryViewModel :
         ArgumentNullException.ThrowIfNull(
             sortKey);
 
-        if (sortKey is not ("Title" or "Provider"))
+        if (sortKey is not ("Recent" or "Playtime" or "Title" or "Provider" or "Size"))
         {
             throw new ArgumentOutOfRangeException(
                 nameof(sortKey));
@@ -358,6 +402,38 @@ public sealed class LibraryViewModel :
 
         OnPropertyChanged(
             nameof(SortKey));
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(GridRows));
+        ReconcileSelectedItem();
+    }
+
+    public void SetQuickFilter(LibraryQuickFilter quickFilter)
+    {
+        if (_quickFilter == quickFilter)
+            return;
+
+        _quickFilter = quickFilter;
+        OnPropertyChanged(nameof(QuickFilter));
+        OnPropertyChanged(nameof(QuickFilterKey));
+        OnPropertyChanged(nameof(IsInstalledQuickFilter));
+        OnPropertyChanged(nameof(IsAttentionQuickFilter));
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(GridRows));
+        ReconcileSelectedItem();
+    }
+
+    public void AttachAttentionService(IAttentionService attentionService)
+    {
+        ArgumentNullException.ThrowIfNull(attentionService);
+        if (ReferenceEquals(_attentionService, attentionService))
+            return;
+
+        if (_attentionService is not null)
+            _attentionService.Changed -= AttentionServiceOnChanged;
+
+        _attentionService = attentionService;
+        _attentionService.Changed += AttentionServiceOnChanged;
+        RefreshAttentionGameIds();
     }
 
     public void SetFilterKey(
@@ -431,6 +507,14 @@ public sealed class LibraryViewModel :
 
         SetFilterKey(
             preferences.LibraryFilterKey);
+    }
+
+    public void Dispose()
+    {
+        if (_attentionService is not null)
+            _attentionService.Changed -= AttentionServiceOnChanged;
+        if (_sessionMonitor is not null)
+            _sessionMonitor.SnapshotUpdated -= SessionMonitor_OnSnapshotUpdated;
     }
 
     public async Task SaveUiPreferencesAsync(
@@ -887,6 +971,8 @@ public sealed class LibraryViewModel :
             await _libraryStore.LoadSnapshotAsync(
                 cancellationToken);
 
+        await RefreshActivityProjectionAsync(snapshot.Installations, cancellationToken);
+
         _installations =
             snapshot.Installations.ToArray();
 
@@ -1191,13 +1277,144 @@ public sealed class LibraryViewModel :
     {
         var selectedItem =
             _selectedGameId is GameId selectedGameId
-                ? Items.FirstOrDefault(
+                ? VisibleItems.FirstOrDefault(
                     item =>
                         item.GameId == selectedGameId)
                 : null;
 
         SetSelectedItem(
             selectedItem);
+    }
+
+    public async Task RefreshActivityProjectionAsync(
+        IReadOnlyCollection<GameInstallation> installations,
+        CancellationToken cancellationToken)
+    {
+        var providerValues = _providerActivityStore is null
+            ? Array.Empty<ProviderActivityMetadata>()
+            : await _providerActivityStore.GetAllAsync(cancellationToken);
+        var providerByGame = providerValues.ToDictionary(value => value.GameId);
+        var projection = new Dictionary<GameId, LibraryActivityProjection>();
+
+        foreach (var installation in installations.Where(item => item.IsPresent))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var provider = providerByGame.TryGetValue(installation.GameId, out var value)
+                ? value
+                : null;
+            TimeSpan? observedPlaytime = null;
+            DateTimeOffset? observedLastPlayed = null;
+            if (_sessionStore is not null)
+            {
+                var sessions = await _sessionStore.GetByGameAsync(installation.GameId.Value, cancellationToken);
+                var completed = sessions
+                    .Where(session => session.State is SessionState.Ended or SessionState.Recovered &&
+                                      session.ObservedEndedAtUtc is not null &&
+                                      session.ObservedEndedAtUtc.Value > session.ObservedStartedAtUtc)
+                    .ToArray();
+                observedPlaytime = completed.Length == 0
+                    ? null
+                    : completed.Aggregate(TimeSpan.Zero, (total, session) =>
+                        total + (session.ObservedEndedAtUtc!.Value - session.ObservedStartedAtUtc));
+                observedLastPlayed = sessions
+                    .Select(session => session.ObservedEndedAtUtc ?? session.LastSeenAtUtc)
+                    .OrderByDescending(value => value)
+                    .FirstOrDefault();
+            }
+
+            projection[installation.GameId] = new LibraryActivityProjection(
+                provider?.TotalPlaytime,
+                provider?.LastPlayedAtUtc,
+                observedPlaytime,
+                observedLastPlayed);
+        }
+
+        _activityByGame = projection;
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(GridRows));
+    }
+
+    private IReadOnlyList<LibraryItemViewModel> ApplyProjection()
+    {
+        if (_quickFilter == LibraryQuickFilter.Installed &&
+            string.IsNullOrWhiteSpace(SearchQuery) &&
+            SortKey == "Title")
+        {
+            return Items;
+        }
+
+        var filtered = _quickFilter == LibraryQuickFilter.Attention
+            ? Items.Where(item => _attentionGameIds.Contains(item.GameId))
+            : Items.AsEnumerable();
+
+        var searched = LibrarySearchService.Search(filtered.ToArray(), SearchQuery);
+        return SortKey switch
+        {
+            "Recent" => searched
+                .OrderByDescending(item => EffectiveActivity(item.GameId).LastPlayedAtUtc.HasValue)
+                .ThenByDescending(item => EffectiveActivity(item.GameId).LastPlayedAtUtc)
+                .ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray(),
+            "Playtime" => searched
+                .OrderByDescending(item => EffectiveActivity(item.GameId).Playtime.HasValue)
+                .ThenByDescending(item => EffectiveActivity(item.GameId).Playtime)
+                .ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray(),
+            "Size" => searched
+                .OrderByDescending(item => item.InstalledSizeBytes.HasValue)
+                .ThenByDescending(item => item.InstalledSizeBytes)
+                .ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray(),
+            "Provider" => searched
+                .OrderBy(item => item.ProviderLabel, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray(),
+            _ => searched
+                .OrderBy(item => item.Title, StringComparer.CurrentCultureIgnoreCase)
+                .ToArray()
+        };
+    }
+
+    private LibraryActivityProjection EffectiveActivity(GameId gameId) =>
+        _activityByGame.TryGetValue(gameId, out var activity)
+            ? activity
+            : LibraryActivityProjection.Empty;
+
+    private sealed record LibraryActivityProjection(
+        TimeSpan? ProviderPlaytime,
+        DateTimeOffset? ProviderLastPlayedAtUtc,
+        TimeSpan? ObservedPlaytime,
+        DateTimeOffset? ObservedLastPlayedAtUtc)
+    {
+        public static LibraryActivityProjection Empty { get; } = new(null, null, null, null);
+
+        public TimeSpan? Playtime => ProviderPlaytime ?? ObservedPlaytime;
+
+        public DateTimeOffset? LastPlayedAtUtc =>
+            GetLastPlayedAtUtc();
+
+        private DateTimeOffset? GetLastPlayedAtUtc()
+        {
+            var values = new[] { ProviderLastPlayedAtUtc, ObservedLastPlayedAtUtc }
+                .Where(value => value.HasValue)
+                .Select(value => value!.Value)
+                .ToArray();
+            return values.Length == 0 ? null : values.Max();
+        }
+    }
+
+    private void AttentionServiceOnChanged(object? sender, EventArgs e) =>
+        RefreshAttentionGameIds();
+
+    private void RefreshAttentionGameIds()
+    {
+        _attentionGameIds = _attentionService?.Items
+            .Where(item => item.GameId is not null)
+            .Select(item => new GameId(item.GameId!.Value))
+            .ToHashSet() ?? [];
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(GridRows));
+        ReconcileSelectedItem();
     }
 
     private void SetSelectedItem(

@@ -1,4 +1,5 @@
 using PlayStead.Core.Library;
+using PlayStead.Core.ProviderActivity;
 using PlayStead.Providers.Steam;
 
 namespace PlayStead.Providers.Tests.Steam;
@@ -99,6 +100,39 @@ public sealed class SteamAppManifestReaderTests
         Assert.Equal("37375447382", result.BytesToStage);
         Assert.Equal("37375447382", result.BytesStaged);
         Assert.Equal("8673686202082408760", result.InstalledDepotManifests!["1172711"]);
+    }
+
+    [Fact]
+    public void ReadActivity_maps_local_playtime_and_last_played_without_network()
+    {
+        var path = Path.GetTempFileName();
+        var observed = new DateTimeOffset(2026, 9, 28, 10, 0, 0, TimeSpan.Zero);
+        try
+        {
+            File.WriteAllText(path, """
+                "AppState"
+                {
+                    "appid" "730"
+                    "playtime_forever" "257280"
+                    "LastPlayed" "1790596800"
+                }
+                """);
+
+            var result = new SteamAppManifestReader().ReadActivity(
+                path,
+                new GameId(Guid.Parse("35e454ba-41f3-4df6-bbc6-1c15fc91fb63")),
+                observed);
+
+            Assert.Equal(TimeSpan.FromMinutes(257280), result.TotalPlaytime);
+            Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1790596800), result.LastPlayedAtUtc);
+            Assert.Equal(ProviderKind.Steam, result.Source);
+            Assert.Equal(observed, result.ObservedAtUtc);
+            Assert.Equal(ProviderActivityAvailability.Complete, result.Availability);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     private static string FixturePath(string name) =>

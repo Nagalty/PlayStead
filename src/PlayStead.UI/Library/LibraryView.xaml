@@ -36,6 +36,32 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="Library.QuickFilterButton"
+               TargetType="Button"
+               BasedOn="{StaticResource PlayStead.Button.Ghost}">
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextSecondary}" />
+            <Style.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsInstalledQuickFilter}" Value="True" />
+                        <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="Installed" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                    <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsAttentionQuickFilter}" Value="True" />
+                        <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="Attention" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                    <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="Library.VerifySteamButton"
                TargetType="Button"
                BasedOn="{StaticResource PlayStead.Button.Ghost}">
@@ -97,6 +123,32 @@
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
+                <Button x:Name="InstalledFilterButton"
+                        Tag="Installed"
+                        Content="Installés"
+                        Click="InstalledFilterButton_OnClick"
+                        Style="{DynamicResource Library.QuickFilterButton}"
+                        ToolTip="Afficher les jeux installés" />
+                <Button x:Name="AttentionFilterButton"
+                        Tag="Attention"
+                        Content="À signaler"
+                        Click="AttentionFilterButton_OnClick"
+                        Style="{DynamicResource Library.QuickFilterButton}"
+                        ToolTip="Afficher les jeux avec une attention active" />
+                <TextBlock Text="Trier par :"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource PlayStead.Brush.TextSecondary}" />
+                <ComboBox x:Name="LibrarySortComboBox"
+                          Width="150"
+                          SelectedValuePath="Tag"
+                          SelectedValue="{Binding SortKey, Mode=OneWay}"
+                          SelectionChanged="LibrarySortComboBox_OnSelectionChanged"
+                          ToolTip="Trier la bibliothèque">
+                    <ComboBoxItem Tag="Recent" Content="Récemment joué" />
+                    <ComboBoxItem Tag="Playtime" Content="Temps de jeu" />
+                    <ComboBoxItem Tag="Title" Content="Nom" />
+                    <ComboBoxItem Tag="Size" Content="Taille" />
+                </ComboBox>
                 <Border Style="{DynamicResource PlayStead.Surface.CardNested}"
                         Padding="{DynamicResource PlayStead.Spacing.1}">
                     <StackPanel Orientation="Horizontal"

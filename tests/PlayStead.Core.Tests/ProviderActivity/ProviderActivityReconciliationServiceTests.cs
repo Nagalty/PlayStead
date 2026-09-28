@@ -24,6 +24,35 @@ public sealed class ProviderActivityReconciliationServiceTests
         Assert.Equal(1, changed);
     }
 
+    [Fact]
+    public async Task An_incomplete_refresh_does_not_erase_known_provider_activity()
+    {
+        var game = GameId.New();
+        var store = new Store();
+        var complete = new ProviderActivityMetadata(
+            game,
+            ProviderKind.Steam,
+            "123",
+            TimeSpan.FromHours(12),
+            new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero),
+            DateTimeOffset.UtcNow,
+            ProviderActivityAvailability.Complete);
+        var source = new SequenceSource(complete, ProviderActivityMetadata.Unknown(
+            game,
+            ProviderKind.Steam,
+            "123",
+            DateTimeOffset.UtcNow));
+        var sut = new ProviderActivityReconciliationService(store, [source]);
+        var snapshot = new LibrarySnapshot([], [new GameInstallation(InstallationId.New(), game, ProviderKind.Steam, "123", "C:\\Game", null, true, true, DateTimeOffset.UtcNow)]);
+
+        await sut.RefreshAsync(snapshot, CancellationToken.None);
+        await sut.RefreshAsync(snapshot, CancellationToken.None);
+
+        var persisted = Assert.Single(await store.GetAllAsync(CancellationToken.None));
+        Assert.Equal(complete.TotalPlaytime, persisted.TotalPlaytime);
+        Assert.Equal(complete.LastPlayedAtUtc, persisted.LastPlayedAtUtc);
+    }
+
     private sealed class Store : IProviderActivityMetadataStore
     {
         private readonly List<ProviderActivityMetadata> _items = [];
@@ -36,5 +65,16 @@ public sealed class ProviderActivityReconciliationServiceTests
     {
         public ProviderKind Provider => value.Provider;
         public Task<IReadOnlyList<ProviderActivityMetadata>> GetAsync(IReadOnlyCollection<GameInstallation> _, CancellationToken __) => Task.FromResult<IReadOnlyList<ProviderActivityMetadata>>([value]);
+    }
+
+    private sealed class SequenceSource(params ProviderActivityMetadata[] values) : IProviderActivityMetadataSource
+    {
+        private int _index;
+        public ProviderKind Provider => ProviderKind.Steam;
+        public Task<IReadOnlyList<ProviderActivityMetadata>> GetAsync(IReadOnlyCollection<GameInstallation> _, CancellationToken __)
+        {
+            var value = values[Math.Min(_index++, values.Length - 1)];
+            return Task.FromResult<IReadOnlyList<ProviderActivityMetadata>>([value]);
+        }
     }
 }

@@ -6,6 +6,7 @@ using PlayStead.Core.Library;
 using PlayStead.Core.GameBuildHistory;
 using PlayStead.Core.Media;
 using PlayStead.Core.Sessions;
+using PlayStead.Core.ProviderActivity;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
@@ -53,6 +54,7 @@ public partial class MainWindow : Window
     private readonly NotificationCenterViewModel? _notificationCenterViewModel;
     private readonly SessionMonitor? _sessionMonitor;
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
+    private readonly IProviderActivityMetadataStore? _providerActivityStore;
 
     public MainWindow()
         : this(
@@ -443,6 +445,7 @@ public partial class MainWindow : Window
         GameBuildHistoryService? gameBuildHistoryService = null,
         AppUpdateNotificationViewModel? appUpdateNotificationViewModel = null,
         IDistributionChannelProvider? distributionChannelProvider = null,
+        IProviderActivityMetadataStore? providerActivityStore = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -455,6 +458,7 @@ public partial class MainWindow : Window
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
         _gameBuildHistoryService = gameBuildHistoryService;
+        _providerActivityStore = providerActivityStore;
         _aboutViewModel = distributionChannelProvider is null
             ? null
             : new AboutViewModel(distributionChannelProvider);
@@ -530,11 +534,13 @@ public partial class MainWindow : Window
                     launch,
                     _sessionStore,
                     _sessionCorrectionStore,
-                    _sessionCorrectionPolicy)
+                    _sessionCorrectionPolicy,
+                    _providerActivityStore)
                 : new GameQuickPanelViewModel(
                     game,
                     _navigationService,
-                    launch);
+                    launch,
+                    _providerActivityStore);
     }
 
     private void LibraryViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)

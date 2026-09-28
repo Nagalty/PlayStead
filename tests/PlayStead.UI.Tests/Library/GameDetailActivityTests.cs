@@ -32,7 +32,7 @@ public sealed class GameDetailActivityTests
             StringComparison.Ordinal);
 
         Assert.Contains(
-            "Activity.HasSessionHistory",
+            "Activity.HasAnyActivity",
             xaml,
             StringComparison.Ordinal);
 

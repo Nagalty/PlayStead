@@ -18,6 +18,10 @@ public sealed record ProviderActivityMetadata(
     DateTimeOffset RefreshedAtUtc,
     ProviderActivityAvailability Availability)
 {
+    public ProviderKind Source => Provider;
+
+    public DateTimeOffset ObservedAtUtc => RefreshedAtUtc;
+
     public static ProviderActivityMetadata Unknown(
         GameId gameId,
         ProviderKind provider,

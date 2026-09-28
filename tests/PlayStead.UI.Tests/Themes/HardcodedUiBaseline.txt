@@ -84,11 +84,12 @@ src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,6,4|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,8,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,9,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,10,0,0|4
-src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,12,0,0|5
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,12,0,0|6
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,18,0,0|4
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,22,0,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,3,0,0|3
-src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,4,0,0|3
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,4,0,0|7
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,6,0,0|3
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,8,0,0|8
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,0,0,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,0,18,0|1

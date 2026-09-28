@@ -42,15 +42,16 @@ public sealed class ProviderActivityReconciliationService
             {
                 var previous = previousValues
                     .FirstOrDefault(x => x.GameId == value.GameId && x.Provider == value.Provider);
+                var merged = Merge(previous, value);
                 if (previous is not null &&
-                    previous.ProviderGameId == value.ProviderGameId &&
-                    previous.TotalPlaytime == value.TotalPlaytime &&
-                    previous.LastPlayedAtUtc == value.LastPlayedAtUtc &&
-                    previous.Availability == value.Availability)
+                    previous.ProviderGameId == merged.ProviderGameId &&
+                    previous.TotalPlaytime == merged.TotalPlaytime &&
+                    previous.LastPlayedAtUtc == merged.LastPlayedAtUtc &&
+                    previous.Availability == merged.Availability)
                 {
                     continue;
                 }
-                await _store.UpsertAsync(value, cancellationToken);
+                await _store.UpsertAsync(merged, cancellationToken);
                 changed = true;
             }
         }
@@ -58,5 +59,29 @@ public sealed class ProviderActivityReconciliationService
         {
             Changed?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    private static ProviderActivityMetadata Merge(
+        ProviderActivityMetadata? previous,
+        ProviderActivityMetadata current)
+    {
+        if (previous is null)
+        {
+            return current;
+        }
+
+        var playtime = current.TotalPlaytime ?? previous.TotalPlaytime;
+        var lastPlayed = current.LastPlayedAtUtc ?? previous.LastPlayedAtUtc;
+        var availability = current.Availability == ProviderActivityAvailability.Unknown &&
+                           (playtime is not null || lastPlayed is not null)
+            ? ProviderActivityAvailability.Partial
+            : current.Availability;
+
+        return current with
+        {
+            TotalPlaytime = playtime,
+            LastPlayedAtUtc = lastPlayed,
+            Availability = availability
+        };
     }
 }

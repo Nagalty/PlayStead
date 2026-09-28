@@ -26,7 +26,7 @@ public sealed class GameDetailHeroActivityReadabilityTests
     [Fact]
     public void Activity_line_remains_conditionally_visible()
     {
-        Assert.Contains("Visibility=\"{Binding Activity.HasSessionHistory", Hero, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"{Binding Activity.HasAnyActivity", Hero, StringComparison.Ordinal);
         Assert.Contains("BooleanToVisibilityConverter", Hero, StringComparison.Ordinal);
     }
 

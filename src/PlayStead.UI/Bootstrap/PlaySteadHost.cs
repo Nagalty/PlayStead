@@ -424,20 +424,22 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             LibraryViewModel>(
             services =>
-                new LibraryViewModel(
-                    services.GetRequiredService<
-                        ILibraryStore>(),
-                    services.GetRequiredService<
-                        ISteamReferenceRuntime>(),
-                    services.GetRequiredService<
-                        SessionMonitor>(),
-                    services.GetRequiredService<
-                        UiPreferencesStore>(),
-                    services.GetRequiredService<
-                        IGameMediaResolver>(),
+            {
+                var viewModel = new LibraryViewModel(
+                    services.GetRequiredService<ILibraryStore>(),
+                    services.GetRequiredService<ISteamReferenceRuntime>(),
+                    services.GetRequiredService<SessionMonitor>(),
+                    services.GetRequiredService<UiPreferencesStore>(),
+                    services.GetRequiredService<IGameMediaResolver>(),
                     services.GetRequiredService<ICanonicalCatalogStore>(),
                     services.GetRequiredService<PlayStead.Core.Shortlist.IGamesDuMomentService>(),
-                    services.GetRequiredService<IProviderGameMetadataStore>()));
+                    services.GetRequiredService<IProviderGameMetadataStore>(),
+                    services.GetRequiredService<IProviderActivityMetadataStore>(),
+                    services.GetRequiredService<ISessionStore>());
+                viewModel.AttachAttentionService(
+                    services.GetRequiredService<PlayStead.Core.Notifications.IAttentionService>());
+                return viewModel;
+            });
 
         builder.Services.AddSingleton<
             SessionViewModel>();

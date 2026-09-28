@@ -210,7 +210,7 @@
                         Grid.Column="0"
                         Margin="0,0,9,0"
                         Style="{DynamicResource PlayStead.Surface.Card}"
-                        Visibility="{Binding Activity.HasSessionHistory,
+                        Visibility="{Binding Activity.HasAnyActivity,
                                              Converter={StaticResource BooleanToVisibilityConverter},
                                              FallbackValue=Collapsed}">
                     <StackPanel>
@@ -238,6 +238,33 @@
                                 </StackPanel>
                             </Border>
                         </UniformGrid>
+                        <StackPanel Margin="0,12,0,0"
+                                    Visibility="{Binding Activity.HasProviderActivity,
+                                                 Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="Référence provider"
+                                       Style="{DynamicResource PlayStead.Text.Caption}"/>
+                            <TextBlock Margin="0,4,0,0"
+                                       Text="{Binding Activity.ProviderActivitySourceLabel}"
+                                       Style="{DynamicResource PlayStead.Text.BodySecondary}"/>
+                            <TextBlock Margin="0,6,0,0"
+                                       Text="Temps provider"
+                                       Style="{DynamicResource PlayStead.Text.Caption}"/>
+                            <TextBlock Margin="0,4,0,0"
+                                       Text="{Binding Activity.ProviderPlayTimeLabel, TargetNullValue=Inconnu}"
+                                       Style="{DynamicResource PlayStead.Text.Body}"/>
+                            <TextBlock Margin="0,6,0,0"
+                                       Text="Dernière activité provider"
+                                       Style="{DynamicResource PlayStead.Text.Caption}"/>
+                            <TextBlock Margin="0,4,0,0"
+                                       Text="{Binding Activity.ProviderLastPlayedLabel, TargetNullValue=Inconnue}"
+                                       Style="{DynamicResource PlayStead.Text.Body}"/>
+                            <TextBlock Margin="0,6,0,0"
+                                       Text="Suivi PlayStead"
+                                       Style="{DynamicResource PlayStead.Text.Caption}"/>
+                            <TextBlock Margin="0,4,0,0"
+                                       Text="{Binding Activity.PlaySteadTotalPlayTimeLabel}"
+                                       Style="{DynamicResource PlayStead.Text.Body}"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

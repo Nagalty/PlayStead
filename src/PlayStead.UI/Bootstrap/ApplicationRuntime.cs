@@ -114,6 +114,9 @@ public sealed class ApplicationRuntime
         {
             await StartupForensicTrace.MeasureAsync("ProviderActivityMetadata", async () =>
                 await _providerActivity.RefreshAsync(await _libraryStore.LoadSnapshotAsync(cancellationToken), cancellationToken));
+            await _libraryViewModel.RefreshActivityProjectionAsync(
+                (await _libraryStore.LoadSnapshotAsync(cancellationToken)).Installations,
+                cancellationToken);
         }
         if (_providerGameMetadata is not null && _libraryStore is not null)
             await StartupForensicTrace.MeasureAsync("ProviderGameMetadata", async () =>
@@ -139,6 +142,9 @@ public sealed class ApplicationRuntime
         {
             await StartupForensicTrace.MeasureAsync("Refresh.ProviderActivityMetadata", async () =>
                 await _providerActivity.RefreshAsync(await _libraryStore.LoadSnapshotAsync(cancellationToken), cancellationToken));
+            await _libraryViewModel.RefreshActivityProjectionAsync(
+                (await _libraryStore.LoadSnapshotAsync(cancellationToken)).Installations,
+                cancellationToken);
         }
         if (_providerGameMetadata is not null && _libraryStore is not null)
             await StartupForensicTrace.MeasureAsync("Refresh.ProviderGameMetadata", async () =>
