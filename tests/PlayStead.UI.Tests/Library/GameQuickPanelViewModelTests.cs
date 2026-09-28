@@ -2,6 +2,7 @@ using PlayStead.Core.Library;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
 using PlayStead.Core.ProviderActivity;
+using PlayStead.Core.GameBuildHistory;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 
@@ -151,6 +152,51 @@ public sealed class GameQuickPanelViewModelTests
         Assert.NotNull(viewModel.ProviderLastPlayedLabel);
     }
 
+    [Fact]
+    public void Attention_state_exposes_one_compact_since_last_play_summary()
+    {
+        var game = new LibraryItemViewModel(
+            GameId.New(), "Game", ProviderKind.Steam, "Steam", @"C:\Game", null);
+        var viewModel = new GameQuickPanelViewModel(game, new NavigationService());
+
+        Assert.False(viewModel.HasAttention);
+        Assert.False(viewModel.HasSinceLastPlaySummary);
+
+        viewModel.SetAttentionState(true);
+
+        Assert.True(viewModel.HasAttention);
+        Assert.True(viewModel.HasSinceLastPlaySummary);
+        Assert.Equal("Mise à jour disponible", viewModel.SinceLastPlaySummary);
+    }
+
+    [Fact]
+    public async Task Since_last_play_summary_reuses_build_history_service()
+    {
+        var gameId = GameId.New();
+        var playedAt = new DateTimeOffset(2026, 9, 10, 18, 0, 0, TimeSpan.Zero);
+        var game = new LibraryItemViewModel(gameId, "Game", ProviderKind.Steam, "Steam", @"C:\Game", null);
+        var buildHistory = new GameBuildHistoryService(
+            new FakeBuildHistoryStore(
+                [
+                    new GameBuildObservation(gameId, ProviderKind.Steam, "123", "1", playedAt.AddDays(-1)),
+                    new GameBuildObservation(gameId, ProviderKind.Steam, "2", "2", playedAt.AddDays(1))
+                ]),
+            new FakeSessionStore([EndedSession(Guid.NewGuid(), gameId.Value, playedAt, TimeSpan.FromHours(1))]));
+        var viewModel = new GameQuickPanelViewModel(
+            game,
+            new NavigationService(),
+            launch: null,
+            new FakeSessionStore([]),
+            new FakeCorrectionStore(new Dictionary<Guid, SessionCorrection>()),
+            new SessionCorrectionPolicy(),
+            gameBuildHistoryService: buildHistory);
+
+        await viewModel.LoadSessionSummaryAsync(CancellationToken.None);
+
+        Assert.True(viewModel.HasSinceLastPlaySummary);
+        Assert.Equal("Build modifié depuis ta dernière session", viewModel.SinceLastPlaySummary);
+    }
+
     private static GameSession EndedSession(
         Guid sessionId,
         Guid gameId,
@@ -241,5 +287,20 @@ public sealed class GameQuickPanelViewModelTests
 
         public Task UpsertAsync(ProviderActivityMetadata metadata, CancellationToken cancellationToken) =>
             Task.CompletedTask;
+    }
+
+    private sealed class FakeBuildHistoryStore(IReadOnlyList<GameBuildObservation> observations) : IGameBuildHistoryStore
+    {
+        public Task<GameBuildObservation?> GetLatestAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) =>
+            Task.FromResult<GameBuildObservation?>(observations.LastOrDefault());
+
+        public Task<IReadOnlyList<GameBuildObservation>> GetHistoryAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GameBuildObservation>>(observations.Where(item => item.GameId == gameId).ToArray());
+
+        public Task<IReadOnlyList<GameBuildObservation>> GetHistoryAsync(IReadOnlyCollection<GameId> gameIds, ProviderKind provider, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GameBuildObservation>>(observations.Where(item => gameIds.Contains(item.GameId)).ToArray());
+
+        public Task<bool> AppendIfChangedAsync(GameBuildObservation observation, CancellationToken cancellationToken) =>
+            Task.FromResult(true);
     }
 }

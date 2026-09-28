@@ -526,7 +526,7 @@ public partial class MainWindow : Window
                 libraryViewModel,
                 gameId);
 
-        return _sessionStore is not null &&
+        var quickPanel = _sessionStore is not null &&
             _sessionCorrectionStore is not null &&
             _sessionCorrectionPolicy is not null
                 ? new GameQuickPanelViewModel(
@@ -536,12 +536,17 @@ public partial class MainWindow : Window
                     _sessionStore,
                     _sessionCorrectionStore,
                     _sessionCorrectionPolicy,
-                    _providerActivityStore)
+                    _providerActivityStore,
+                    _gameBuildHistoryService)
                 : new GameQuickPanelViewModel(
                     game,
                     _navigationService,
                     launch,
-                    _providerActivityStore);
+                    _providerActivityStore,
+                    _gameBuildHistoryService);
+
+        quickPanel.SetAttentionState(libraryViewModel.AttentionGameIds.Contains(gameId));
+        return quickPanel;
     }
 
     private void LibraryViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -556,6 +561,8 @@ public partial class MainWindow : Window
             e.PropertyName is nameof(LibraryViewModel.CollectionNamesByGame) or nameof(LibraryViewModel.ProviderMetadataByGame) or nameof(LibraryViewModel.AttentionGameIds))
         {
             _shellViewModel.SetSearchItems(collectionLibrary.Items, collectionLibrary.CollectionNamesByGame, collectionLibrary.ProviderMetadataByGame, collectionLibrary.AttentionGameIds);
+            if (e.PropertyName == nameof(LibraryViewModel.AttentionGameIds))
+                UpdateQuickPanel();
         }
 
         if (e.PropertyName == nameof(LibraryViewModel.SelectedItem))

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.ProviderActivity;
+using PlayStead.Core.GameBuildHistory;
 using PlayStead.UI.Launching;
 using PlayStead.UI.Navigation;
 
@@ -16,6 +17,7 @@ public sealed class GameQuickPanelViewModel :
     private readonly ISessionCorrectionStore? _sessionCorrectionStore;
     private readonly SessionCorrectionPolicy? _sessionCorrectionPolicy;
     private IProviderActivityMetadataStore? _providerActivityStore;
+    private GameBuildHistoryService? _gameBuildHistoryService;
 
     private bool _hasSessionHistory;
     private string _lastActivityLabel = "Aucune activité PlayStead";
@@ -25,6 +27,8 @@ public sealed class GameQuickPanelViewModel :
     private string _sessionCountLabel = "0 session";
     private IReadOnlyList<RecentActivitySessionItemViewModel> _recentActivitySessions =
         Array.Empty<RecentActivitySessionItemViewModel>();
+    private bool _hasAttention;
+    private bool _hasBuildChangeSinceLastPlay;
 
     public GameQuickPanelViewModel(
         LibraryItemViewModel game,
@@ -50,10 +54,12 @@ public sealed class GameQuickPanelViewModel :
         LibraryItemViewModel game,
         NavigationService navigationService,
         GameLaunchViewModel? launch,
-        IProviderActivityMetadataStore? providerActivityStore)
+        IProviderActivityMetadataStore? providerActivityStore,
+        GameBuildHistoryService? gameBuildHistoryService = null)
         : this(game, navigationService, launch)
     {
         _providerActivityStore = providerActivityStore;
+        _gameBuildHistoryService = gameBuildHistoryService;
     }
 
     public GameQuickPanelViewModel(
@@ -63,7 +69,8 @@ public sealed class GameQuickPanelViewModel :
         ISessionStore sessionStore,
         ISessionCorrectionStore sessionCorrectionStore,
         SessionCorrectionPolicy sessionCorrectionPolicy,
-        IProviderActivityMetadataStore? providerActivityStore = null)
+        IProviderActivityMetadataStore? providerActivityStore = null,
+        GameBuildHistoryService? gameBuildHistoryService = null)
         : this(game, navigationService, launch)
     {
         ArgumentNullException.ThrowIfNull(sessionStore);
@@ -74,6 +81,7 @@ public sealed class GameQuickPanelViewModel :
         _sessionCorrectionStore = sessionCorrectionStore;
         _sessionCorrectionPolicy = sessionCorrectionPolicy;
         _providerActivityStore = providerActivityStore;
+        _gameBuildHistoryService = gameBuildHistoryService;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -96,6 +104,16 @@ public sealed class GameQuickPanelViewModel :
     }
 
     public bool HasAnyActivity => HasSessionHistory || HasProviderActivity;
+
+    public bool HasAttention => _hasAttention;
+
+    public bool HasSinceLastPlaySummary => HasAttention || _hasBuildChangeSinceLastPlay;
+
+    public string SinceLastPlaySummary => HasAttention
+        ? "Mise à jour disponible"
+        : _hasBuildChangeSinceLastPlay
+            ? "Build modifié depuis ta dernière session"
+            : string.Empty;
 
     public string LastActivityLabel
     {
@@ -148,6 +166,7 @@ public sealed class GameQuickPanelViewModel :
         CancellationToken cancellationToken)
     {
         await LoadProviderActivityAsync(cancellationToken);
+        await LoadSinceLastPlaySummaryAsync(cancellationToken);
 
         if (_sessionStore is null ||
             _sessionCorrectionStore is null ||
@@ -274,6 +293,28 @@ public sealed class GameQuickPanelViewModel :
             sessions.Count == 1
                 ? "1 session"
                 : $"{sessions.Count} sessions";
+    }
+
+    public void SetAttentionState(bool hasAttention)
+    {
+        if (_hasAttention == hasAttention)
+            return;
+
+        _hasAttention = hasAttention;
+        OnPropertyChanged(nameof(HasAttention));
+        OnPropertyChanged(nameof(HasSinceLastPlaySummary));
+        OnPropertyChanged(nameof(SinceLastPlaySummary));
+    }
+
+    private async Task LoadSinceLastPlaySummaryAsync(CancellationToken cancellationToken)
+    {
+        _hasBuildChangeSinceLastPlay = _gameBuildHistoryService is not null &&
+            await _gameBuildHistoryService.HasChangedSinceLastPlayAsync(
+                Game.GameId,
+                Game.Provider,
+                cancellationToken);
+        OnPropertyChanged(nameof(HasSinceLastPlaySummary));
+        OnPropertyChanged(nameof(SinceLastPlaySummary));
     }
 
     private async Task LoadProviderActivityAsync(CancellationToken cancellationToken)

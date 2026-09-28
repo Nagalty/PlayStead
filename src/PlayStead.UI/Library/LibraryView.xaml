@@ -560,6 +560,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <!-- Identité / logo -->
@@ -680,6 +681,7 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
 
                                     <StackPanel Grid.Row="0"
@@ -745,6 +747,21 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </Grid>
+
+                                    <Border Grid.Row="3"
+                                            Margin="0,10,0,0"
+                                            Padding="8,5"
+                                            Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
+                                            BorderBrush="{DynamicResource PlayStead.Brush.Copper}"
+                                            BorderThickness="1"
+                                            CornerRadius="5"
+                                            Visibility="{Binding QuickPanelViewModel.HasAttention, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        <TextBlock Text="À SIGNALER"
+                                                   Foreground="{DynamicResource PlayStead.Brush.Copper}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   AutomationProperties.Name="À signaler"/>
+                                    </Border>
                                 </Grid>
                             </Border>
 
@@ -903,8 +920,29 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Collections -->
+                            <!-- Depuis ta dernière partie -->
                             <Border Grid.Row="4"
+                                    Margin="0,10,0,0"
+                                    Padding="12"
+                                    Background="{DynamicResource PlayStead.Brush.Surface}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Visibility="{Binding QuickPanelViewModel.HasSinceLastPlaySummary, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Text="Depuis ta dernière partie"
+                                               Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                                               FontSize="12"/>
+                                    <TextBlock Margin="0,5,0,0"
+                                               Text="{Binding QuickPanelViewModel.SinceLastPlaySummary, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}"
+                                               Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Collections -->
+                            <Border Grid.Row="5"
                                     Margin="0,10,0,0"
                                     Padding="12"
                                     Background="{DynamicResource PlayStead.Brush.Surface}"
@@ -930,7 +968,7 @@
                             </Border>
 
                             <!-- Actions -->
-                            <controls:PlaySplitButton Grid.Row="5"
+                            <controls:PlaySplitButton Grid.Row="6"
                                                       Height="42"
                                                       MaxHeight="42"
                                                       Margin="0,16,0,0"
@@ -939,7 +977,7 @@
                                                       DataContext="{Binding QuickPanelViewModel.Launch, RelativeSource={RelativeSource AncestorType={x:Type library:LibraryView}}}"/>
 
                             <Button x:Name="OpenGameDetailButton"
-                                    Grid.Row="6"
+                                    Grid.Row="7"
                                     Height="42"
                                     Content="Voir la fiche"
                                     Click="OpenGameDetailButton_OnClick"
