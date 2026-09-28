@@ -411,6 +411,18 @@ public sealed class HomeViewModel :
     public string WeeklyPlayTimeLabel => WeeklySummary.TotalPlayTime.TotalHours >= 1
         ? $"{(int)WeeklySummary.TotalPlayTime.TotalHours} h {WeeklySummary.TotalPlayTime.Minutes:00}"
         : $"{WeeklySummary.TotalPlayTime.Minutes} min";
+    public string WeeklyPlayTimeTitle => WeeklySummary.Coverage switch
+    {
+        WeeklyActivityCoverage.Complete => "Temps joué cette semaine",
+        WeeklyActivityCoverage.Partial => "Temps joué cette semaine · partiel",
+        _ => "Temps observé cette semaine"
+    };
+    public string WeeklySessionsTitle => WeeklySummary.Coverage switch
+    {
+        WeeklyActivityCoverage.Complete => "Sessions cette semaine",
+        WeeklyActivityCoverage.Partial => "Sessions cette semaine · partiel",
+        _ => "Sessions observées cette semaine"
+    };
     public int DormantBuildChangeCount => DormantGame is null
         ? 0
         : DormantGame.Game.MediaIdentity is null
@@ -468,6 +480,8 @@ public sealed class HomeViewModel :
         OnPropertyChanged(nameof(WeeklySummary));
         OnPropertyChanged(nameof(HasWeeklyActivity));
         OnPropertyChanged(nameof(WeeklyPlayTimeLabel));
+        OnPropertyChanged(nameof(WeeklyPlayTimeTitle));
+        OnPropertyChanged(nameof(WeeklySessionsTitle));
     }
 
     public async Task RefreshHomeAttentionAsync(CancellationToken cancellationToken)
@@ -875,7 +889,7 @@ public sealed class HomeViewModel :
             nameof(SuggestionCapabilityText), nameof(HasSuggestionUpdate), nameof(SuggestionUpdateStatusText), nameof(SuggestionMediaPath), nameof(HasSuggestionMedia),
             nameof(SuggestionBuildChangeCount), nameof(HasSuggestionBuildChanges), nameof(SuggestionBuildChangeText),
             nameof(CanLaunchSuggestion),
-            nameof(WeeklySummary), nameof(HasWeeklyActivity), nameof(WeeklyPlayTimeLabel), nameof(GamesChangedSinceLastPlayCount), nameof(GamesChangedSinceLastPlayLabel), nameof(GamesChangedSinceLastPlaySubtitle),
+            nameof(WeeklySummary), nameof(HasWeeklyActivity), nameof(WeeklyPlayTimeLabel), nameof(WeeklyPlayTimeTitle), nameof(WeeklySessionsTitle), nameof(GamesChangedSinceLastPlayCount), nameof(GamesChangedSinceLastPlayLabel), nameof(GamesChangedSinceLastPlaySubtitle),
             nameof(HomeAttentionItems), nameof(HasHomeAttention)
         })
         {

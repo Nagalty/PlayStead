@@ -53,7 +53,7 @@
                     <StackPanel>
                         <TextBlock Text="{Binding WeeklyPlayTimeLabel}"
                                    Style="{DynamicResource PlayStead.Text.Display}" />
-                        <TextBlock Text="Temps joué cette semaine"
+                        <TextBlock Text="{Binding WeeklyPlayTimeTitle}"
                                    Style="{DynamicResource PlayStead.Text.BodySecondary}" />
                     </StackPanel>
                 </Border>
@@ -65,7 +65,7 @@
                     <StackPanel>
                         <TextBlock Text="{Binding WeeklySummary.SessionCount}"
                                    Style="{DynamicResource PlayStead.Text.Display}" />
-                        <TextBlock Text="Sessions cette semaine"
+                        <TextBlock Text="{Binding WeeklySessionsTitle}"
                                    Style="{DynamicResource PlayStead.Text.BodySecondary}" />
                     </StackPanel>
                 </Border>

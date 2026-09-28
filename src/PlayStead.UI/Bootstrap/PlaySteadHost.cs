@@ -292,6 +292,11 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             IProviderActivityMetadataStore,
             SqliteProviderActivityMetadataStore>();
+        builder.Services.AddSingleton<
+            IProviderObservedSessionStore,
+            SqliteProviderObservedSessionStore>();
+        builder.Services.AddSingleton<SteamProcessLogSessionParser>();
+        builder.Services.AddSingleton<SteamProcessLogSessionImporter>();
         builder.Services.AddSingleton<SteamLocalProviderActivitySource>();
         builder.Services.AddSingleton<IProviderActivityMetadataSource>(services =>
             services.GetRequiredService<SteamLocalProviderActivitySource>());
@@ -461,9 +466,10 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             PlayStead.Core.Shortlist.IGamesDuMomentService,
             PlayStead.Data.Shortlist.SqliteGamesDuMomentService>();
-        builder.Services.AddSingleton<
-            PlayStead.Core.Sessions.IWeeklyActivitySummaryService,
-            PlayStead.Data.Sessions.SqliteWeeklyActivitySummaryService>();
+        builder.Services.AddSingleton<PlayStead.Core.Sessions.IWeeklyActivitySummaryService>(services =>
+            new PlayStead.Data.Sessions.SqliteWeeklyActivitySummaryService(
+                services.GetRequiredService<ISessionStore>(),
+                services.GetRequiredService<IProviderObservedSessionStore>()));
 
         builder.Services.AddSingleton<
             HomeViewModel>();

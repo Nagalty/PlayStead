@@ -102,6 +102,9 @@ public sealed class HomeViewModelTests :
 
         Assert.False(
             sut.HasRecentActivity);
+
+        Assert.Equal("Temps observé cette semaine", sut.WeeklyPlayTimeTitle);
+        Assert.Equal("Sessions observées cette semaine", sut.WeeklySessionsTitle);
     }
 
     [Fact]

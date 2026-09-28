@@ -306,9 +306,9 @@ public sealed class HomeViewStructureTests
         Assert.Contains(kpiRow.Descendants(presentation + "TextBlock"), element =>
             (string?)element.Attribute("Text") == "{Binding GamesChangedSinceLastPlayCount}");
         Assert.Contains(kpiRow.Descendants(presentation + "TextBlock"), element =>
-            (string?)element.Attribute("Text") == "Temps joué cette semaine");
+            (string?)element.Attribute("Text") == "{Binding WeeklyPlayTimeTitle}");
         Assert.Contains(kpiRow.Descendants(presentation + "TextBlock"), element =>
-            (string?)element.Attribute("Text") == "Sessions cette semaine");
+            (string?)element.Attribute("Text") == "{Binding WeeklySessionsTitle}");
         Assert.Contains(kpiRow.Descendants(presentation + "TextBlock"), element =>
             (string?)element.Attribute("Text") == "{Binding GamesChangedSinceLastPlayLabel}");
         Assert.Contains(kpiRow.Descendants(presentation + "TextBlock"), element =>

@@ -8,16 +8,23 @@ public sealed class SteamLocalProviderActivitySource : IProviderActivityMetadata
     private readonly WindowsSteamRootLocator _rootLocator;
     private readonly SteamLibraryFoldersReader _folders;
     private readonly SteamAppManifestReader _manifests;
+    private readonly SteamProcessLogSessionImporter? _processLogImporter;
 
-    public SteamLocalProviderActivitySource(WindowsSteamRootLocator rootLocator, SteamLibraryFoldersReader folders, SteamAppManifestReader manifests)
-    { _rootLocator = rootLocator; _folders = folders; _manifests = manifests; }
+    public SteamLocalProviderActivitySource(
+        WindowsSteamRootLocator rootLocator,
+        SteamLibraryFoldersReader folders,
+        SteamAppManifestReader manifests,
+        SteamProcessLogSessionImporter? processLogImporter = null)
+    { _rootLocator = rootLocator; _folders = folders; _manifests = manifests; _processLogImporter = processLogImporter; }
     public ProviderKind Provider => ProviderKind.Steam;
 
-    public Task<IReadOnlyList<ProviderActivityMetadata>> GetAsync(IReadOnlyCollection<GameInstallation> installations, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ProviderActivityMetadata>> GetAsync(IReadOnlyCollection<GameInstallation> installations, CancellationToken cancellationToken)
     {
         var byExternal = installations.ToDictionary(x => x.ExternalId, StringComparer.Ordinal);
         var root = _rootLocator.TryLocate();
-        if (root is null) return Task.FromResult<IReadOnlyList<ProviderActivityMetadata>>(Array.Empty<ProviderActivityMetadata>());
+        if (root is null) return Array.Empty<ProviderActivityMetadata>();
+        if (_processLogImporter is not null)
+            await _processLogImporter.ImportAsync(installations, cancellationToken);
         var result = new List<ProviderActivityMetadata>();
         var now = DateTimeOffset.UtcNow;
         foreach (var library in _folders.Read(root))
@@ -37,6 +44,6 @@ public sealed class SteamLocalProviderActivitySource : IProviderActivityMetadata
                 catch (FormatException) { }
             }
         }
-        return Task.FromResult<IReadOnlyList<ProviderActivityMetadata>>(result);
+        return result;
     }
 }
