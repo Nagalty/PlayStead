@@ -39,9 +39,10 @@ public sealed class LocalArtifactDiscoveryService : IGameLocalArtifactDiscoveryS
                 rule.Kind,
                 path,
                 rule.Source,
-                Directory.Exists(path)
+                File.Exists(path) || Directory.Exists(path)
                     ? GameLocalArtifactStatus.KnownAndExists
-                    : GameLocalArtifactStatus.KnownButMissing));
+                    : GameLocalArtifactStatus.KnownButMissing,
+                rule.PathTemplate));
         }
 
         return Task.FromResult<IReadOnlyList<GameLocalArtifact>>(artifacts);

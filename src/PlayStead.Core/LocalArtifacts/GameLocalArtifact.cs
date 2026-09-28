@@ -36,7 +36,9 @@ public sealed record GameLocalArtifact(
     GameLocalArtifactKind Kind,
     string Path,
     GameLocalArtifactSource Source,
-    GameLocalArtifactStatus Status)
+    GameLocalArtifactStatus Status,
+    string? RuleIdentity = null,
+    LocalArtifactBaselineStatus BaselineStatus = LocalArtifactBaselineStatus.NoBaseline)
 {
     public bool Exists => Status == GameLocalArtifactStatus.KnownAndExists;
 
@@ -47,6 +49,17 @@ public sealed record GameLocalArtifact(
         GameLocalArtifactKind.Log => "Logs",
         _ => Kind.ToString()
     };
+
+    public string BaselineStatusLabel => BaselineStatus switch
+    {
+        LocalArtifactBaselineStatus.Unchanged => "Conforme à la référence",
+        LocalArtifactBaselineStatus.Changed => "Modifié depuis la référence",
+        LocalArtifactBaselineStatus.Missing => "Introuvable",
+        LocalArtifactBaselineStatus.Unavailable => "Indisponible",
+        _ => "Aucune référence"
+    };
+
+    public bool CanCaptureBaseline => Exists && BaselineStatus != LocalArtifactBaselineStatus.Unavailable;
 }
 
 public interface IGameLocalArtifactDiscoveryService

@@ -51,6 +51,7 @@ using PlayStead.UI.Tray;
 using PlayStead.UI.Updates;
 using PlayStead.Core.Updates;
 using PlayStead.Core.LocalArtifacts;
+using PlayStead.Data.LocalArtifacts;
 using PlayStead.Providers.Updates;
 
 namespace PlayStead.UI.Bootstrap;
@@ -424,6 +425,9 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<IGameLocalArtifactDiscoveryService>(
             _ => new LocalArtifactDiscoveryService(LocalArtifactRuleCatalog.Rules));
+        builder.Services.AddSingleton<IArtifactFingerprintService, Sha256ArtifactFingerprintService>();
+        builder.Services.AddSingleton<ILocalArtifactBaselineStore, SqliteLocalArtifactBaselineStore>();
+        builder.Services.AddSingleton<LocalArtifactBaselineComparisonService>();
 
         builder.Services.AddSingleton<
             PlayStead.Core.Collections.IGameCollectionStore,

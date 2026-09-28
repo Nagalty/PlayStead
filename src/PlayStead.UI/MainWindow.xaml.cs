@@ -57,6 +57,8 @@ public partial class MainWindow : Window
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
     private readonly IProviderActivityMetadataStore? _providerActivityStore;
     private readonly IGameLocalArtifactDiscoveryService? _localArtifactDiscoveryService;
+    private readonly IArtifactFingerprintService? _artifactFingerprintService;
+    private readonly ILocalArtifactBaselineStore? _artifactBaselineStore;
     private LibraryUiState? _libraryStateBeforeGameDetail;
 
     public MainWindow()
@@ -450,6 +452,8 @@ public partial class MainWindow : Window
         IDistributionChannelProvider? distributionChannelProvider = null,
         IProviderActivityMetadataStore? providerActivityStore = null,
         IGameLocalArtifactDiscoveryService? localArtifactDiscoveryService = null,
+        IArtifactFingerprintService? artifactFingerprintService = null,
+        ILocalArtifactBaselineStore? artifactBaselineStore = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -464,6 +468,8 @@ public partial class MainWindow : Window
         _gameBuildHistoryService = gameBuildHistoryService;
         _providerActivityStore = providerActivityStore;
         _localArtifactDiscoveryService = localArtifactDiscoveryService;
+        _artifactFingerprintService = artifactFingerprintService;
+        _artifactBaselineStore = artifactBaselineStore;
         _aboutViewModel = distributionChannelProvider is null
             ? null
             : new AboutViewModel(distributionChannelProvider);
@@ -849,7 +855,9 @@ public partial class MainWindow : Window
                         libraryViewModel.GamesDuMomentService,
                         libraryViewModel.ProviderGameMetadataStore,
                         _gameBuildHistoryService,
-                        _localArtifactDiscoveryService)
+                        _localArtifactDiscoveryService,
+                        _artifactFingerprintService,
+                        _artifactBaselineStore)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -862,7 +870,9 @@ public partial class MainWindow : Window
                         libraryViewModel.GamesDuMomentService,
                         libraryViewModel.ProviderGameMetadataStore,
                         _gameBuildHistoryService,
-                        _localArtifactDiscoveryService);
+                        _localArtifactDiscoveryService,
+                        _artifactFingerprintService,
+                        _artifactBaselineStore);
 
                 MainContent.Content =
                     new GameDetailView(

@@ -17,7 +17,7 @@ public sealed class NotificationMigrationTests : IDisposable
         var options = await CreateDatabaseAsync("fresh.db");
 
         await using var connection = await OpenAsync(options.DatabasePath);
-        Assert.Equal(17, await ScalarIntAsync(connection,
+        Assert.Equal(18, await ScalarIntAsync(connection,
             "SELECT MAX(version) FROM schema_migrations;"));
         Assert.Equal(1, await ScalarIntAsync(connection,
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='notifications';"));
@@ -36,14 +36,14 @@ public sealed class NotificationMigrationTests : IDisposable
             await ExecuteAsync(connection,
                 $"INSERT INTO game_identity_resolutions(game_id,provisional_id,state,candidate_content_id,evidence_json,created_utc,updated_utc) VALUES ('{gameId}','PS-TEMP-01K5C0YQ8S0000000000000000',4,NULL,'{{}}','2026-09-16T18:00:00Z','2026-09-16T18:00:00Z');");
             Assert.Equal(
-17, await ScalarIntAsync(connection,
+18,await ScalarIntAsync(connection,
                 "SELECT MAX(version) FROM schema_migrations;"));
         }
 
         await new DatabaseInitializer(options).InitializeAsync(CancellationToken.None);
 
         await using var upgraded = await OpenAsync(options.DatabasePath);
-        Assert.Equal(17, await ScalarIntAsync(upgraded,
+        Assert.Equal(18, await ScalarIntAsync(upgraded,
             "SELECT MAX(version) FROM schema_migrations;"));
         Assert.Equal(1, await ScalarIntAsync(upgraded,
             $"SELECT COUNT(*) FROM games WHERE game_id='{gameId}';"));

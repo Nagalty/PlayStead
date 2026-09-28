@@ -460,14 +460,25 @@
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
+                                            <TextBlock Text="{Binding BaselineStatusLabel}"
+                                                       Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                                       FontSize="13"
+                                                       Margin="0,4,0,0" />
                                         </StackPanel>
-                                        <Button Grid.Column="2"
-                                                Content="Ouvrir le dossier"
-                                                Style="{DynamicResource PlayStead.Button.Secondary}"
-                                                Command="{Binding DataContext.OpenLocalArtifactFolderCommand, ElementName=GameDetailRoot}"
-                                                CommandParameter="{Binding}"
-                                                IsEnabled="{Binding Exists}"
-                                                Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        <StackPanel Grid.Column="2">
+                                            <Button Content="Ouvrir le dossier"
+                                                    Style="{DynamicResource PlayStead.Button.Secondary}"
+                                                    Command="{Binding DataContext.OpenLocalArtifactFolderCommand, ElementName=GameDetailRoot}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding Exists}"
+                                                    Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <Button Content="Définir comme référence"
+                                                    Margin="0,6,0,0"
+                                                    Style="{DynamicResource PlayStead.Button.Secondary}"
+                                                    Command="{Binding DataContext.CaptureLocalArtifactBaselineCommand, ElementName=GameDetailRoot}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding CanCaptureBaseline}" />
+                                        </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
