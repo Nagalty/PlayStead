@@ -436,6 +436,9 @@
                         Visibility="{Binding HasLocalArtifacts, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel>
                         <controls:SectionHeader Title="Fichiers locaux" />
+                        <TextBlock Text="Protège les sauvegardes, configurations et fichiers importants de ce jeu."
+                                   Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                   TextWrapping="Wrap" />
                         <ItemsControl Margin="0,12,0,0"
                                       ItemsSource="{Binding LocalArtifacts}">
                             <ItemsControl.ItemTemplate>
@@ -470,7 +473,7 @@
                                             </TextBlock>
                                         </StackPanel>
                                         <StackPanel Grid.Row="2" Margin="0,4,0,0">
-                                            <TextBlock Text="Référence"
+                                            <TextBlock Text="État de référence"
                                                        Style="{DynamicResource PlayStead.Text.Caption}" />
                                             <TextBlock Text="{Binding BaselineStatusLabel}"
                                                        Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
@@ -483,12 +486,12 @@
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding Exists}"
                                                     Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                            <Button Content="Définir comme référence"
+                                            <Button Content="Définir l’état actuel comme référence"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CaptureLocalArtifactBaselineCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding CanCaptureBaseline}" />
-                                            <Button Content="Créer un snapshot"
+                                            <Button Content="Créer une sauvegarde"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CreateLocalArtifactSnapshotCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
@@ -500,7 +503,7 @@
                         </ItemsControl>
                         <StackPanel Margin="0,6,0,0"
                                     Visibility="{Binding HasLocalArtifactSnapshots, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <TextBlock Text="Snapshots récents" Style="{DynamicResource PlayStead.Text.Caption}" />
+                            <TextBlock Text="Sauvegardes récentes" Style="{DynamicResource PlayStead.Text.Caption}" />
                             <ItemsControl ItemsSource="{Binding LocalArtifactSnapshots}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>

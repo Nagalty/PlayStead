@@ -7,7 +7,7 @@ public sealed class GameDetailSnapshotStructureTests
     {
         var path = Path.Combine(FindRoot(), "src", "PlayStead.UI", "Library", "GameDetailView.xaml");
         var xaml = File.ReadAllText(path);
-        Assert.Contains("Créer un snapshot", xaml, StringComparison.Ordinal);
+        Assert.Contains("Créer une sauvegarde", xaml, StringComparison.Ordinal);
         Assert.Contains("CreateLocalArtifactSnapshotCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("DeleteLocalArtifactSnapshotCommand", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Restaurer", xaml, StringComparison.OrdinalIgnoreCase);
