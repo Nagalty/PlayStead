@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Threading;
@@ -72,6 +73,9 @@ public sealed class LibraryViewModel :
     private HashSet<GameId> _attentionGameIds = [];
     private IReadOnlyDictionary<GameId, LibraryActivityProjection> _activityByGame =
         new Dictionary<GameId, LibraryActivityProjection>();
+    private IReadOnlyList<LibraryFilterOption> _providerFilterOptions = [];
+    private IReadOnlyList<LibraryFilterOption> _driveFilterOptions = [];
+    private bool _isAdvancedFiltersOpen;
     private string _searchQuery = string.Empty;
     private GameId? _selectedGameId;
     private LibraryItemViewModel? _selectedItem;
@@ -230,6 +234,8 @@ public sealed class LibraryViewModel :
 
             _items = value;
 
+            RefreshAdvancedFilterOptions();
+
             OnPropertyChanged();
             OnPropertyChanged(
                 nameof(HasItems));
@@ -339,6 +345,41 @@ public sealed class LibraryViewModel :
 
     public bool IsAttentionQuickFilter => _quickFilter == LibraryQuickFilter.Attention;
 
+    public IReadOnlyList<LibraryFilterOption> ProviderFilterOptions => _providerFilterOptions;
+
+    public IReadOnlyList<LibraryFilterOption> DriveFilterOptions => _driveFilterOptions;
+
+    public bool HasDriveFilterOptions => _driveFilterOptions.Count > 0;
+
+    public bool IsAdvancedFiltersOpen
+    {
+        get => _isAdvancedFiltersOpen;
+        private set
+        {
+            if (_isAdvancedFiltersOpen == value)
+                return;
+            _isAdvancedFiltersOpen = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public int ActiveAdvancedFilterCategoryCount =>
+        (_providerFilterOptions.Any(option => option.IsSelected) ? 1 : 0) +
+        (_driveFilterOptions.Any(option => option.IsSelected) ? 1 : 0);
+
+    public string AdvancedFilterButtonLabel =>
+        ActiveAdvancedFilterCategoryCount == 0
+            ? "Filtres"
+            : $"Filtres ({ActiveAdvancedFilterCategoryCount})";
+
+    public bool HasAdvancedFilters => ActiveAdvancedFilterCategoryCount > 0;
+
+    public bool IsAdvancedFilterEmpty =>
+        HasAdvancedFilters &&
+        Items.Count > 0 &&
+        string.IsNullOrWhiteSpace(SearchQuery) &&
+        VisibleItems.Count == 0;
+
     public string? FilterKey => _filterKey;
 
     public string SearchQuery =>
@@ -420,6 +461,17 @@ public sealed class LibraryViewModel :
         OnPropertyChanged(nameof(VisibleItems));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
+    }
+
+    public void ToggleAdvancedFilters() => IsAdvancedFiltersOpen = !IsAdvancedFiltersOpen;
+
+    public void CloseAdvancedFilters() => IsAdvancedFiltersOpen = false;
+
+    public void ResetAdvancedFilters()
+    {
+        foreach (var option in _providerFilterOptions.Concat(_driveFilterOptions))
+            option.IsSelected = false;
+        NotifyAdvancedFilterProjectionChanged();
     }
 
     public void AttachAttentionService(IAttentionService attentionService)
@@ -1338,7 +1390,8 @@ public sealed class LibraryViewModel :
     {
         if (_quickFilter == LibraryQuickFilter.Installed &&
             string.IsNullOrWhiteSpace(SearchQuery) &&
-            SortKey == "Title")
+            SortKey == "Title" &&
+            !HasAdvancedFilters)
         {
             return Items;
         }
@@ -1346,6 +1399,24 @@ public sealed class LibraryViewModel :
         var filtered = _quickFilter == LibraryQuickFilter.Attention
             ? Items.Where(item => _attentionGameIds.Contains(item.GameId))
             : Items.AsEnumerable();
+
+        var selectedProviders = _providerFilterOptions
+            .Where(option => option.IsSelected)
+            .Select(option => option.Key)
+            .ToHashSet(StringComparer.Ordinal);
+        var selectedDrives = _driveFilterOptions
+            .Where(option => option.IsSelected)
+            .Select(option => option.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (selectedProviders.Count > 0)
+            filtered = filtered.Where(item => selectedProviders.Contains(item.Provider.ToString()));
+        if (selectedDrives.Count > 0)
+            filtered = filtered.Where(item =>
+            {
+                var installation = _installations.FirstOrDefault(value => value.GameId == item.GameId);
+                var drive = installation is null ? null : Path.GetPathRoot(installation.InstallPath)?.TrimEnd('\\');
+                return drive is not null && selectedDrives.Contains(drive);
+            });
 
         var searched = LibrarySearchService.Search(filtered.ToArray(), SearchQuery);
         return SortKey switch
@@ -1405,6 +1476,42 @@ public sealed class LibraryViewModel :
 
     private void AttentionServiceOnChanged(object? sender, EventArgs e) =>
         RefreshAttentionGameIds();
+
+    private void RefreshAdvancedFilterOptions()
+    {
+        var selectedProviders = _providerFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToHashSet(StringComparer.Ordinal);
+        var selectedDrives = _driveFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _providerFilterOptions = Items.Select(item => item.Provider).Distinct().OrderBy(value => value)
+            .Select(value => CreateFilterOption(value.ToString(), value.ToString(), selectedProviders.Contains(value.ToString()))).ToArray();
+        _driveFilterOptions = _installations.Select(value => Path.GetPathRoot(value.InstallPath)?.TrimEnd('\\'))
+            .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .Select(value => CreateFilterOption(value!, value!, selectedDrives.Contains(value!))).ToArray();
+        OnPropertyChanged(nameof(ProviderFilterOptions));
+        OnPropertyChanged(nameof(DriveFilterOptions));
+        OnPropertyChanged(nameof(HasDriveFilterOptions));
+        NotifyAdvancedFilterProjectionChanged();
+    }
+
+    private LibraryFilterOption CreateFilterOption(string key, string label, bool selected)
+    {
+        var option = new LibraryFilterOption(key, label) { IsSelected = selected };
+        option.Changed += AdvancedFilterOptionOnChanged;
+        return option;
+    }
+
+    private void AdvancedFilterOptionOnChanged(object? sender, EventArgs e) =>
+        NotifyAdvancedFilterProjectionChanged();
+
+    private void NotifyAdvancedFilterProjectionChanged()
+    {
+        OnPropertyChanged(nameof(ActiveAdvancedFilterCategoryCount));
+        OnPropertyChanged(nameof(AdvancedFilterButtonLabel));
+        OnPropertyChanged(nameof(HasAdvancedFilters));
+        OnPropertyChanged(nameof(IsAdvancedFilterEmpty));
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(GridRows));
+        ReconcileSelectedItem();
+    }
 
     private void RefreshAttentionGameIds()
     {

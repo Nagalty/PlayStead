@@ -201,6 +201,24 @@ public partial class LibraryView :
             viewModel.SetQuickFilter(LibraryQuickFilter.Attention);
     }
 
+    private void AdvancedFiltersButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel)
+            viewModel.ToggleAdvancedFilters();
+    }
+
+    private void ResetAdvancedFiltersButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel)
+            viewModel.ResetAdvancedFilters();
+    }
+
+    private void AdvancedFiltersPopup_OnClosed(object? sender, EventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel)
+            viewModel.CloseAdvancedFilters();
+    }
+
     private void LibrarySortComboBox_OnSelectionChanged(
         object sender,
         SelectionChangedEventArgs e)

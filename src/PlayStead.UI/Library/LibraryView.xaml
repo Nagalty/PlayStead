@@ -135,6 +135,11 @@
                         Click="AttentionFilterButton_OnClick"
                         Style="{DynamicResource Library.QuickFilterButton}"
                         ToolTip="Afficher les jeux avec une attention active" />
+                <Button x:Name="AdvancedFiltersButton"
+                        Content="{Binding AdvancedFilterButtonLabel}"
+                        Click="AdvancedFiltersButton_OnClick"
+                        Style="{DynamicResource Library.QuickFilterButton}"
+                        ToolTip="Filtrer la bibliothèque" />
                 <TextBlock Text="Trier par :"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource PlayStead.Brush.TextSecondary}" />
@@ -212,6 +217,53 @@
 
             </StackPanel>
         </Grid>
+
+        <Popup x:Name="AdvancedFiltersPopup"
+               Grid.Row="0"
+               PlacementTarget="{Binding ElementName=AdvancedFiltersButton}"
+               Placement="Bottom"
+               StaysOpen="False"
+               Closed="AdvancedFiltersPopup_OnClosed"
+               IsOpen="{Binding IsAdvancedFiltersOpen, Mode=OneWay}"
+               AllowsTransparency="True">
+            <Border MinWidth="240"
+                    Padding="16"
+                    Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
+                    BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <StackPanel>
+                    <TextBlock Text="Filtres" Style="{DynamicResource PlayStead.Text.SectionTitle}" />
+                    <TextBlock Margin="0,12,0,4" Text="Source" Style="{DynamicResource PlayStead.Text.Caption}" />
+                    <ItemsControl ItemsSource="{Binding ProviderFilterOptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Label}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Margin="0,2,0,0" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Margin="0,12,0,4"
+                               Text="Disque"
+                               Style="{DynamicResource PlayStead.Text.Caption}"
+                               Visibility="{Binding HasDriveFilterOptions, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    <ItemsControl ItemsSource="{Binding DriveFilterOptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Label}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Margin="0,2,0,0" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="Réinitialiser"
+                            Margin="0,12,0,0"
+                            Click="ResetAdvancedFiltersButton_OnClick"
+                            Style="{DynamicResource PlayStead.Button.Secondary}" />
+                </StackPanel>
+            </Border>
+        </Popup>
 
         <TextBlock x:Name="SteamVerificationErrorText"
                    Grid.Row="1"
@@ -391,6 +443,13 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <TextBlock Grid.Row="2"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Text="Aucun jeu ne correspond à ces filtres."
+                   Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                   Visibility="{Binding IsAdvancedFilterEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
 
         <ContentControl x:Name="GameQuickPanel"

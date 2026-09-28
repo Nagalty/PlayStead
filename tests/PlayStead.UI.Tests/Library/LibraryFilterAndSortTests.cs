@@ -115,6 +115,28 @@ public sealed class LibraryFilterAndSortTests
         Assert.Equal(["Provider", "Observed", "Old"], library.VisibleItems.Select(item => item.Title));
     }
 
+    [Fact]
+    public async Task Advanced_provider_and_drive_filters_combine_with_and_and_reset_only_themselves()
+    {
+        var steamOnD = GameId.New();
+        var steamOnC = GameId.New();
+        var epicOnD = GameId.New();
+        var library = await LoadAdvanced([
+            (steamOnD, "Steam D", "Steam", @"D:\Games"),
+            (steamOnC, "Steam C", "Steam", @"C:\Games"),
+            (epicOnD, "Epic D", "Epic", @"D:\Games")]);
+
+        library.ProviderFilterOptions.Single(option => option.Key == "Steam").IsSelected = true;
+        library.ProviderFilterOptions.Single(option => option.Key == "Epic").IsSelected = true;
+        library.DriveFilterOptions.Single(option => option.Key == "D:").IsSelected = true;
+
+        Assert.Equal(2, library.ActiveAdvancedFilterCategoryCount);
+        Assert.Equal(["Epic D", "Steam D"], library.VisibleItems.Select(item => item.Title));
+        library.ResetAdvancedFilters();
+        Assert.Equal(0, library.ActiveAdvancedFilterCategoryCount);
+        Assert.Equal(3, library.VisibleItems.Count);
+    }
+
     private static Task<LibraryViewModel> LoadAsync(
         params (string Title, long? Size)[] games) =>
         LoadAsync(games.Select(game => (GameId.New(), game.Title, game.Size)).ToArray(), null);
@@ -152,6 +174,18 @@ public sealed class LibraryFilterAndSortTests
             games.Select(game => new LogicalGame(game.Id, game.Title, false, now, now)).ToArray(),
             games.Select(game => new GameInstallation(InstallationId.New(), game.Id, ProviderKind.Steam, "123456", @"C:\Games", game.Size, true, true, now)).ToArray());
         var library = new LibraryViewModel(new StubLibraryStore(snapshot), providerStore, sessionStore);
+        await library.RefreshAsync(CancellationToken.None);
+        return library;
+    }
+
+    private static async Task<LibraryViewModel> LoadAdvanced(
+        (GameId Id, string Title, string Provider, string Path)[] games)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = new LibrarySnapshot(
+            games.Select(game => new LogicalGame(game.Id, game.Title, false, now, now)).ToArray(),
+            games.Select(game => new GameInstallation(InstallationId.New(), game.Id, Enum.Parse<ProviderKind>(game.Provider), "123456", game.Path, null, true, true, now)).ToArray());
+        var library = new LibraryViewModel(new StubLibraryStore(snapshot));
         await library.RefreshAsync(CancellationToken.None);
         return library;
     }

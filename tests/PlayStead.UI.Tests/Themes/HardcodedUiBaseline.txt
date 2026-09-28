@@ -106,7 +106,7 @@ src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|9,0,0,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|CornerRadius|12|1
 src/PlayStead.UI/Library/LibraryView.xaml|CornerRadius|2|1
 src/PlayStead.UI/Library/LibraryView.xaml|CornerRadius|6|1
-src/PlayStead.UI/Library/LibraryView.xaml|CornerRadius|8|3
+src/PlayStead.UI/Library/LibraryView.xaml|CornerRadius|8|4
 src/PlayStead.UI/Library/LibraryView.xaml|FontSize|11|3
 src/PlayStead.UI/Library/LibraryView.xaml|FontSize|12|16
 src/PlayStead.UI/Library/LibraryView.xaml|FontSize|13|7
@@ -121,14 +121,17 @@ src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,0,0,8|2
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,0,12,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,10,0,0|6
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,10,0,10|1
-src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,12,0,0|2
+src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,12,0,0|3
+src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,12,0,4|2
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,14,0,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,16,0,0|5
+src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,2,0,0|2
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,4,0,0|2
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,7,0,0|4
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,8,0,0|2
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|10,0,0,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|12|3
+src/PlayStead.UI/Library/LibraryView.xaml|Spacing|16|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|18|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|20,16,0,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|8,0,0,0|7

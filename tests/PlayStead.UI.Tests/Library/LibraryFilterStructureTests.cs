@@ -19,6 +19,12 @@ public sealed class LibraryFilterStructureTests
         Assert.Contains(buttons, button =>
             button.Attributes().Any(attribute => attribute.Value == "AttentionFilterButton") &&
             (string?)button.Attribute("Content") == "À signaler");
+        Assert.Contains(buttons, button =>
+            button.Attributes().Any(attribute => attribute.Value == "AdvancedFiltersButton") &&
+            (string?)button.Attribute("Content") == "{Binding AdvancedFilterButtonLabel}");
+        Assert.True(text.Contains("ProviderFilterOptions", StringComparison.Ordinal));
+        Assert.True(text.Contains("DriveFilterOptions", StringComparison.Ordinal));
+        Assert.True(text.Contains("Aucun jeu ne correspond à ces filtres.", StringComparison.Ordinal));
 
         var sortTags = comboBox.Descendants()
             .Where(element => element.Name.LocalName == "ComboBoxItem")
