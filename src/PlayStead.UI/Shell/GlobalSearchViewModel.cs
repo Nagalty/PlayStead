@@ -1,9 +1,11 @@
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using CommunityToolkit.Mvvm.Input;
 using PlayStead.Core.Library;
+using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 
@@ -21,6 +23,9 @@ public sealed class GlobalSearchViewModel : INotifyPropertyChanged
     private IReadOnlyList<LibraryItemViewModel> _items = [];
     private IReadOnlyDictionary<GameId, IReadOnlyList<string>> _collectionNamesByGame =
         new Dictionary<GameId, IReadOnlyList<string>>();
+    private IReadOnlyDictionary<GameId, ProviderGameMetadata> _metadataByGame =
+        new Dictionary<GameId, ProviderGameMetadata>();
+    private IReadOnlySet<GameId> _attentionGameIds = new HashSet<GameId>();
     private IReadOnlyList<GlobalSearchResult> _results = [];
     private string _query = string.Empty;
 
@@ -51,6 +56,20 @@ public sealed class GlobalSearchViewModel : INotifyPropertyChanged
     {
         ArgumentNullException.ThrowIfNull(collectionNamesByGame);
         _collectionNamesByGame = collectionNamesByGame;
+        RebuildResults();
+    }
+
+    public void SetProviderMetadata(IReadOnlyDictionary<GameId, ProviderGameMetadata> metadataByGame)
+    {
+        ArgumentNullException.ThrowIfNull(metadataByGame);
+        _metadataByGame = metadataByGame;
+        RebuildResults();
+    }
+
+    public void SetAttentionGames(IReadOnlySet<GameId> attentionGameIds)
+    {
+        ArgumentNullException.ThrowIfNull(attentionGameIds);
+        _attentionGameIds = attentionGameIds;
         RebuildResults();
     }
 
@@ -85,12 +104,28 @@ public sealed class GlobalSearchViewModel : INotifyPropertyChanged
                     var collections = _collectionNamesByGame.TryGetValue(item.GameId, out var names)
                         ? names.Select(Normalize).ToArray()
                         : [];
+                    var metadata = _metadataByGame.GetValueOrDefault(item.GameId);
+                    var developers = metadata?.Developers?.Select(Normalize).ToArray() ?? [];
+                    var publishers = metadata?.Publishers?.Select(Normalize).ToArray() ?? [];
+                    var genres = metadata?.Genres?.Select(Normalize).ToArray() ?? [];
                     var titleStarts = title.StartsWith(normalizedQuery, StringComparison.Ordinal);
                     var titleContains = title.Contains(normalizedQuery, StringComparison.Ordinal);
                     var collectionStarts = collections.Any(name => name.StartsWith(normalizedQuery, StringComparison.Ordinal));
                     var collectionContains = collections.Any(name => name.Contains(normalizedQuery, StringComparison.Ordinal));
-                    var rank = titleStarts ? 0 : titleContains ? 1 : collectionStarts ? 2 : collectionContains ? 3 : 4;
-                    return (Item: item, Title: title, Rank: rank, Matches: titleContains || collectionContains);
+                    var developerPublisherStarts = developers.Concat(publishers).Any(value => value.StartsWith(normalizedQuery, StringComparison.Ordinal));
+                    var developerPublisherContains = developers.Concat(publishers).Any(value => value.Contains(normalizedQuery, StringComparison.Ordinal));
+                    var genreStarts = genres.Any(value => value.StartsWith(normalizedQuery, StringComparison.Ordinal));
+                    var genreContains = genres.Any(value => value.Contains(normalizedQuery, StringComparison.Ordinal));
+                    var providerMatch = Normalize(item.ProviderLabel).Contains(normalizedQuery, StringComparison.Ordinal);
+                    var capabilityMatch = MatchesCapability(metadata, normalizedQuery);
+                    var driveMatch = DriveMatches(item.InstallPath, normalizedQuery);
+                    var attentionMatch = _attentionGameIds.Contains(item.GameId) && normalizedQuery is ("ATTENTION" or "A SIGNALER");
+                    var rank = titleStarts ? 0 : titleContains ? 1 : collectionStarts ? 2 : collectionContains ? 3 :
+                        developerPublisherStarts ? 4 : developerPublisherContains ? 5 : genreStarts ? 6 : genreContains ? 7 :
+                        providerMatch ? 8 : capabilityMatch ? 9 : driveMatch ? 10 : attentionMatch ? 11 : int.MaxValue;
+                    var matches = titleContains || collectionContains || developerPublisherContains || genreContains ||
+                        providerMatch || capabilityMatch || driveMatch || attentionMatch;
+                    return (Item: item, Title: title, Rank: rank, Matches: matches);
                 })
                 .Where(candidate => candidate.Matches)
                 .OrderBy(candidate => candidate.Rank)
@@ -106,6 +141,21 @@ public sealed class GlobalSearchViewModel : INotifyPropertyChanged
 
         OnPropertyChanged(nameof(Results));
         OnPropertyChanged(nameof(IsOpen));
+    }
+
+    private static bool MatchesCapability(ProviderGameMetadata? metadata, string query) =>
+        metadata is not null && query switch
+        {
+            "SOLO" => metadata.SinglePlayer is true,
+            "COOP" or "CO-OP" => metadata.SupportsCoop is true,
+            "MULTIJOUEUR" or "MULTIPLAYER" => metadata.MultiPlayer is true,
+            _ => false
+        };
+
+    private static bool DriveMatches(string path, string query)
+    {
+        var root = Path.GetPathRoot(path)?.TrimEnd('\\');
+        return !string.IsNullOrWhiteSpace(root) && Normalize(root).Equals(query, StringComparison.Ordinal);
     }
 
     private void SelectResult(GlobalSearchResult? result)

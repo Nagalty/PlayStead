@@ -1,4 +1,5 @@
 using PlayStead.Core.Library;
+using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Shell;
@@ -121,6 +122,75 @@ public sealed class GlobalSearchViewModelTests
         Assert.Single(search.Results);
     }
 
-    private static LibraryItemViewModel Item(string title) =>
-        new(GameId.New(), title, ProviderKind.Steam, "Steam", @"C:\Games", null);
+    [Fact]
+    public void Developer_publisher_provider_genre_and_drive_metadata_are_searchable()
+    {
+        var item = new LibraryItemViewModel(GameId.New(), "Unknown title", ProviderKind.Steam, "Steam", @"D:\Games", null);
+        var search = new GlobalSearchViewModel(new NavigationService());
+        search.SetItems([item]);
+        search.SetProviderMetadata(new Dictionary<GameId, ProviderGameMetadata>
+        {
+            [item.GameId] = Metadata(item.GameId, ["RPG"], ["Coffee Stain", "Café Games"], ["Deep Publisher"])
+        });
+
+        foreach (var query in new[] { "coffee", "cafe", "publisher", "steam", "rpg", "d:" })
+        {
+            search.SetQuery(query);
+            Assert.Single(search.Results);
+        }
+    }
+
+    [Fact]
+    public void Positive_capability_and_attention_match_but_unknown_does_not()
+    {
+        var coop = Item("Coop game", @"C:\Games");
+        var unknown = Item("Unknown game", @"C:\Other");
+        var search = new GlobalSearchViewModel(new NavigationService());
+        search.SetItems([coop, unknown]);
+        search.SetProviderMetadata(new Dictionary<GameId, ProviderGameMetadata>
+        {
+            [coop.GameId] = Metadata(coop.GameId, [], [], [], onlineCoop: true),
+            [unknown.GameId] = Metadata(unknown.GameId, [])
+        });
+        search.SetAttentionGames(new HashSet<GameId> { coop.GameId });
+
+        search.SetQuery("co-op");
+        Assert.Equal("Coop game", Assert.Single(search.Results).Title);
+        search.SetQuery("attention");
+        Assert.Equal("Coop game", Assert.Single(search.Results).Title);
+        search.SetQuery("coop");
+        Assert.Single(search.Results);
+    }
+
+    [Fact]
+    public void Title_then_collection_then_secondary_metadata_ranking_is_preserved_and_deduplicated()
+    {
+        var title = Item("RPG Quest");
+        var collection = Item("Other game");
+        var metadata = Item("Third game");
+        var search = new GlobalSearchViewModel(new NavigationService());
+        search.SetItems([title, collection, metadata, metadata]);
+        search.SetCollectionNames(new Dictionary<GameId, IReadOnlyList<string>> { [collection.GameId] = ["RPG"] });
+        search.SetProviderMetadata(new Dictionary<GameId, ProviderGameMetadata>
+        {
+            [metadata.GameId] = Metadata(metadata.GameId, ["RPG"])
+        });
+
+        search.SetQuery("rpg");
+
+        Assert.Equal(["RPG Quest", "Other game", "Third game"], search.Results.Select(result => result.Title));
+        Assert.Equal(3, search.Results.Select(result => result.GameId).Distinct().Count());
+    }
+
+    private static ProviderGameMetadata Metadata(
+        GameId gameId,
+        IReadOnlyList<string> genres,
+        IReadOnlyList<string>? developers = null,
+        IReadOnlyList<string>? publishers = null,
+        bool? onlineCoop = null) =>
+        ProviderGameMetadata.Create(gameId, ProviderKind.Steam, "123", DateTimeOffset.UtcNow,
+            genres: genres, developers: developers, publishers: publishers, onlineCoop: onlineCoop);
+
+    private static LibraryItemViewModel Item(string title, string path = @"C:\Games") =>
+        new(GameId.New(), title, ProviderKind.Steam, "Steam", path, null);
 }

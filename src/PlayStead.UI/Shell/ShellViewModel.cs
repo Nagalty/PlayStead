@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using PlayStead.UI.Navigation;
+using PlayStead.Core.ProviderGameMetadata;
 
 namespace PlayStead.UI.Shell;
 
@@ -95,11 +96,17 @@ public sealed class ShellViewModel :
 
     public void SetSearchItems(
         IEnumerable<PlayStead.UI.Library.LibraryItemViewModel> items,
-        IReadOnlyDictionary<PlayStead.Core.Library.GameId, IReadOnlyList<string>>? collectionNamesByGame = null)
+        IReadOnlyDictionary<PlayStead.Core.Library.GameId, IReadOnlyList<string>>? collectionNamesByGame = null,
+        IReadOnlyDictionary<PlayStead.Core.Library.GameId, ProviderGameMetadata>? metadataByGame = null,
+        IReadOnlySet<PlayStead.Core.Library.GameId>? attentionGameIds = null)
     {
         Search.SetItems(items);
         if (collectionNamesByGame is not null)
             Search.SetCollectionNames(collectionNamesByGame);
+        if (metadataByGame is not null)
+            Search.SetProviderMetadata(metadataByGame);
+        if (attentionGameIds is not null)
+            Search.SetAttentionGames(attentionGameIds);
     }
 
     public AppRoute CurrentRoute =>

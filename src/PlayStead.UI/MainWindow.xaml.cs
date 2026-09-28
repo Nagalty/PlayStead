@@ -118,7 +118,7 @@ public partial class MainWindow : Window
 
         DataContext =
             viewModel;
-        _shellViewModel.SetSearchItems(viewModel.Items, viewModel.CollectionNamesByGame);
+        _shellViewModel.SetSearchItems(viewModel.Items, viewModel.CollectionNamesByGame, viewModel.ProviderMetadataByGame, viewModel.AttentionGameIds);
     }
 
     public MainWindow(
@@ -192,7 +192,7 @@ public partial class MainWindow : Window
 
         DataContext =
             viewModel;
-        _shellViewModel.SetSearchItems(viewModel.Items, viewModel.CollectionNamesByGame);
+        _shellViewModel.SetSearchItems(viewModel.Items, viewModel.CollectionNamesByGame, viewModel.ProviderMetadataByGame, viewModel.AttentionGameIds);
 
         _windowPlacementService =
             windowPlacementService;
@@ -549,13 +549,13 @@ public partial class MainWindow : Window
         if (sender is LibraryViewModel library &&
             e.PropertyName == nameof(LibraryViewModel.Items))
         {
-            _shellViewModel.SetSearchItems(library.Items, library.CollectionNamesByGame);
+            _shellViewModel.SetSearchItems(library.Items, library.CollectionNamesByGame, library.ProviderMetadataByGame, library.AttentionGameIds);
         }
 
         if (sender is LibraryViewModel collectionLibrary &&
-            e.PropertyName == nameof(LibraryViewModel.CollectionNamesByGame))
+            e.PropertyName is nameof(LibraryViewModel.CollectionNamesByGame) or nameof(LibraryViewModel.ProviderMetadataByGame) or nameof(LibraryViewModel.AttentionGameIds))
         {
-            _shellViewModel.SetSearchItems(collectionLibrary.Items, collectionLibrary.CollectionNamesByGame);
+            _shellViewModel.SetSearchItems(collectionLibrary.Items, collectionLibrary.CollectionNamesByGame, collectionLibrary.ProviderMetadataByGame, collectionLibrary.AttentionGameIds);
         }
 
         if (e.PropertyName == nameof(LibraryViewModel.SelectedItem))

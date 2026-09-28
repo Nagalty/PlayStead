@@ -384,6 +384,10 @@ public sealed class LibraryViewModel :
                 group => group.Key,
                 group => (IReadOnlyList<string>)group.Select(value => value.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
 
+    public IReadOnlyDictionary<GameId, ProviderGameMetadata> ProviderMetadataByGame => _providerMetadataByGame;
+
+    public IReadOnlySet<GameId> AttentionGameIds => _attentionGameIds;
+
     public bool HasCollections => _collectionOptions.Count > 0;
 
     public bool HasDriveFilterOptions => _driveFilterOptions.Count > 0;
@@ -1725,6 +1729,7 @@ public sealed class LibraryViewModel :
             : (await ProviderGameMetadataStore.GetAllAsync(cancellationToken))
                 .GroupBy(metadata => metadata.GameId)
                 .ToDictionary(group => group.Key, group => group.OrderByDescending(metadata => metadata.RefreshedAtUtc).First());
+        OnPropertyChanged(nameof(ProviderMetadataByGame));
         RefreshAdvancedFilterOptions();
     }
 
@@ -1747,6 +1752,7 @@ public sealed class LibraryViewModel :
             .Where(item => item.GameId is not null)
             .Select(item => new GameId(item.GameId!.Value))
             .ToHashSet() ?? [];
+        OnPropertyChanged(nameof(AttentionGameIds));
         OnPropertyChanged(nameof(VisibleItems));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
