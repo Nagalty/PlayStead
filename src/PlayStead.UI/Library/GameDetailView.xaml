@@ -444,7 +444,6 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="{Binding KindLabel}"
                                                    Style="{DynamicResource PlayStead.Text.Caption}" />
@@ -475,7 +474,7 @@
                                                            Margin="0,4,0,0" />
                                             </StackPanel>
                                         </StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,6,0,0">
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,6,0,0">
                                             <Button Content="Ouvrir le dossier"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.OpenLocalArtifactFolderCommand, ElementName=GameDetailRoot}"
