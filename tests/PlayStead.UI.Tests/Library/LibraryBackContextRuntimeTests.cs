@@ -151,6 +151,11 @@ public sealed class LibraryBackContextRuntimeTests
             "ScrollToVerticalOffset(",
             codeBehind,
             StringComparison.Ordinal);
+
+        Assert.Contains(
+            "RestoreSavedScrollPosition",
+            codeBehind,
+            StringComparison.Ordinal);
     }
 
     private static XElement FindRequiredByName(

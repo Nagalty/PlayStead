@@ -55,6 +55,7 @@ public partial class MainWindow : Window
     private readonly SessionMonitor? _sessionMonitor;
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
     private readonly IProviderActivityMetadataStore? _providerActivityStore;
+    private LibraryUiState? _libraryStateBeforeGameDetail;
 
     public MainWindow()
         : this(
@@ -735,8 +736,16 @@ public partial class MainWindow : Window
                 _libraryView.DataContext =
                     DataContext;
 
+                if (_libraryStateBeforeGameDetail is { } libraryState &&
+                    DataContext is LibraryViewModel restoredLibraryViewModel)
+                {
+                    restoredLibraryViewModel.RestoreUiState(libraryState);
+                    _libraryStateBeforeGameDetail = null;
+                }
+
                 MainContent.Content =
                     _libraryView;
+                _libraryView.RestoreSavedScrollPosition();
                 break;
 
             case AppRoute.Sessions:
@@ -1002,6 +1011,8 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        _libraryStateBeforeGameDetail = viewModel.CaptureUiState();
 
         var quickPanelViewModel =
             new GameQuickPanelViewModel(

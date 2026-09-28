@@ -737,7 +737,14 @@ public sealed class LibraryViewModel :
             SortKey,
             FilterKey,
             SelectedGameId,
-            VerticalOffset);
+            VerticalOffset)
+        {
+            QuickFilter = QuickFilter,
+            ProviderFilters = _providerFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToArray(),
+            DriveFilters = _driveFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToArray(),
+            CollectionFilters = _collectionOptions.Where(option => option.IsFilterSelected).Select(option => option.Id).ToArray(),
+            SearchText = SearchQuery
+        };
     }
 
     public void RestoreUiState(
@@ -748,6 +755,8 @@ public sealed class LibraryViewModel :
 
         SetViewMode(
             state.ViewMode);
+
+        SetQuickFilter(state.QuickFilter);
 
         if (_sortKey != state.SortKey)
         {
@@ -766,6 +775,22 @@ public sealed class LibraryViewModel :
             OnPropertyChanged(
                 nameof(FilterKey));
         }
+
+        SetSearchQuery(state.SearchText ?? string.Empty);
+
+        var providerFilters = state.ProviderFilters.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var option in _providerFilterOptions)
+            option.IsSelected = providerFilters.Contains(option.Key);
+
+        var driveFilters = state.DriveFilters.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var option in _driveFilterOptions)
+            option.IsSelected = driveFilters.Contains(option.Key);
+
+        var collectionFilters = state.CollectionFilters.ToHashSet();
+        foreach (var option in _collectionOptions)
+            option.IsFilterSelected = collectionFilters.Contains(option.Id);
+
+        NotifyAdvancedFilterProjectionChanged();
 
         SetSelectedGame(
             state.SelectedGameId);

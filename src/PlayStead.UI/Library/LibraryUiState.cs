@@ -7,4 +7,15 @@ public sealed record LibraryUiState(
     string SortKey,
     string? FilterKey,
     GameId? SelectedGameId,
-    double VerticalOffset);
+    double VerticalOffset)
+{
+    public LibraryQuickFilter QuickFilter { get; init; } = LibraryQuickFilter.Installed;
+
+    public IReadOnlyList<string> ProviderFilters { get; init; } = [];
+
+    public IReadOnlyList<string> DriveFilters { get; init; } = [];
+
+    public IReadOnlyList<Guid> CollectionFilters { get; init; } = [];
+
+    public string SearchText { get; init; } = string.Empty;
+}

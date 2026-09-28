@@ -55,6 +55,8 @@ public partial class LibraryView :
         // Search is owned by the Shell global search field.
     }
 
+    public void RestoreSavedScrollPosition() => RestoreVerticalOffset();
+
     private void GameCard_OnSelectionRequested(
         object? sender,
         EventArgs e)

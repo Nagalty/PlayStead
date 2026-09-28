@@ -155,6 +155,27 @@ public sealed class LibraryUiStateTests
                     null!));
     }
 
+    [Fact]
+    public void RestoreUiState_restores_quick_filter_and_local_search()
+    {
+        var sut = new LibraryViewModel(new EmptyLibraryStore());
+        var state = new LibraryUiState(
+            LibraryViewMode.Grid,
+            "Recent",
+            null,
+            null,
+            0d)
+        {
+            QuickFilter = LibraryQuickFilter.Attention,
+            SearchText = "stalker"
+        };
+
+        sut.RestoreUiState(state);
+
+        Assert.Equal(LibraryQuickFilter.Attention, sut.QuickFilter);
+        Assert.Equal("stalker", sut.SearchQuery);
+    }
+
     private sealed class EmptyLibraryStore :
         ILibraryStore
     {
