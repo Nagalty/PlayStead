@@ -302,6 +302,9 @@ public static class PlaySteadHost
             services.GetRequiredService<SteamLocalProviderActivitySource>());
         builder.Services.AddSingleton<ProviderActivityReconciliationService>();
         builder.Services.AddSingleton<IProviderGameMetadataStore, SqliteProviderGameMetadataStore>();
+        builder.Services.AddSingleton<PlayStead.Core.Modding.IModEvidenceStore, PlayStead.Data.Modding.SqliteModEvidenceStore>();
+        builder.Services.AddSingleton<PlayStead.Core.Modding.IModEvidenceDetector, PlayStead.Providers.Steam.SteamWorkshopModEvidenceDetector>();
+        builder.Services.AddSingleton<PlayStead.Core.Modding.ModEvidenceRefreshService>();
         builder.Services.AddSingleton<SteamLocalGameMetadataSource>();
         builder.Services.AddSingleton<HttpClient>(_ =>
         {
@@ -468,6 +471,10 @@ public static class PlaySteadHost
                     services.GetRequiredService<PlayStead.Core.Collections.IGameCollectionStore>());
                 viewModel.AttachAttentionService(
                     services.GetRequiredService<PlayStead.Core.Notifications.IAttentionService>());
+                viewModel.AttachModEvidenceStore(
+                    services.GetRequiredService<PlayStead.Core.Modding.IModEvidenceStore>());
+                viewModel.AttachModEvidenceRefreshService(
+                    services.GetRequiredService<PlayStead.Core.Modding.ModEvidenceRefreshService>());
                 return viewModel;
             });
 

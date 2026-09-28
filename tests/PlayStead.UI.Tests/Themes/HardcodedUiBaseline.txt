@@ -84,7 +84,7 @@ src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,6,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,6,4|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,8,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,9,0|1
-src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,10,0,0|4
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,10,0,0|5
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,12,0,0|7
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,18,0,0|5
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,22,0,0|1
@@ -94,7 +94,7 @@ src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,6,0,0|4
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,8,0,0|8
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,0,0,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,0,18,0|1
-src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,10,0,0|1
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,10,0,0|2
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,8,0,0|2
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|16,0,0,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|16,0,12,0|1
@@ -124,11 +124,10 @@ src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,0,0,8|2
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,0,12,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,10,0,0|9
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,10,0,10|1
-src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,12,0,0|4
-src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,12,0,4|5
+src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,12,0,0|3
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,14,0,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,16,0,0|5
-src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,2,0,0|6
+src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,2,0,0|2
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,4,0,0|3
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,7,0,0|4
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|0,8,0,0|3

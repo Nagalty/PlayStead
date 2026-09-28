@@ -871,7 +871,8 @@ public partial class MainWindow : Window
                         _artifactBaselineStore,
                         null,
                         _artifactSnapshotService,
-                        _artifactRestoreService)
+                        _artifactRestoreService,
+                        libraryViewModel.ModEvidenceStore)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -889,7 +890,8 @@ public partial class MainWindow : Window
                         _artifactBaselineStore,
                         null,
                         _artifactSnapshotService,
-                        _artifactRestoreService);
+                        _artifactRestoreService,
+                        libraryViewModel.ModEvidenceStore);
 
                 MainContent.Content =
                     new GameDetailView(

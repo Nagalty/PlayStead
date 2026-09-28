@@ -10,6 +10,91 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
+        <ControlTemplate x:Key="Library.SortComboToggleTemplate" TargetType="ToggleButton">
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{DynamicResource PlayStead.Radius.Small}"
+                    Padding="{TemplateBinding Padding}">
+                <ContentPresenter />
+            </Border>
+        </ControlTemplate>
+
+        <Style x:Key="Library.FilterCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+            <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Body}" />
+            <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.14}" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="{DynamicResource PlayStead.Spacing.2}" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="20" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="Box"
+                                    Width="16"
+                                    Height="16"
+                                    Background="{DynamicResource PlayStead.Brush.SurfaceSubtle}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
+                                    BorderThickness="1"
+                                    CornerRadius="{DynamicResource PlayStead.Radius.Small}"
+                                    VerticalAlignment="Center">
+                                <Path x:Name="CheckMark"
+                                      Data="M 2,8 L 6,12 L 14,3"
+                                      Stroke="{DynamicResource PlayStead.Brush.Copper}"
+                                      StrokeThickness="2"
+                                      Visibility="Collapsed" />
+                            </Border>
+                            <ContentPresenter Grid.Column="1"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
+                                              TextElement.FontFamily="{TemplateBinding FontFamily}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}" />
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceHover}" />
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="Library.FilterSectionTitle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource PlayStead.Text.Caption}">
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextSecondary}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,16,0,6" />
+        </Style>
+
+        <Style x:Key="Library.FilterResetButton"
+               TargetType="Button"
+               BasedOn="{StaticResource PlayStead.Button.Secondary}">
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,16,0,0" />
+        </Style>
+
         <Style x:Key="Library.ViewModeButton"
                TargetType="Button"
                BasedOn="{StaticResource PlayStead.Button.Ghost}">
@@ -28,6 +113,15 @@
                     <MultiDataTrigger.Conditions>
                         <Condition Binding="{Binding IsListMode}" Value="True" />
                         <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="List" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                    <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsModdedQuickFilter}" Value="True" />
+                        <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}" Value="Modded" />
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
@@ -99,6 +193,113 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="Library.SortComboBoxItem" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+            <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+            <Setter Property="Padding" Value="{DynamicResource PlayStead.Control.Padding}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceHover}" />
+                                <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                                <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="Library.SortComboBox"
+               TargetType="ComboBox"
+               BasedOn="{StaticResource PlayStead.ControlBase}">
+            <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}" />
+            <Setter Property="Padding" Value="{DynamicResource PlayStead.Control.Padding}" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource Library.SortComboBoxItem}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="PART_ToggleButton"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          Padding="{TemplateBinding Padding}"
+                                          Template="{StaticResource Library.SortComboToggleTemplate}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Grid.Column="0"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                                      VerticalAlignment="Center" />
+                                    <Path Grid.Column="1"
+                                          Margin="{DynamicResource PlayStead.Spacing.2}"
+                                          Data="M 0,0 L 8,0 L 4,4 Z"
+                                          Fill="{DynamicResource PlayStead.Brush.IconMuted}"
+                                          Stretch="Uniform"
+                                          Width="8"
+                                          Height="5"
+                                          VerticalAlignment="Center" />
+                                </Grid>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Slide"
+                                   Focusable="False"
+                                   HorizontalOffset="0"
+                                   VerticalOffset="2">
+                                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
+                                        BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                                        BorderThickness="{DynamicResource PlayStead.Border.Thin}"
+                                        CornerRadius="{DynamicResource PlayStead.Radius.Small}">
+                                    <ScrollViewer MaxHeight="320"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  Background="{DynamicResource PlayStead.Brush.SurfaceRaised}">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="PART_ToggleButton" Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceHover}" />
+                                <Setter TargetName="PART_ToggleButton" Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.CopperHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="PART_ToggleButton" Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </UserControl.Resources>
 
     <Grid Margin="{DynamicResource PlayStead.Inset.Page}">
@@ -135,6 +336,12 @@
                         Click="AttentionFilterButton_OnClick"
                         Style="{DynamicResource Library.QuickFilterButton}"
                         ToolTip="Afficher les jeux avec une attention active" />
+                <Button x:Name="ModdedFilterButton"
+                        Tag="Modded"
+                        Content="Moddés"
+                        Click="ModdedFilterButton_OnClick"
+                        Style="{DynamicResource Library.QuickFilterButton}"
+                        ToolTip="Afficher les jeux avec une preuve de modding confirmée" />
                 <Button x:Name="AdvancedFiltersButton"
                         Content="{Binding AdvancedFilterButtonLabel}"
                         Click="AdvancedFiltersButton_OnClick"
@@ -145,6 +352,7 @@
                            Foreground="{DynamicResource PlayStead.Brush.TextSecondary}" />
                 <ComboBox x:Name="LibrarySortComboBox"
                           Width="150"
+                          Style="{DynamicResource Library.SortComboBox}"
                           SelectedValuePath="Tag"
                           SelectedValue="{Binding SortKey, Mode=OneWay}"
                           SelectionChanged="LibrarySortComboBox_OnSelectionChanged"
@@ -226,54 +434,64 @@
                Closed="AdvancedFiltersPopup_OnClosed"
                IsOpen="{Binding IsAdvancedFiltersOpen, Mode=OneWay}"
                AllowsTransparency="True">
-            <Border MinWidth="240"
+            <Border MinWidth="260"
+                    MaxHeight="620"
                     Padding="16"
                     Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
-                    BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
+                    BorderBrush="{DynamicResource PlayStead.Brush.AccentMuted}"
                     BorderThickness="1"
                     CornerRadius="8">
                 <StackPanel>
                     <TextBlock Text="Filtres" Style="{DynamicResource PlayStead.Text.SectionTitle}" />
-                    <TextBlock Margin="0,12,0,4" Text="Source" Style="{DynamicResource PlayStead.Text.Caption}" />
+                    <TextBlock Text="SOURCE" Style="{DynamicResource Library.FilterSectionTitle}" />
                     <ItemsControl ItemsSource="{Binding ProviderFilterOptions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <CheckBox Content="{Binding Label}"
                                           IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                          Margin="0,2,0,0" />
+                                          Style="{DynamicResource Library.FilterCheckBox}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Margin="0,12,0,4"
-                               Text="Disque"
-                               Style="{DynamicResource PlayStead.Text.Caption}"
+                    <TextBlock Text="DISQUE"
+                               Style="{DynamicResource Library.FilterSectionTitle}"
                                Visibility="{Binding HasDriveFilterOptions, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <ItemsControl ItemsSource="{Binding DriveFilterOptions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <CheckBox Content="{Binding Label}"
                                           IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                          Margin="0,2,0,0" />
+                                          Style="{DynamicResource Library.FilterCheckBox}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Margin="0,12,0,4" Text="Modes de jeu" Style="{DynamicResource PlayStead.Text.Caption}" />
+                    <TextBlock Text="MODES DE JEU" Style="{DynamicResource Library.FilterSectionTitle}" />
                     <ItemsControl ItemsSource="{Binding CapabilityFilterOptions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,2,0,0" />
+                                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Style="{DynamicResource Library.FilterCheckBox}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Margin="0,12,0,4" Text="Genres" Style="{DynamicResource PlayStead.Text.Caption}" />
+                    <TextBlock Text="GENRES">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource Library.FilterSectionTitle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding GenreFilterOptions.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                     <ItemsControl ItemsSource="{Binding GenreFilterOptions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,2,0,0" />
+                                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Style="{DynamicResource Library.FilterCheckBox}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Margin="0,12,0,4" Text="Collections" Style="{DynamicResource PlayStead.Text.Caption}" />
+                    <TextBlock Text="COLLECTIONS" Style="{DynamicResource Library.FilterSectionTitle}" />
                     <ItemsControl ItemsSource="{Binding CollectionOptions}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -283,7 +501,7 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <CheckBox Content="{Binding Name}" IsChecked="{Binding IsFilterSelected, Mode=TwoWay}" />
+                                    <CheckBox Content="{Binding Name}" IsChecked="{Binding IsFilterSelected, Mode=TwoWay}" Style="{DynamicResource Library.FilterCheckBox}" />
                                     <Button Grid.Column="1" Content="Renommer" Tag="{Binding Id}" Click="RenameCollectionButton_OnClick" Margin="6,0,0,0" Style="{DynamicResource PlayStead.Button.Secondary}" />
                                     <Button Grid.Column="2" Content="Supprimer" Tag="{Binding Id}" Click="DeleteCollectionButton_OnClick" Margin="6,0,0,0" Style="{DynamicResource PlayStead.Button.Secondary}" />
                                 </Grid>
@@ -292,7 +510,7 @@
                     </ItemsControl>
                     <TextBlock Text="Aucune collection&#xA;Créez-en une pour organiser vos jeux."
                                Margin="0,4,0,0"
-                               Foreground="{DynamicResource PlayStead.Brush.TextMuted}"
+                               Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
                                FontSize="12">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -310,9 +528,8 @@
                             Click="CreateCollectionButton_OnClick"
                             Style="{DynamicResource PlayStead.Button.Secondary}" />
                     <Button Content="Réinitialiser"
-                            Margin="0,12,0,0"
-                            Click="ResetAdvancedFiltersButton_OnClick"
-                            Style="{DynamicResource PlayStead.Button.Secondary}" />
+                            Style="{DynamicResource Library.FilterResetButton}"
+                            Click="ResetAdvancedFiltersButton_OnClick" />
                 </StackPanel>
             </Border>
         </Popup>

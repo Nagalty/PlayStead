@@ -4,7 +4,7 @@ namespace PlayStead.Data.Database;
 
 public sealed class DatabaseInitializer
 {
-    private const int TargetVersion = 21;
+    private const int TargetVersion = 22;
 
     private static readonly IReadOnlyDictionary<int, string> MigrationFiles =
         new Dictionary<int, string>
@@ -29,7 +29,8 @@ public sealed class DatabaseInitializer
             [18] = "018_local_artifact_baselines.sql",
             [19] = "019_provider_observed_sessions.sql",
             [20] = "020_local_artifact_snapshots.sql",
-            [21] = "021_local_artifact_snapshot_reason.sql"
+            [21] = "021_local_artifact_snapshot_reason.sql",
+            [22] = "022_mod_evidence.sql"
         };
 
     private readonly DatabaseOptions _options;

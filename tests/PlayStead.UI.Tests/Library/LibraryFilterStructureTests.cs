@@ -38,7 +38,7 @@ public sealed class LibraryFilterStructureTests
             .ToArray();
 
         Assert.Equal(["Recent", "Playtime", "Title", "Size"], sortTags);
-        Assert.DoesNotContain("Content=\"Moddés\"", text);
+        Assert.Contains("Content=\"Moddés\"", text);
         Assert.DoesNotContain("Content=\"Dernière mise à jour\"", text);
     }
 

@@ -347,6 +347,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
@@ -382,6 +383,8 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,10,0,0" Text="Modifications" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasModEvidence, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,10,0,0" Text="{Binding ModStatusLabel}" Style="{DynamicResource PlayStead.Text.Body}" Visibility="{Binding HasModEvidence, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
                     </StackPanel>
                 </Border>

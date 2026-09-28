@@ -204,6 +204,12 @@ public partial class LibraryView :
             viewModel.SetQuickFilter(LibraryQuickFilter.Attention);
     }
 
+    private void ModdedFilterButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is LibraryViewModel viewModel)
+            viewModel.SetQuickFilter(LibraryQuickFilter.Modded);
+    }
+
     private void AdvancedFiltersButton_OnClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is LibraryViewModel viewModel)

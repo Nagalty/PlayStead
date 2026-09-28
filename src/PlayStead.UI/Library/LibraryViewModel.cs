@@ -17,6 +17,7 @@ using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.Core.Notifications;
 using PlayStead.Core.ProviderActivity;
 using PlayStead.Core.Collections;
+using PlayStead.Core.Modding;
 
 namespace PlayStead.UI.Library;
 
@@ -73,6 +74,9 @@ public sealed class LibraryViewModel :
     private LibraryQuickFilter _quickFilter = LibraryQuickFilter.Installed;
     private IAttentionService? _attentionService;
     private HashSet<GameId> _attentionGameIds = [];
+    private IReadOnlyDictionary<GameId, ModDetectionState> _modStatesByGame = new Dictionary<GameId, ModDetectionState>();
+    private IModEvidenceStore? _modEvidenceStore;
+    private ModEvidenceRefreshService? _modEvidenceRefreshService;
     private IReadOnlyDictionary<GameId, LibraryActivityProjection> _activityByGame =
         new Dictionary<GameId, LibraryActivityProjection>();
     private IReadOnlyList<LibraryFilterOption> _providerFilterOptions = [];
@@ -362,6 +366,9 @@ public sealed class LibraryViewModel :
     public bool IsInstalledQuickFilter => _quickFilter == LibraryQuickFilter.Installed;
 
     public bool IsAttentionQuickFilter => _quickFilter == LibraryQuickFilter.Attention;
+    public bool IsModdedQuickFilter => _quickFilter == LibraryQuickFilter.Modded;
+    public IReadOnlyDictionary<GameId, ModDetectionState> ModStatesByGame => _modStatesByGame;
+    public IModEvidenceStore? ModEvidenceStore => _modEvidenceStore;
 
     public IReadOnlyList<LibraryFilterOption> ProviderFilterOptions => _providerFilterOptions;
 
@@ -502,6 +509,7 @@ public sealed class LibraryViewModel :
         OnPropertyChanged(nameof(QuickFilterKey));
         OnPropertyChanged(nameof(IsInstalledQuickFilter));
         OnPropertyChanged(nameof(IsAttentionQuickFilter));
+        OnPropertyChanged(nameof(IsModdedQuickFilter));
         OnPropertyChanged(nameof(VisibleItems));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
@@ -591,6 +599,16 @@ public sealed class LibraryViewModel :
         _attentionService = attentionService;
         _attentionService.Changed += AttentionServiceOnChanged;
         RefreshAttentionGameIds();
+    }
+
+    public void AttachModEvidenceStore(IModEvidenceStore store)
+    {
+        _modEvidenceStore = store ?? throw new ArgumentNullException(nameof(store));
+    }
+
+    public void AttachModEvidenceRefreshService(ModEvidenceRefreshService service)
+    {
+        _modEvidenceRefreshService = service ?? throw new ArgumentNullException(nameof(service));
     }
 
     public void SetFilterKey(
@@ -1169,9 +1187,16 @@ public sealed class LibraryViewModel :
         await RefreshActivityProjectionAsync(snapshot.Installations, cancellationToken);
 
         await RefreshProviderMetadataProjectionAsync(cancellationToken);
+        await RefreshModEvidenceProjectionAsync(cancellationToken);
 
         _installations =
             snapshot.Installations.ToArray();
+
+        if (_modEvidenceRefreshService is not null)
+        {
+            foreach (var installation in _installations.Where(value => value.IsPresent))
+                await _modEvidenceRefreshService.RefreshAsync(installation, cancellationToken);
+        }
 
         Items =
             BuildItems(
@@ -1543,9 +1568,12 @@ public sealed class LibraryViewModel :
             return Items;
         }
 
-        var filtered = _quickFilter == LibraryQuickFilter.Attention
-            ? Items.Where(item => _attentionGameIds.Contains(item.GameId))
-            : Items.AsEnumerable();
+        var filtered = _quickFilter switch
+        {
+            LibraryQuickFilter.Attention => Items.Where(item => _attentionGameIds.Contains(item.GameId)),
+            LibraryQuickFilter.Modded => Items.Where(item => _modStatesByGame.TryGetValue(item.GameId, out var state) && state == ModDetectionState.ConfirmedModded),
+            _ => Items.AsEnumerable()
+        };
 
         var selectedProviders = _providerFilterOptions
             .Where(option => option.IsSelected)
@@ -1757,6 +1785,24 @@ public sealed class LibraryViewModel :
         OnPropertyChanged(nameof(VisibleItems));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
+    }
+
+    private async Task RefreshModEvidenceProjectionAsync(CancellationToken cancellationToken)
+    {
+        if (_modEvidenceStore is null)
+        {
+            _modStatesByGame = new Dictionary<GameId, ModDetectionState>();
+        }
+        else
+        {
+            var evidences = await _modEvidenceStore.GetAllAsync(cancellationToken);
+            _modStatesByGame = evidences
+                .GroupBy(evidence => evidence.GameId)
+                .ToDictionary(group => group.Key, group => ModEvidenceAggregation.GetState(group));
+        }
+        OnPropertyChanged(nameof(ModStatesByGame));
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(GridRows));
     }
 
     private void UpdateCollectionMemberships(GameId? gameId)

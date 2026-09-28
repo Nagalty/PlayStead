@@ -11,6 +11,7 @@ using PlayStead.UI.Sessions;
 using PlayStead.Core.Shortlist;
 using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.Core.GameBuildHistory;
+using PlayStead.Core.Modding;
 using PlayStead.Core.LocalArtifacts;
 using CommunityToolkit.Mvvm.Input;
 using System.Globalization;
@@ -33,6 +34,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly ILocalArtifactBaselineStore? _localArtifactBaselineStore;
     private readonly ILocalArtifactSnapshotService? _localArtifactSnapshotService;
     private readonly ILocalArtifactRestoreService? _localArtifactRestoreService;
+    private readonly IModEvidenceStore? _modEvidenceStore;
     private readonly LocalArtifactBaselineComparisonService _artifactBaselineComparisonService = new();
     private bool _isShortlistOperationInProgress;
     public GameDetailViewModel(
@@ -70,7 +72,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ILocalArtifactBaselineStore? artifactBaselineStore = null,
         LocalArtifactBaselineComparisonService? artifactBaselineComparisonService = null,
         ILocalArtifactSnapshotService? artifactSnapshotService = null,
-        ILocalArtifactRestoreService? artifactRestoreService = null)
+        ILocalArtifactRestoreService? artifactRestoreService = null,
+        IModEvidenceStore? modEvidenceStore = null)
     {
         ArgumentNullException.ThrowIfNull(
             game);
@@ -120,6 +123,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         _localArtifactBaselineStore = artifactBaselineStore;
         _localArtifactSnapshotService = artifactSnapshotService;
         _localArtifactRestoreService = artifactRestoreService;
+        _modEvidenceStore = modEvidenceStore;
         _artifactBaselineComparisonService = artifactBaselineComparisonService ?? new LocalArtifactBaselineComparisonService();
         _openLocalArtifactFolderCommand = new RelayCommand<GameLocalArtifact>(OpenLocalArtifactFolder,
             artifact => artifact?.Exists == true && Directory.Exists(artifact.Path));
@@ -151,8 +155,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ILocalArtifactBaselineStore? artifactBaselineStore = null,
         LocalArtifactBaselineComparisonService? artifactBaselineComparisonService = null,
         ILocalArtifactSnapshotService? artifactSnapshotService = null,
-        ILocalArtifactRestoreService? artifactRestoreService = null)
-        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService)
+        ILocalArtifactRestoreService? artifactRestoreService = null,
+        IModEvidenceStore? modEvidenceStore = null)
+        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -205,6 +210,14 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         }
         if (_providerGameMetadataStore is not null)
             ApplyProviderMetadata(await _providerGameMetadataStore.GetAsync(GameId, Game.Provider, cancellationToken));
+        if (_modEvidenceStore is not null)
+        {
+            ModState = ModEvidenceAggregation.GetState(await _modEvidenceStore.GetByGameAsync(GameId, cancellationToken));
+            OnPropertyChanged(nameof(ModState));
+            OnPropertyChanged(nameof(HasModEvidence));
+            OnPropertyChanged(nameof(ModStatusLabel));
+            OnPropertyChanged(nameof(HasGeneralInfo));
+        }
 
         await LoadBuildHistoryAsync(cancellationToken);
         await LoadLocalArtifactsAsync(cancellationToken);
@@ -247,6 +260,14 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public IReadOnlyList<string> GameModes { get; private set; } = [];
     public bool HasGenres => Genres.Count > 0;
     public bool HasGameModes => GameModes.Count > 0;
+    public ModDetectionState ModState { get; private set; } = ModDetectionState.Unknown;
+    public bool HasModEvidence => ModState != ModDetectionState.Unknown;
+    public string ModStatusLabel => ModState switch
+    {
+        ModDetectionState.ConfirmedModded => "Mods détectés",
+        ModDetectionState.PossiblyModded => "Indices de modifications détectés",
+        _ => string.Empty
+    };
 
     public bool IsInGamesDuMoment { get; private set; }
     public bool CanChangeGamesDuMoment => _gamesDuMomentService is not null && !_isShortlistOperationInProgress;
@@ -447,7 +468,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public bool HasDeveloper => !string.IsNullOrWhiteSpace(DeveloperDisplay);
     public bool HasPublisher => !string.IsNullOrWhiteSpace(PublisherDisplay);
     public bool HasReleaseDate => !string.IsNullOrWhiteSpace(ReleaseDateDisplay);
-    public bool HasGeneralInfo => HasDeveloper || HasPublisher || HasReleaseDate || HasGenres || HasGameModes;
+    public bool HasGeneralInfo => HasDeveloper || HasPublisher || HasReleaseDate || HasGenres || HasGameModes || HasModEvidence;
 
     private void ApplyProviderMetadata(ProviderGameMetadata? metadata)
     {
