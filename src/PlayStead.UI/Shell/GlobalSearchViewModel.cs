@@ -19,6 +19,8 @@ public sealed class GlobalSearchViewModel : INotifyPropertyChanged
 {
     private readonly NavigationService _navigation;
     private IReadOnlyList<LibraryItemViewModel> _items = [];
+    private IReadOnlyDictionary<GameId, IReadOnlyList<string>> _collectionNamesByGame =
+        new Dictionary<GameId, IReadOnlyList<string>>();
     private IReadOnlyList<GlobalSearchResult> _results = [];
     private string _query = string.Empty;
 
@@ -45,6 +47,13 @@ public sealed class GlobalSearchViewModel : INotifyPropertyChanged
         RebuildResults();
     }
 
+    public void SetCollectionNames(IReadOnlyDictionary<GameId, IReadOnlyList<string>> collectionNamesByGame)
+    {
+        ArgumentNullException.ThrowIfNull(collectionNamesByGame);
+        _collectionNamesByGame = collectionNamesByGame;
+        RebuildResults();
+    }
+
     public void SetQuery(string query)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -68,9 +77,23 @@ public sealed class GlobalSearchViewModel : INotifyPropertyChanged
         else
         {
             _results = _items
-                .Select(item => (Item: item, Title: Normalize(item.Title)))
-                .Where(candidate => candidate.Title.Contains(normalizedQuery, StringComparison.Ordinal))
-                .OrderBy(candidate => candidate.Title.StartsWith(normalizedQuery, StringComparison.Ordinal) ? 0 : 1)
+                .GroupBy(item => item.GameId)
+                .Select(group => group.First())
+                .Select(item =>
+                {
+                    var title = Normalize(item.Title);
+                    var collections = _collectionNamesByGame.TryGetValue(item.GameId, out var names)
+                        ? names.Select(Normalize).ToArray()
+                        : [];
+                    var titleStarts = title.StartsWith(normalizedQuery, StringComparison.Ordinal);
+                    var titleContains = title.Contains(normalizedQuery, StringComparison.Ordinal);
+                    var collectionStarts = collections.Any(name => name.StartsWith(normalizedQuery, StringComparison.Ordinal));
+                    var collectionContains = collections.Any(name => name.Contains(normalizedQuery, StringComparison.Ordinal));
+                    var rank = titleStarts ? 0 : titleContains ? 1 : collectionStarts ? 2 : collectionContains ? 3 : 4;
+                    return (Item: item, Title: title, Rank: rank, Matches: titleContains || collectionContains);
+                })
+                .Where(candidate => candidate.Matches)
+                .OrderBy(candidate => candidate.Rank)
                 .ThenBy(candidate => candidate.Title, StringComparer.CurrentCultureIgnoreCase)
                 .Take(8)
                 .Select(candidate => new GlobalSearchResult(

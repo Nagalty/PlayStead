@@ -93,8 +93,14 @@ public sealed class ShellViewModel :
         ((RelayCommand)SearchCommand).NotifyCanExecuteChanged();
     }
 
-    public void SetSearchItems(IEnumerable<PlayStead.UI.Library.LibraryItemViewModel> items) =>
+    public void SetSearchItems(
+        IEnumerable<PlayStead.UI.Library.LibraryItemViewModel> items,
+        IReadOnlyDictionary<PlayStead.Core.Library.GameId, IReadOnlyList<string>>? collectionNamesByGame = null)
+    {
         Search.SetItems(items);
+        if (collectionNamesByGame is not null)
+            Search.SetCollectionNames(collectionNamesByGame);
+    }
 
     public AppRoute CurrentRoute =>
         _navigation.CurrentRoute;

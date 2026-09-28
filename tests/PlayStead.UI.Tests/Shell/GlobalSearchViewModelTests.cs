@@ -60,6 +60,67 @@ public sealed class GlobalSearchViewModelTests
         Assert.False(search.IsOpen);
     }
 
+    [Fact]
+    public void Collection_name_finds_member_game_without_duplicate_results()
+    {
+        var first = Item("Helldivers 2");
+        var second = Item("Deep Rock Galactic");
+        var search = new GlobalSearchViewModel(new NavigationService());
+        search.SetItems([first, second]);
+        search.SetCollectionNames(new Dictionary<GameId, IReadOnlyList<string>>
+        {
+            [first.GameId] = ["Coop du vendredi", "Coop FPS"],
+            [second.GameId] = ["Coop du vendredi"]
+        });
+
+        search.SetQuery("coop");
+
+        Assert.Equal(["Deep Rock Galactic", "Helldivers 2"], search.Results.Select(x => x.Title));
+        Assert.Equal(2, search.Results.Count);
+    }
+
+    [Fact]
+    public void Title_matches_rank_before_collection_matches()
+    {
+        var titleMatch = Item("Coop Quest");
+        var collectionMatch = Item("Helldivers 2");
+        var search = new GlobalSearchViewModel(new NavigationService());
+        search.SetItems([collectionMatch, titleMatch]);
+        search.SetCollectionNames(new Dictionary<GameId, IReadOnlyList<string>>
+        {
+            [collectionMatch.GameId] = ["Coop du vendredi"]
+        });
+
+        search.SetQuery("coop");
+
+        Assert.Equal("Coop Quest", search.Results[0].Title);
+        Assert.Equal("Helldivers 2", search.Results[1].Title);
+    }
+
+    [Fact]
+    public void Collection_projection_refresh_removes_old_name_and_matches_new_name()
+    {
+        var item = Item("Helldivers 2");
+        var search = new GlobalSearchViewModel(new NavigationService());
+        search.SetItems([item]);
+        search.SetCollectionNames(new Dictionary<GameId, IReadOnlyList<string>>
+        {
+            [item.GameId] = ["Coop"]
+        });
+        search.SetQuery("coop");
+        Assert.Single(search.Results);
+
+        search.SetCollectionNames(new Dictionary<GameId, IReadOnlyList<string>>
+        {
+            [item.GameId] = ["Soirée"]
+        });
+        search.SetQuery("coop");
+        Assert.Empty(search.Results);
+
+        search.SetQuery("soiree");
+        Assert.Single(search.Results);
+    }
+
     private static LibraryItemViewModel Item(string title) =>
         new(GameId.New(), title, ProviderKind.Steam, "Steam", @"C:\Games", null);
 }

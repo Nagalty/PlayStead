@@ -117,7 +117,7 @@ public partial class MainWindow : Window
 
         DataContext =
             viewModel;
-        _shellViewModel.SetSearchItems(viewModel.Items);
+        _shellViewModel.SetSearchItems(viewModel.Items, viewModel.CollectionNamesByGame);
     }
 
     public MainWindow(
@@ -191,7 +191,7 @@ public partial class MainWindow : Window
 
         DataContext =
             viewModel;
-        _shellViewModel.SetSearchItems(viewModel.Items);
+        _shellViewModel.SetSearchItems(viewModel.Items, viewModel.CollectionNamesByGame);
 
         _windowPlacementService =
             windowPlacementService;
@@ -548,7 +548,13 @@ public partial class MainWindow : Window
         if (sender is LibraryViewModel library &&
             e.PropertyName == nameof(LibraryViewModel.Items))
         {
-            _shellViewModel.SetSearchItems(library.Items);
+            _shellViewModel.SetSearchItems(library.Items, library.CollectionNamesByGame);
+        }
+
+        if (sender is LibraryViewModel collectionLibrary &&
+            e.PropertyName == nameof(LibraryViewModel.CollectionNamesByGame))
+        {
+            _shellViewModel.SetSearchItems(collectionLibrary.Items, collectionLibrary.CollectionNamesByGame);
         }
 
         if (e.PropertyName == nameof(LibraryViewModel.SelectedItem))

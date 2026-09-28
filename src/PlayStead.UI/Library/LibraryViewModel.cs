@@ -356,6 +356,17 @@ public sealed class LibraryViewModel :
 
     public IReadOnlyList<LibraryCollectionOption> CollectionOptions => _collectionOptions;
 
+    public IReadOnlyDictionary<GameId, IReadOnlyList<string>> CollectionNamesByGame =>
+        _collectionMemberships
+            .Join(_collectionOptions,
+                membership => membership.CollectionId,
+                option => option.Id,
+                (membership, option) => new { membership.GameId, option.Name })
+            .GroupBy(value => value.GameId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<string>)group.Select(value => value.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+
     public bool HasCollections => _collectionOptions.Count > 0;
 
     public bool HasDriveFilterOptions => _driveFilterOptions.Count > 0;
@@ -514,6 +525,7 @@ public sealed class LibraryViewModel :
             return option;
         }).ToArray();
         OnPropertyChanged(nameof(CollectionOptions));
+        OnPropertyChanged(nameof(CollectionNamesByGame));
         OnPropertyChanged(nameof(HasCollections));
         NotifyAdvancedFilterProjectionChanged();
     }
@@ -1591,6 +1603,7 @@ public sealed class LibraryViewModel :
         {
             await _collectionStore.SetMembershipAsync(option.Id, gameId, option.IsMember, CancellationToken.None);
             _collectionMemberships = (await _collectionStore.GetMembershipsAsync(CancellationToken.None)).ToHashSet();
+            OnPropertyChanged(nameof(CollectionNamesByGame));
             NotifyAdvancedFilterProjectionChanged();
         }
         catch
