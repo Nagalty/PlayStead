@@ -61,6 +61,7 @@ public partial class MainWindow : Window
     private readonly IArtifactFingerprintService? _artifactFingerprintService;
     private readonly ILocalArtifactBaselineStore? _artifactBaselineStore;
     private readonly ILocalArtifactSnapshotService? _artifactSnapshotService;
+    private readonly ILocalArtifactRestoreService? _artifactRestoreService;
     private LibraryUiState? _libraryStateBeforeGameDetail;
 
     public MainWindow()
@@ -457,6 +458,7 @@ public partial class MainWindow : Window
         IArtifactFingerprintService? artifactFingerprintService = null,
         ILocalArtifactBaselineStore? artifactBaselineStore = null,
         ILocalArtifactSnapshotService? artifactSnapshotService = null,
+        ILocalArtifactRestoreService? artifactRestoreService = null,
         IProviderObservedSessionStore? providerObservedSessionStore = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
@@ -476,6 +478,7 @@ public partial class MainWindow : Window
         _artifactFingerprintService = artifactFingerprintService;
         _artifactBaselineStore = artifactBaselineStore;
         _artifactSnapshotService = artifactSnapshotService;
+        _artifactRestoreService = artifactRestoreService;
         _aboutViewModel = distributionChannelProvider is null
             ? null
             : new AboutViewModel(distributionChannelProvider);
@@ -867,7 +870,8 @@ public partial class MainWindow : Window
                         _artifactFingerprintService,
                         _artifactBaselineStore,
                         null,
-                        _artifactSnapshotService)
+                        _artifactSnapshotService,
+                        _artifactRestoreService)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -884,7 +888,8 @@ public partial class MainWindow : Window
                         _artifactFingerprintService,
                         _artifactBaselineStore,
                         null,
-                        _artifactSnapshotService);
+                        _artifactSnapshotService,
+                        _artifactRestoreService);
 
                 MainContent.Content =
                     new GameDetailView(

@@ -12,14 +12,14 @@ public sealed class SqliteLocalArtifactSnapshotStore(DatabaseOptions options) : 
     {
         await using var connection = await OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT snapshot_id, archive_path, fingerprint_algorithm, fingerprint_hash, file_count, total_size_bytes, created_at_utc FROM local_artifact_snapshots WHERE game_id=$game_id AND artifact_kind=$kind AND rule_identity=$rule_identity ORDER BY created_at_utc DESC;";
+        command.CommandText = "SELECT snapshot_id, archive_path, fingerprint_algorithm, fingerprint_hash, file_count, total_size_bytes, created_at_utc, reason FROM local_artifact_snapshots WHERE game_id=$game_id AND artifact_kind=$kind AND rule_identity=$rule_identity ORDER BY created_at_utc DESC;";
         command.Parameters.AddWithValue("$game_id", gameId.Value.ToString("D"));
         command.Parameters.AddWithValue("$kind", (int)kind);
         command.Parameters.AddWithValue("$rule_identity", ruleIdentity);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var result = new List<LocalArtifactSnapshot>();
         while (await reader.ReadAsync(cancellationToken))
-            result.Add(new LocalArtifactSnapshot(Guid.Parse(reader.GetString(0)), gameId, kind, ruleIdentity, reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetInt32(4), reader.GetInt64(5), DateTimeOffset.Parse(reader.GetString(6), CultureInfo.InvariantCulture)));
+            result.Add(new LocalArtifactSnapshot(Guid.Parse(reader.GetString(0)), gameId, kind, ruleIdentity, reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetInt32(4), reader.GetInt64(5), DateTimeOffset.Parse(reader.GetString(6), CultureInfo.InvariantCulture), true, (SnapshotReason)reader.GetInt32(7)));
         return result;
     }
 
@@ -27,7 +27,7 @@ public sealed class SqliteLocalArtifactSnapshotStore(DatabaseOptions options) : 
     {
         await using var connection = await OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
-        command.CommandText = "INSERT INTO local_artifact_snapshots(snapshot_id,game_id,artifact_kind,rule_identity,archive_path,fingerprint_algorithm,fingerprint_hash,file_count,total_size_bytes,created_at_utc) VALUES($id,$game,$kind,$rule,$path,$algorithm,$hash,$count,$size,$created);";
+        command.CommandText = "INSERT INTO local_artifact_snapshots(snapshot_id,game_id,artifact_kind,rule_identity,archive_path,fingerprint_algorithm,fingerprint_hash,file_count,total_size_bytes,created_at_utc,reason) VALUES($id,$game,$kind,$rule,$path,$algorithm,$hash,$count,$size,$created,$reason);";
         command.Parameters.AddWithValue("$id", snapshot.SnapshotId.ToString("D"));
         command.Parameters.AddWithValue("$game", snapshot.GameId.Value.ToString("D"));
         command.Parameters.AddWithValue("$kind", (int)snapshot.ArtifactKind);
@@ -38,6 +38,7 @@ public sealed class SqliteLocalArtifactSnapshotStore(DatabaseOptions options) : 
         command.Parameters.AddWithValue("$count", snapshot.FileCount);
         command.Parameters.AddWithValue("$size", snapshot.TotalSizeBytes);
         command.Parameters.AddWithValue("$created", snapshot.CreatedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$reason", (int)snapshot.Reason);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

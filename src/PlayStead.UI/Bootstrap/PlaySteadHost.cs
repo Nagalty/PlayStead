@@ -439,6 +439,11 @@ public static class PlaySteadHost
                 services.GetRequiredService<IArtifactFingerprintService>(),
                 services.GetRequiredService<ILocalArtifactSnapshotStore>(),
                 Path.Combine(dataRoot, "Snapshots")));
+        builder.Services.AddSingleton<ILocalArtifactRestoreService>(services =>
+            new LocalArtifactRestoreService(
+                services.GetRequiredService<IArtifactFingerprintService>(),
+                services.GetRequiredService<ILocalArtifactSnapshotService>(),
+                gameId => services.GetRequiredService<SessionMonitor>().LatestSnapshot?.ActiveSessions.Any(session => session.GameId == gameId.Value) == true));
 
         builder.Services.AddSingleton<
             PlayStead.Core.Collections.IGameCollectionStore,

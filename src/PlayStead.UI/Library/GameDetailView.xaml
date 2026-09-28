@@ -486,12 +486,13 @@
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding Exists}"
                                                     Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                            <Button Content="Définir l’état actuel comme référence"
+                                            <Button Content="{Binding BaselineActionLabel}"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CaptureLocalArtifactBaselineCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding CanCaptureBaseline}" />
                                             <Button Content="Créer une sauvegarde"
+                                                    ToolTip="Définissez d’abord un état de référence."
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CreateLocalArtifactSnapshotCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
@@ -508,10 +509,18 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <DockPanel>
-                                            <Button DockPanel.Dock="Right" Content="Supprimer" Style="{DynamicResource PlayStead.Button.Secondary}"
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                <Button Content="Restaurer"
+                                                        Style="{DynamicResource PlayStead.Button.Secondary}"
+                                                        Command="{Binding DataContext.RestoreLocalArtifactSnapshotCommand, ElementName=GameDetailRoot}"
+                                                        CommandParameter="{Binding}"
+                                                        IsEnabled="{Binding IsValid}" />
+                                                <Button Content="Supprimer" Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.DeleteLocalArtifactSnapshotCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}" />
+                                            </StackPanel>
                                             <TextBlock Text="{Binding CreatedAtUtc, StringFormat=dd MMM yyyy · HH:mm}" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                                            <TextBlock Text="{Binding ReasonLabel}" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
                                         </DockPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

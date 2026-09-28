@@ -3,14 +3,14 @@ namespace PlayStead.UI.Tests.Library;
 public sealed class GameDetailSnapshotStructureTests
 {
     [Fact]
-    public void Game_detail_exposes_snapshot_actions_without_restore()
+    public void Game_detail_exposes_snapshot_actions_with_restore()
     {
         var path = Path.Combine(FindRoot(), "src", "PlayStead.UI", "Library", "GameDetailView.xaml");
         var xaml = File.ReadAllText(path);
         Assert.Contains("Créer une sauvegarde", xaml, StringComparison.Ordinal);
         Assert.Contains("CreateLocalArtifactSnapshotCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("DeleteLocalArtifactSnapshotCommand", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("Restaurer", xaml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("RestoreLocalArtifactSnapshotCommand", xaml, StringComparison.Ordinal);
     }
 
     private static string FindRoot()

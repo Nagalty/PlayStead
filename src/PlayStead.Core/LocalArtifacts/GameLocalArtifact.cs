@@ -60,6 +60,8 @@ public sealed record GameLocalArtifact(
     };
 
     public bool CanCaptureBaseline => Exists && BaselineStatus != LocalArtifactBaselineStatus.Unavailable;
+    public bool HasBaseline => BaselineStatus is LocalArtifactBaselineStatus.Unchanged or LocalArtifactBaselineStatus.Changed;
+    public string BaselineActionLabel => HasBaseline ? "Mettre à jour l’état de référence" : "Définir l’état actuel comme référence";
 }
 
 public interface IGameLocalArtifactDiscoveryService

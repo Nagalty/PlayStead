@@ -15,7 +15,7 @@ public sealed class LocalArtifactSnapshotServiceTests : IDisposable
         Directory.CreateDirectory(_root);
         var source = Path.Combine(_root, "settings.json");
         await File.WriteAllTextAsync(source, "{\"enabled\":true}");
-        var artifact = new GameLocalArtifact(GameId.New(), GameLocalArtifactKind.Configuration, source, GameLocalArtifactSource.ExplicitRule, GameLocalArtifactStatus.KnownAndExists, "rule");
+        var artifact = new GameLocalArtifact(GameId.New(), GameLocalArtifactKind.Configuration, source, GameLocalArtifactSource.ExplicitRule, GameLocalArtifactStatus.KnownAndExists, "rule", LocalArtifactBaselineStatus.Unchanged);
         var store = new MemoryStore();
         var snapshot = await new LocalArtifactSnapshotService(new Sha256ArtifactFingerprintService(), store, Path.Combine(_root, "Snapshots")).CreateAsync(artifact, CancellationToken.None);
 

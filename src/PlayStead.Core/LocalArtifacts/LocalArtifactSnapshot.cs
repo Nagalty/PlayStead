@@ -15,9 +15,17 @@ public sealed record LocalArtifactSnapshot(
     int FileCount,
     long TotalSizeBytes,
     DateTimeOffset CreatedAtUtc,
-    bool IsValid = true)
+    bool IsValid = true,
+    SnapshotReason Reason = SnapshotReason.Manual)
 {
     public string StatusLabel => IsValid ? string.Empty : "Corrompu";
+    public string ReasonLabel => Reason == SnapshotReason.PreRestore ? "Sauvegarde de sécurité" : string.Empty;
+}
+
+public enum SnapshotReason
+{
+    Manual = 0,
+    PreRestore = 1
 }
 
 public interface ILocalArtifactSnapshotStore
@@ -29,7 +37,7 @@ public interface ILocalArtifactSnapshotStore
 
 public interface ILocalArtifactSnapshotService
 {
-    Task<LocalArtifactSnapshot> CreateAsync(GameLocalArtifact artifact, CancellationToken cancellationToken);
+    Task<LocalArtifactSnapshot> CreateAsync(GameLocalArtifact artifact, CancellationToken cancellationToken, SnapshotReason reason = SnapshotReason.Manual);
     Task<IReadOnlyList<LocalArtifactSnapshot>> ListAsync(GameLocalArtifact artifact, CancellationToken cancellationToken);
     Task DeleteAsync(LocalArtifactSnapshot snapshot, CancellationToken cancellationToken);
 }
@@ -39,9 +47,9 @@ public sealed class LocalArtifactSnapshotService(
     ILocalArtifactSnapshotStore store,
     string snapshotsRoot) : ILocalArtifactSnapshotService
 {
-    public async Task<LocalArtifactSnapshot> CreateAsync(GameLocalArtifact artifact, CancellationToken cancellationToken)
+    public async Task<LocalArtifactSnapshot> CreateAsync(GameLocalArtifact artifact, CancellationToken cancellationToken, SnapshotReason reason = SnapshotReason.Manual)
     {
-        if (!artifact.Exists || string.IsNullOrWhiteSpace(artifact.RuleIdentity))
+        if (!artifact.Exists || !artifact.HasBaseline || string.IsNullOrWhiteSpace(artifact.RuleIdentity))
             throw new InvalidOperationException("Only an existing, identified artifact can be snapshotted.");
 
         var before = await fingerprintService.ComputeAsync(artifact, cancellationToken).ConfigureAwait(false);
@@ -69,7 +77,7 @@ public sealed class LocalArtifactSnapshotService(
             if (!after.IsAvailable || after.Fingerprint!.Hash != before.Fingerprint!.Hash)
                 throw new IOException("Artifact changed while the snapshot was created.");
             File.Move(tempPath, finalPath);
-            var snapshot = new LocalArtifactSnapshot(id, artifact.GameId, artifact.Kind, artifact.RuleIdentity!, finalPath, before.Fingerprint.Algorithm, before.Fingerprint.Hash, before.Fingerprint.FileCount, before.Fingerprint.TotalSizeBytes, before.Fingerprint.CapturedAtUtc);
+            var snapshot = new LocalArtifactSnapshot(id, artifact.GameId, artifact.Kind, artifact.RuleIdentity!, finalPath, before.Fingerprint.Algorithm, before.Fingerprint.Hash, before.Fingerprint.FileCount, before.Fingerprint.TotalSizeBytes, before.Fingerprint.CapturedAtUtc, true, reason);
             await store.UpsertAsync(snapshot, cancellationToken).ConfigureAwait(false);
             return snapshot;
         }
