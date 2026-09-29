@@ -112,6 +112,7 @@ public sealed class LocalProtectionSetupServiceTests : IDisposable
         {
             public List<LocalArtifactSnapshot> Items { get; } = [];
             public Task<IReadOnlyList<LocalArtifactSnapshot>> GetAsync(GameId gameId, GameLocalArtifactKind kind, string ruleIdentity, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LocalArtifactSnapshot>>(Items.Where(x => x.GameId == gameId && x.ArtifactKind == kind && x.RuleIdentity == ruleIdentity).ToArray());
+            public Task<IReadOnlyList<LocalArtifactSnapshot>> GetAllAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LocalArtifactSnapshot>>(Items);
             public Task UpsertAsync(LocalArtifactSnapshot snapshot, CancellationToken cancellationToken) { Items.Add(snapshot); return Task.CompletedTask; }
             public Task DeleteAsync(Guid snapshotId, CancellationToken cancellationToken) { Items.RemoveAll(x => x.SnapshotId == snapshotId); return Task.CompletedTask; }
         }

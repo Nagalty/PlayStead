@@ -446,11 +446,15 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<LocalArtifactBaselineComparisonService>();
         builder.Services.AddSingleton<ILocalProtectionSetupService, LocalProtectionSetupService>();
         builder.Services.AddSingleton<ILocalArtifactSnapshotStore, SqliteLocalArtifactSnapshotStore>();
+        builder.Services.AddSingleton<ILocalSnapshotStorageService>(services =>
+            new LocalSnapshotStorageService(
+                services.GetRequiredService<ILocalArtifactSnapshotStore>()));
         builder.Services.AddSingleton<ILocalArtifactSnapshotService>(services =>
             new LocalArtifactSnapshotService(
                 services.GetRequiredService<IArtifactFingerprintService>(),
                 services.GetRequiredService<ILocalArtifactSnapshotStore>(),
-                Path.Combine(dataRoot, "Snapshots")));
+                Path.Combine(dataRoot, "Snapshots"),
+                services.GetRequiredService<ILocalSnapshotStorageService>()));
         builder.Services.AddSingleton<ILocalArtifactRestoreService>(services =>
             new LocalArtifactRestoreService(
                 services.GetRequiredService<IArtifactFingerprintService>(),

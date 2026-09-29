@@ -172,6 +172,20 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task Snapshot_quota_round_trips_and_is_exposed_in_summary()
+    {
+        using var temp = new TemporaryDirectory();
+        var store = new UiPreferencesStore(Path.Combine(temp.Path, "ui-preferences.json"));
+        var sut = new SettingsViewModel(store) { SnapshotStorageQuotaBytes = 2_147_483_648 };
+
+        await sut.SaveAsync(CancellationToken.None);
+        var reloaded = await store.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(2_147_483_648, reloaded.SnapshotStorageQuotaBytes);
+        Assert.Contains("2 Go", sut.SnapshotStorageSummaryLabel, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Completed_protection_keeps_the_card_visible_as_a_summary()
     {
         using var temp = new TemporaryDirectory();

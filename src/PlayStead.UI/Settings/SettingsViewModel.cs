@@ -21,6 +21,9 @@ public sealed class SettingsViewModel :
     private bool _autoProtectRecognizedArtifacts;
     private readonly ILocalProtectionSetupService? _protectionService;
     private readonly ILibraryStore? _libraryStore;
+    private readonly ILocalSnapshotStorageService? _snapshotStorage;
+    private long _snapshotStorageQuotaBytes = 1_073_741_824;
+    private LocalSnapshotStorageUsage _snapshotStorageUsage = new(0, 1_073_741_824, 0, null);
     private IReadOnlyList<LocalProtectionGameContext> _protectionGames = [];
     private LocalProtectionInventory _protectionInventory = new([]);
     private int _protectionFailureCount;
@@ -32,13 +35,15 @@ public sealed class SettingsViewModel :
     public SettingsViewModel(
         UiPreferencesStore store,
         ILocalProtectionSetupService? protectionService = null,
-        ILibraryStore? libraryStore = null)
+        ILibraryStore? libraryStore = null,
+        ILocalSnapshotStorageService? snapshotStorage = null)
     {
         ArgumentNullException.ThrowIfNull(store);
 
         _store = store;
         _protectionService = protectionService;
         _libraryStore = libraryStore;
+        _snapshotStorage = snapshotStorage;
 
         SaveCommand =
             new AsyncRelayCommand(
@@ -126,6 +131,31 @@ public sealed class SettingsViewModel :
             ? "Un dossier m’a résisté, on pourra regarder ça."
             : string.Empty;
 
+    public IReadOnlyList<SnapshotQuotaOption> SnapshotQuotaOptions { get; } =
+    [
+        new(524_288_000, "500 Mo"),
+        new(1_073_741_824, "1 Go"),
+        new(2_147_483_648, "2 Go"),
+        new(5_368_709_120, "5 Go")
+    ];
+
+    public long SnapshotStorageQuotaBytes
+    {
+        get => _snapshotStorageQuotaBytes;
+        set
+        {
+            if (_snapshotStorageQuotaBytes == value) return;
+            _snapshotStorageQuotaBytes = value;
+            _snapshotStorage?.SetQuotaBytes(value);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(SnapshotStorageSummaryLabel));
+        }
+    }
+
+    public LocalSnapshotStorageUsage SnapshotStorageUsage => _snapshotStorageUsage;
+    public string SnapshotStorageSummaryLabel =>
+        $"{FormatBytes(_snapshotStorageUsage.UsedBytes)} utilisés sur {FormatBytes(SnapshotStorageQuotaBytes)}\n{_snapshotStorageUsage.SnapshotCount} sauvegarde{(_snapshotStorageUsage.SnapshotCount == 1 ? string.Empty : "s")} conservée{(_snapshotStorageUsage.SnapshotCount == 1 ? string.Empty : "s")}";
+
     private bool IsProtectionEnabled(GameId gameId) =>
         !_protectionEnabledGameIds.TryGetValue(gameId.Value, out var enabled) || enabled;
 
@@ -154,6 +184,20 @@ public sealed class SettingsViewModel :
         _libraryFilterKey = preferences.LibraryFilterKey;
         ProtectionOnboardingCompleted = preferences.ProtectionOnboardingCompleted;
         AutoProtectRecognizedArtifacts = preferences.AutoProtectRecognizedArtifacts;
+        SnapshotStorageQuotaBytes = preferences.SnapshotStorageQuotaBytes > 0
+            ? preferences.SnapshotStorageQuotaBytes
+            : 1_073_741_824;
+        if (_snapshotStorage is not null)
+        {
+            try
+            {
+                _snapshotStorageUsage = await _snapshotStorage.GetUsageAsync(cancellationToken);
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                _snapshotStorageUsage = new LocalSnapshotStorageUsage(0, SnapshotStorageQuotaBytes, 0, null);
+            }
+        }
         _protectionEnabledGameIds.Clear();
         foreach (var entry in preferences.LocalProtectionEnabledByGame ?? new Dictionary<Guid, bool>())
             _protectionEnabledGameIds[entry.Key] = entry.Value;
@@ -234,6 +278,8 @@ public sealed class SettingsViewModel :
             OnPropertyChanged(nameof(ProtectedGamesSummaryLabel));
             OnPropertyChanged(nameof(ProtectedArtifactsSummaryLabel));
             OnPropertyChanged(nameof(ProtectionFailureSummaryLabel));
+            OnPropertyChanged(nameof(SnapshotStorageUsage));
+            OnPropertyChanged(nameof(SnapshotStorageSummaryLabel));
             ProtectAllCommand.NotifyCanExecuteChanged();
         }
     }
@@ -250,9 +296,19 @@ public sealed class SettingsViewModel :
                 null,
                 ProtectionOnboardingCompleted,
                 AutoProtectRecognizedArtifacts,
-                new Dictionary<Guid, bool>(_protectionEnabledGameIds)),
+                new Dictionary<Guid, bool>(_protectionEnabledGameIds),
+                SnapshotStorageQuotaBytes),
             cancellationToken);
     }
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        >= 1_073_741_824 => $"{bytes / 1_073_741_824d:0.#} Go",
+        >= 1_048_576 => $"{bytes / 1_048_576d:0.#} Mo",
+        _ => $"{bytes} octets"
+    };
+
+    public sealed record SnapshotQuotaOption(long Bytes, string Label);
 
     private async Task ProtectAllAsync()
     {

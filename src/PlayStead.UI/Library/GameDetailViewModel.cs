@@ -426,13 +426,23 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private async Task CreateLocalArtifactSnapshotAsync(GameLocalArtifact? artifact)
     {
         if (artifact is null || _localArtifactSnapshotService is null) return;
-        await _localArtifactSnapshotService.CreateAsync(artifact, CancellationToken.None);
+        try
+        {
+            await _localArtifactSnapshotService.CreateAsync(artifact, CancellationToken.None);
+        }
+        catch (SnapshotStorageQuotaExceededException)
+        {
+            MessageBox.Show("L’espace réservé aux sauvegardes est plein. Supprime une ancienne sauvegarde ou augmente la limite dans Paramètres.", "Fichiers locaux", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
         await LoadLocalArtifactsAsync(CancellationToken.None);
     }
 
     private async Task DeleteLocalArtifactSnapshotAsync(LocalArtifactSnapshot? snapshot)
     {
         if (snapshot is null || _localArtifactSnapshotService is null) return;
+        if (MessageBox.Show("Supprimer cette sauvegarde de PlayStead ?\n\nLes fichiers du jeu ne seront pas modifiés.", "Supprimer cette sauvegarde ?", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+            return;
         await _localArtifactSnapshotService.DeleteAsync(snapshot, CancellationToken.None);
         await LoadLocalArtifactsAsync(CancellationToken.None);
     }

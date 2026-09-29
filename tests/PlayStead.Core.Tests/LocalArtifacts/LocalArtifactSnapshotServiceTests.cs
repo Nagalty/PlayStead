@@ -46,6 +46,7 @@ public sealed class LocalArtifactSnapshotServiceTests : IDisposable
     private sealed class MemoryStore : ILocalArtifactSnapshotStore
     {
         public Task<IReadOnlyList<LocalArtifactSnapshot>> GetAsync(GameId gameId, GameLocalArtifactKind kind, string ruleIdentity, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LocalArtifactSnapshot>>([]);
+        public Task<IReadOnlyList<LocalArtifactSnapshot>> GetAllAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LocalArtifactSnapshot>>([]);
         public Task UpsertAsync(LocalArtifactSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task DeleteAsync(Guid snapshotId, CancellationToken cancellationToken) => Task.CompletedTask;
     }

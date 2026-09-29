@@ -10,4 +10,5 @@ public sealed record UiPreferences(
     Guid? LastDormantGameId = null,
     bool ProtectionOnboardingCompleted = false,
     bool AutoProtectRecognizedArtifacts = false,
-    IReadOnlyDictionary<Guid, bool>? LocalProtectionEnabledByGame = null);
+    IReadOnlyDictionary<Guid, bool>? LocalProtectionEnabledByGame = null,
+    long SnapshotStorageQuotaBytes = 1_073_741_824);

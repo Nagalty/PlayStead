@@ -750,7 +750,8 @@ public sealed class LibraryViewModel :
                 existing.LastDormantGameId,
                 existing.ProtectionOnboardingCompleted,
                 existing.AutoProtectRecognizedArtifacts,
-                existing.LocalProtectionEnabledByGame),
+                existing.LocalProtectionEnabledByGame,
+                existing.SnapshotStorageQuotaBytes),
             cancellationToken);
     }
 

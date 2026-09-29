@@ -63,6 +63,76 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <ControlTemplate x:Key="Settings.SnapshotQuotaToggleTemplate" TargetType="ToggleButton">
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{DynamicResource PlayStead.Radius.Small}"
+                    Padding="{TemplateBinding Padding}">
+                <ContentPresenter />
+            </Border>
+        </ControlTemplate>
+        <Style x:Key="Settings.SnapshotQuotaComboBoxItem" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+            <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+            <Setter Property="Padding" Value="{DynamicResource PlayStead.Control.Padding}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceHover}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <DataTemplate x:Key="Settings.SnapshotQuotaItemTemplate">
+            <TextBlock Text="{Binding Label}" />
+        </DataTemplate>
+        <Style x:Key="Settings.SnapshotQuotaComboBox" TargetType="ComboBox" BasedOn="{StaticResource PlayStead.ControlBase}">
+            <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="{DynamicResource PlayStead.Border.Thin}" />
+            <Setter Property="Padding" Value="{DynamicResource PlayStead.Control.Padding}" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource Settings.SnapshotQuotaComboBoxItem}" />
+            <Setter Property="ItemTemplate" Value="{StaticResource Settings.SnapshotQuotaItemTemplate}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="PART_ToggleButton" Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" Template="{StaticResource Settings.SnapshotQuotaToggleTemplate}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding SelectedItem.Label, RelativeSource={RelativeSource TemplatedParent}}" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" />
+                                    <Path Grid.Column="1" Margin="{DynamicResource PlayStead.Spacing.2}" Data="M 0,0 L 8,0 L 4,4 Z" Fill="{DynamicResource PlayStead.Brush.IconMuted}" Width="8" Height="5" VerticalAlignment="Center" />
+                                </Grid>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" PopupAnimation="Slide" Focusable="False" VerticalOffset="2">
+                                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" Background="{DynamicResource PlayStead.Brush.SurfaceRaised}" BorderBrush="{DynamicResource PlayStead.Brush.Border}" BorderThickness="{DynamicResource PlayStead.Border.Thin}" CornerRadius="{DynamicResource PlayStead.Radius.Small}">
+                                    <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto" Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"><ItemsPresenter /></ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="PART_ToggleButton" Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceHover}" /><Setter TargetName="PART_ToggleButton" Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.CopperHover}" /></Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="PART_ToggleButton" Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="{DynamicResource PlayStead.Spacing.4}">
@@ -76,7 +146,7 @@
                     BorderThickness="1"
                     CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
                     Padding="{DynamicResource PlayStead.Spacing.3}"
-                    Margin="0,0,0,16"
+                    Margin="{DynamicResource PlayStead.Spacing.4}"
                     Visibility="{Binding IsProtectionCardVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel>
                     <StackPanel Visibility="{Binding IsProtectionOnboardingPending, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -111,6 +181,27 @@
                         <Button Content="Revoir la protection" Style="{DynamicResource PlayStead.Button.Secondary}" Margin="12,0,0,0" Command="{Binding RevisitProtectionCommand}"
                                 Visibility="{Binding IsProtectionSummaryVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="Sauvegardes de sécurité" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
+            <Border Background="{DynamicResource PlayStead.Brush.Surface}"
+                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
+                    Padding="{DynamicResource PlayStead.Spacing.3}"
+                    Margin="{DynamicResource PlayStead.Spacing.4}">
+                <StackPanel>
+                    <TextBlock Text="{Binding SnapshotStorageSummaryLabel}" Style="{DynamicResource PlayStead.Text.BodySecondary}" TextWrapping="Wrap" />
+                    <TextBlock Text="Je fais le ménage automatiquement quand l’espace réservé est atteint." Margin="0,6,0,0" Style="{DynamicResource PlayStead.Text.BodySecondary}" TextWrapping="Wrap" />
+                    <TextBlock Text="Espace maximal" Margin="0,14,0,0" Style="{DynamicResource PlayStead.Text.Caption}" />
+                    <ComboBox ItemsSource="{Binding SnapshotQuotaOptions}"
+                              SelectedValuePath="Bytes"
+                              SelectedValue="{Binding SnapshotStorageQuotaBytes, Mode=TwoWay}"
+                              DisplayMemberPath="Label"
+                              Style="{StaticResource Settings.SnapshotQuotaComboBox}"
+                              Margin="0,6,0,0"
+                              Width="160"
+                              HorizontalAlignment="Left" />
                 </StackPanel>
             </Border>
             <TextBlock Text="Préférences" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />

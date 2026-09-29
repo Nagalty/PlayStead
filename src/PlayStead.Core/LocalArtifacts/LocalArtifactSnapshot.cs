@@ -37,6 +37,7 @@ public enum SnapshotReason
 public interface ILocalArtifactSnapshotStore
 {
     Task<IReadOnlyList<LocalArtifactSnapshot>> GetAsync(GameId gameId, GameLocalArtifactKind kind, string ruleIdentity, CancellationToken cancellationToken);
+    Task<IReadOnlyList<LocalArtifactSnapshot>> GetAllAsync(CancellationToken cancellationToken);
     Task UpsertAsync(LocalArtifactSnapshot snapshot, CancellationToken cancellationToken);
     Task DeleteAsync(Guid snapshotId, CancellationToken cancellationToken);
 }
@@ -51,7 +52,8 @@ public interface ILocalArtifactSnapshotService
 public sealed class LocalArtifactSnapshotService(
     IArtifactFingerprintService fingerprintService,
     ILocalArtifactSnapshotStore store,
-    string snapshotsRoot) : ILocalArtifactSnapshotService
+    string snapshotsRoot,
+    ILocalSnapshotStorageService? storage = null) : ILocalArtifactSnapshotService
 {
     public async Task<LocalArtifactSnapshot> CreateAsync(GameLocalArtifact artifact, CancellationToken cancellationToken, SnapshotReason reason = SnapshotReason.Manual)
     {
@@ -82,8 +84,10 @@ public sealed class LocalArtifactSnapshotService(
             var after = await fingerprintService.ComputeAsync(artifact, cancellationToken).ConfigureAwait(false);
             if (!after.IsAvailable || after.Fingerprint!.Hash != before.Fingerprint!.Hash)
                 throw new IOException("Artifact changed while the snapshot was created.");
-            File.Move(tempPath, finalPath);
             var snapshot = new LocalArtifactSnapshot(id, artifact.GameId, artifact.Kind, artifact.RuleIdentity!, finalPath, before.Fingerprint.Algorithm, before.Fingerprint.Hash, before.Fingerprint.FileCount, before.Fingerprint.TotalSizeBytes, before.Fingerprint.CapturedAtUtc, true, reason);
+            File.Move(tempPath, finalPath);
+            if (storage is not null)
+                await storage.EnsureCapacityForAsync(snapshot, cancellationToken).ConfigureAwait(false);
             await store.UpsertAsync(snapshot, cancellationToken).ConfigureAwait(false);
             return snapshot;
         }
@@ -104,8 +108,13 @@ public sealed class LocalArtifactSnapshotService(
     public async Task DeleteAsync(LocalArtifactSnapshot snapshot, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (File.Exists(snapshot.ArchivePath)) File.Delete(snapshot.ArchivePath);
-        await store.DeleteAsync(snapshot.SnapshotId, cancellationToken).ConfigureAwait(false);
+        if (storage is not null)
+            await storage.DeleteSnapshotAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        else
+        {
+            if (File.Exists(snapshot.ArchivePath)) File.Delete(snapshot.ArchivePath);
+            await store.DeleteAsync(snapshot.SnapshotId, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static void AddArtifact(ZipArchive archive, string path, CancellationToken cancellationToken)

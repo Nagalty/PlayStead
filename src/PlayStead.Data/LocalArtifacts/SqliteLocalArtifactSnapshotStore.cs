@@ -8,6 +8,18 @@ namespace PlayStead.Data.LocalArtifacts;
 
 public sealed class SqliteLocalArtifactSnapshotStore(DatabaseOptions options) : ILocalArtifactSnapshotStore
 {
+    public async Task<IReadOnlyList<LocalArtifactSnapshot>> GetAllAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT snapshot_id, game_id, artifact_kind, rule_identity, archive_path, fingerprint_algorithm, fingerprint_hash, file_count, total_size_bytes, created_at_utc, reason FROM local_artifact_snapshots ORDER BY created_at_utc DESC;";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var result = new List<LocalArtifactSnapshot>();
+        while (await reader.ReadAsync(cancellationToken))
+            result.Add(new LocalArtifactSnapshot(Guid.Parse(reader.GetString(0)), new GameId(Guid.Parse(reader.GetString(1))), (GameLocalArtifactKind)reader.GetInt32(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetInt32(7), reader.GetInt64(8), DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture), true, (SnapshotReason)reader.GetInt32(10)));
+        return result;
+    }
+
     public async Task<IReadOnlyList<LocalArtifactSnapshot>> GetAsync(GameId gameId, GameLocalArtifactKind kind, string ruleIdentity, CancellationToken cancellationToken)
     {
         await using var connection = await OpenAsync(cancellationToken);
