@@ -28,5 +28,18 @@ public sealed class SqliteLocalArtifactSnapshotStoreTests : IDisposable
         await store.DeleteAsync(old.SnapshotId, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Initial_protection_reason_round_trips()
+    {
+        Directory.CreateDirectory(_root);
+        var options = new DatabaseOptions(Path.Combine(_root, "db.sqlite"), Path.Combine(_root, "Backups"));
+        await new DatabaseInitializer(options).InitializeAsync(CancellationToken.None);
+        var snapshot = new LocalArtifactSnapshot(Guid.NewGuid(), GameId.New(), GameLocalArtifactKind.SaveData, "rule", Path.Combine(_root, "initial.zip"), "SHA256", "A", 1, 1, DateTimeOffset.UtcNow, true, SnapshotReason.InitialProtection);
+        var store = new SqliteLocalArtifactSnapshotStore(options);
+        await store.UpsertAsync(snapshot, CancellationToken.None);
+        var loaded = await store.GetAsync(snapshot.GameId, snapshot.ArtifactKind, snapshot.RuleIdentity, CancellationToken.None);
+        Assert.Equal(SnapshotReason.InitialProtection, Assert.Single(loaded).Reason);
+    }
+
     public void Dispose() { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); if (Directory.Exists(_root)) Directory.Delete(_root, true); }
 }

@@ -19,13 +19,19 @@ public sealed record LocalArtifactSnapshot(
     SnapshotReason Reason = SnapshotReason.Manual)
 {
     public string StatusLabel => IsValid ? string.Empty : "Corrompu";
-    public string ReasonLabel => Reason == SnapshotReason.PreRestore ? "Sauvegarde de sécurité" : string.Empty;
+    public string ReasonLabel => Reason switch
+    {
+        SnapshotReason.PreRestore => "Sauvegarde de sécurité",
+        SnapshotReason.InitialProtection => "Première sauvegarde de sécurité",
+        _ => string.Empty
+    };
 }
 
 public enum SnapshotReason
 {
     Manual = 0,
-    PreRestore = 1
+    PreRestore = 1,
+    InitialProtection = 2
 }
 
 public interface ILocalArtifactSnapshotStore

@@ -101,11 +101,32 @@
                         </VisualBrush>
                     </Border.OpacityMask>
 
-                    <controls:GameArtwork SourcePath="{Binding CoverPath}"
-                                          Title="{Binding Title}"
-                                          ProviderLabel="{Binding ProviderLabel}"
-                                          HasArtwork="{Binding HasCover}"
-                                          MouseDoubleClick="GameArtwork_OnMouseDoubleClick" />
+                    <Grid>
+                        <controls:GameArtwork SourcePath="{Binding CoverPath}"
+                                              Title="{Binding Title}"
+                                              ProviderLabel="{Binding ProviderLabel}"
+                                              HasArtwork="{Binding HasCover}"
+                                              MouseDoubleClick="GameArtwork_OnMouseDoubleClick" />
+                        <Border HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Margin="0,10,10,0"
+                                Padding="6"
+                                Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                                BorderBrush="{DynamicResource PlayStead.Brush.Copper}"
+                                BorderThickness="1"
+                                CornerRadius="{DynamicResource PlayStead.Radius.Small}"
+                                ToolTip="{Binding ProtectionBadgeTooltip}"
+                                Visibility="{Binding IsLocallyProtected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Path Width="16"
+                                  Height="18"
+                                  Stretch="Uniform"
+                                  Data="M10,1 L18,4 V9 C18,14 14,18 10,20 C6,18 2,14 2,9 V4 Z"
+                                  Stroke="{DynamicResource PlayStead.Brush.Copper}"
+                                  StrokeThickness="1.8"
+                                  Fill="Transparent"
+                                  AutomationProperties.Name="Protégé par PlayStead" />
+                        </Border>
+                    </Grid>
                 </Border>
 
                 <Grid Grid.Row="1"

@@ -135,6 +135,70 @@ public sealed class SettingsViewModelTests
             reloaded.ReduceMotion);
     }
 
+    [Fact]
+    public async Task Protection_preferences_round_trip()
+    {
+        using var temp = new TemporaryDirectory();
+        var store = new UiPreferencesStore(Path.Combine(temp.Path, "ui-preferences.json"));
+        var sut = new SettingsViewModel(store)
+        {
+            ProtectionOnboardingCompleted = true,
+            AutoProtectRecognizedArtifacts = true
+        };
+
+        await sut.SaveAsync(CancellationToken.None);
+
+        var reloaded = await store.LoadAsync(CancellationToken.None);
+
+        Assert.True(reloaded.ProtectionOnboardingCompleted);
+        Assert.True(reloaded.AutoProtectRecognizedArtifacts);
+    }
+
+    [Fact]
+    public async Task Protection_game_override_round_trips_explicit_false()
+    {
+        using var temp = new TemporaryDirectory();
+        var store = new UiPreferencesStore(Path.Combine(temp.Path, "ui-preferences.json"));
+        var gameId = Guid.NewGuid();
+
+        await store.SaveAsync(
+            new UiPreferences(LocalProtectionEnabledByGame: new Dictionary<Guid, bool> { [gameId] = false }),
+            CancellationToken.None);
+
+        var reloaded = await store.LoadAsync(CancellationToken.None);
+
+        Assert.NotNull(reloaded.LocalProtectionEnabledByGame);
+        Assert.False(reloaded.LocalProtectionEnabledByGame![gameId]);
+    }
+
+    [Fact]
+    public void Completed_protection_keeps_the_card_visible_as_a_summary()
+    {
+        using var temp = new TemporaryDirectory();
+        var sut = new SettingsViewModel(
+            new UiPreferencesStore(Path.Combine(temp.Path, "ui-preferences.json")))
+        {
+            ProtectionOnboardingCompleted = true
+        };
+
+        Assert.False(sut.IsProtectionOnboardingPending);
+        Assert.True(sut.IsProtectionSummaryVisible);
+        Assert.True(sut.IsProtectionCardVisible);
+        Assert.False(sut.HasProtectionPrompt);
+    }
+
+    [Fact]
+    public void Pending_protection_without_recognized_artifacts_does_not_show_an_empty_card()
+    {
+        using var temp = new TemporaryDirectory();
+        var sut = new SettingsViewModel(
+            new UiPreferencesStore(Path.Combine(temp.Path, "ui-preferences.json")));
+
+        Assert.True(sut.IsProtectionOnboardingPending);
+        Assert.False(sut.IsProtectionSummaryVisible);
+        Assert.False(sut.IsProtectionCardVisible);
+    }
+
     private sealed class TemporaryDirectory :
         IDisposable
     {

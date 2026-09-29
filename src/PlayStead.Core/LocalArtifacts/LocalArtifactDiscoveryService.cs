@@ -5,10 +5,12 @@ namespace PlayStead.Core.LocalArtifacts;
 public sealed class LocalArtifactDiscoveryService : IGameLocalArtifactDiscoveryService
 {
     private readonly IReadOnlyList<GameLocalArtifactRule> _rules;
+    private readonly IUserDefinedLocalArtifactStore? _userDefinedStore;
 
-    public LocalArtifactDiscoveryService(IEnumerable<GameLocalArtifactRule>? rules = null)
+    public LocalArtifactDiscoveryService(IEnumerable<GameLocalArtifactRule>? rules = null, IUserDefinedLocalArtifactStore? userDefinedStore = null)
     {
         _rules = (rules ?? []).ToArray();
+        _userDefinedStore = userDefinedStore;
     }
 
     public Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(
@@ -16,7 +18,7 @@ public sealed class LocalArtifactDiscoveryService : IGameLocalArtifactDiscoveryS
         CancellationToken cancellationToken)
         => DiscoverAsync(gameId, provider: null, providerGameId: null, cancellationToken);
 
-    public Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(
+    public async Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(
         GameId gameId,
         ProviderKind? provider,
         string? providerGameId,
@@ -45,7 +47,28 @@ public sealed class LocalArtifactDiscoveryService : IGameLocalArtifactDiscoveryS
                 rule.PathTemplate));
         }
 
-        return Task.FromResult<IReadOnlyList<GameLocalArtifact>>(artifacts);
+        if (_userDefinedStore is not null)
+        {
+            var builtInPaths = artifacts
+                .Select(artifact => (artifact.Kind, Path: NormalizeForComparison(artifact.Path)))
+                .ToHashSet();
+            foreach (var custom in await _userDefinedStore.GetByGameAsync(gameId, cancellationToken))
+            {
+                if (!TryNormalizePath(custom.Path, out var path))
+                    continue;
+                if (!builtInPaths.Add((custom.Kind, NormalizeForComparison(path))))
+                    continue;
+                artifacts.Add(new GameLocalArtifact(
+                    gameId,
+                    custom.Kind,
+                    path,
+                    GameLocalArtifactSource.UserDefined,
+                    Directory.Exists(path) ? GameLocalArtifactStatus.KnownAndExists : GameLocalArtifactStatus.KnownButMissing,
+                    $"user:{custom.Id:D}"));
+            }
+        }
+
+        return artifacts;
     }
 
     private static bool TryNormalizePath(string template, out string path)
@@ -72,4 +95,6 @@ public sealed class LocalArtifactDiscoveryService : IGameLocalArtifactDiscoveryS
             return false;
         }
     }
+
+    private static string NormalizeForComparison(string path) => Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 }

@@ -679,6 +679,23 @@
                                            Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
                                            FontWeight="SemiBold"
                                            TextTrimming="CharacterEllipsis" />
+                                <Border Width="24"
+                                        Height="24"
+                                        Margin="8,0,0,0"
+                                        Padding="4"
+                                        Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                                        BorderBrush="{DynamicResource PlayStead.Brush.Copper}"
+                                        BorderThickness="1"
+                                        CornerRadius="{DynamicResource PlayStead.Radius.Small}"
+                                        ToolTip="{Binding ProtectionBadgeTooltip}"
+                                        Visibility="{Binding IsLocallyProtected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Path Stretch="Uniform"
+                                          Data="M10,1 L18,4 V9 C18,14 14,18 10,20 C6,18 2,14 2,9 V4 Z"
+                                          Stroke="{DynamicResource PlayStead.Brush.Copper}"
+                                          StrokeThickness="1.5"
+                                          Fill="Transparent"
+                                          AutomationProperties.Name="Protégé par PlayStead" />
+                                </Border>
                             </StackPanel>
 
                             <TextBlock Grid.Column="1"

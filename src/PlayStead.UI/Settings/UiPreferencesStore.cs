@@ -13,6 +13,8 @@ public sealed class UiPreferencesStore
         _filePath = filePath;
     }
 
+    public event EventHandler<UiPreferences>? Changed;
+
     public async Task<UiPreferences> LoadAsync(
         CancellationToken cancellationToken)
     {
@@ -58,5 +60,7 @@ public sealed class UiPreferencesStore
             _filePath,
             json,
             cancellationToken);
+
+        Changed?.Invoke(this, preferences);
     }
 }

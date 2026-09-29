@@ -203,8 +203,9 @@ public sealed class LibraryPolishStructureTests
 
         var mediaFrame = FindNamed(document, "MediaFallback");
         Assert.Equal("-16,-16,-16,0", Attr(mediaFrame, "Margin"));
-        Assert.Equal("218", Attr(mediaFrame.Descendants(presentation + "Border").Single(), "Width"));
-        Assert.Equal("316", Attr(mediaFrame.Descendants(presentation + "Border").Single(), "Height"));
+        var mediaBorder = mediaFrame.Descendants(presentation + "Border")
+            .Single(border => Attr(border, "Width") == "218");
+        Assert.Equal("316", Attr(mediaBorder, "Height"));
         Assert.Equal("220", Attr(document.Root!, "Width"));
         Assert.Equal("300", Attr(FindNamed(document, "CardShell")
             .Descendants(presentation + "RowDefinition").First(), "Height"));

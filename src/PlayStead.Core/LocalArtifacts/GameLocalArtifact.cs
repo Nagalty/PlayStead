@@ -6,7 +6,8 @@ public enum GameLocalArtifactKind
 {
     Configuration,
     SaveData,
-    Log
+    Log,
+    Other
 }
 
 public enum GameLocalArtifactStatus
@@ -38,15 +39,19 @@ public sealed record GameLocalArtifact(
     GameLocalArtifactSource Source,
     GameLocalArtifactStatus Status,
     string? RuleIdentity = null,
-    LocalArtifactBaselineStatus BaselineStatus = LocalArtifactBaselineStatus.NoBaseline)
+    LocalArtifactBaselineStatus BaselineStatus = LocalArtifactBaselineStatus.NoBaseline,
+    int SnapshotCount = 0,
+    DateTimeOffset? LastSnapshotAtUtc = null)
 {
     public bool Exists => Status == GameLocalArtifactStatus.KnownAndExists;
+    public bool IsUserDefined => Source == GameLocalArtifactSource.UserDefined;
 
     public string KindLabel => Kind switch
     {
         GameLocalArtifactKind.Configuration => "Configuration",
         GameLocalArtifactKind.SaveData => "Sauvegardes",
         GameLocalArtifactKind.Log => "Logs",
+        GameLocalArtifactKind.Other => "Autre",
         _ => Kind.ToString()
     };
 
@@ -62,6 +67,20 @@ public sealed record GameLocalArtifact(
     public bool CanCaptureBaseline => Exists && BaselineStatus != LocalArtifactBaselineStatus.Unavailable;
     public bool HasBaseline => BaselineStatus is LocalArtifactBaselineStatus.Unchanged or LocalArtifactBaselineStatus.Changed;
     public string BaselineActionLabel => HasBaseline ? "Mettre à jour mon point de repère" : "Prendre cet état comme point de repère";
+    public string ProtectionStatusLabel => BaselineStatus switch
+    {
+        LocalArtifactBaselineStatus.NoBaseline => "Pas encore protégé",
+        _ when Kind == GameLocalArtifactKind.SaveData && SnapshotCount == 0 => "Point de repère uniquement",
+        _ => "Protégé"
+    };
+    public string LastSnapshotLabel => LastSnapshotAtUtc is null ? string.Empty : $"Dernière sauvegarde · {LastSnapshotAtUtc.Value.ToLocalTime():dd/MM/yyyy HH:mm}";
+    public string SnapshotCountLabel => SnapshotCount switch
+    {
+        1 => "1 sauvegarde conservée",
+        > 1 => $"{SnapshotCount} sauvegardes conservées",
+        _ => string.Empty
+    };
+    public bool HasSnapshots => SnapshotCount > 0;
 }
 
 public interface IGameLocalArtifactDiscoveryService

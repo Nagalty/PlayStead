@@ -4,6 +4,66 @@
              Background="{DynamicResource PlayStead.Brush.Background}"
              Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
              FontFamily="{DynamicResource PlayStead.Font.Body}">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="Settings.PreferenceCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextPrimary}" />
+            <Setter Property="FontFamily" Value="{DynamicResource PlayStead.Font.Body}" />
+            <Setter Property="FontSize" Value="{DynamicResource PlayStead.FontSize.14}" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="{DynamicResource PlayStead.Spacing.2}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="20" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="Box"
+                                    Width="16"
+                                    Height="16"
+                                    Background="{DynamicResource PlayStead.Brush.SurfaceSubtle}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
+                                    BorderThickness="1"
+                                    CornerRadius="{DynamicResource PlayStead.Radius.Small}"
+                                    VerticalAlignment="Center">
+                                <Path x:Name="CheckMark"
+                                      Data="M 2,8 L 6,12 L 14,3"
+                                      Stroke="{DynamicResource PlayStead.Brush.Copper}"
+                                      StrokeThickness="2"
+                                      Visibility="Collapsed" />
+                            </Border>
+                            <ContentPresenter Grid.Column="1"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
+                                              TextElement.FontFamily="{TemplateBinding FontFamily}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}" />
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceHover}" />
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.AccentMuted}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="{DynamicResource PlayStead.Spacing.4}">
             <TextBlock Text="Paramètres" FontSize="24" FontWeight="SemiBold"/>
@@ -14,12 +74,61 @@
                     BorderBrush="{DynamicResource PlayStead.Brush.Border}"
                     BorderThickness="1"
                     CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
+                    Padding="{DynamicResource PlayStead.Spacing.3}"
+                    Margin="0,0,0,16"
+                    Visibility="{Binding IsProtectionCardVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="Protection locale" FontSize="18" FontWeight="SemiBold" />
+                    <StackPanel Visibility="{Binding IsProtectionOnboardingPending, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock Text="{Binding ProtectionSummaryLabel}" Margin="0,8,0,0" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                        <TextBlock Text="Je peux garder un œil dessus et protéger tes sauvegardes automatiquement." Margin="0,4,0,0" TextWrapping="Wrap" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding IsProtectionSummaryVisible, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,8,0,0">
+                        <TextBlock Text="{Binding ProtectedGamesSummaryLabel}" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="Je garde maintenant un œil sur leurs fichiers importants." Margin="0,4,0,0" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                        <TextBlock Text="{Binding ProtectedArtifactsSummaryLabel}" Margin="0,10,0,0" TextWrapping="Wrap" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                        <TextBlock Text="{Binding ProtectionFailureSummaryLabel}" Margin="0,6,0,0" TextWrapping="Wrap" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding ProtectionActionMessage}" Margin="0,8,0,0" TextWrapping="Wrap" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                    <ItemsControl ItemsSource="{Binding ProtectionGames}"
+                                  Visibility="{Binding IsChoosingProtectionGames, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                  Margin="0,10,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding DisplayName}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,3,0,0" Style="{StaticResource Settings.PreferenceCheckBox}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <Button Content="Protéger tout ça" Style="{DynamicResource PlayStead.Button.Primary}" Command="{Binding ProtectAllCommand}"
+                                Visibility="{Binding IsProtectionOnboardingPending, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Button Content="Choisir les jeux" Style="{DynamicResource PlayStead.Button.Secondary}" Margin="12,0,0,0" Command="{Binding ChooseProtectionGamesCommand}"
+                                Visibility="{Binding IsProtectionOnboardingPending, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Button Content="Plus tard" Style="{DynamicResource PlayStead.Button.Secondary}" Margin="12,0,0,0" Command="{Binding LaterProtectionCommand}"
+                                Visibility="{Binding IsProtectionOnboardingPending, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Button Content="Voir les jeux protégés" Style="{DynamicResource PlayStead.Button.Secondary}" Command="{Binding RevisitProtectionCommand}"
+                                Visibility="{Binding IsProtectionSummaryVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <Button Content="Revoir la protection" Style="{DynamicResource PlayStead.Button.Secondary}" Margin="12,0,0,0" Command="{Binding RevisitProtectionCommand}"
+                                Visibility="{Binding IsProtectionSummaryVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <TextBlock Text="Préférences" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
+            <Border Background="{DynamicResource PlayStead.Brush.Surface}"
+                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
                     Padding="{DynamicResource PlayStead.Spacing.3}">
                 <StackPanel>
                     <CheckBox x:Name="ReduceMotionToggle"
                               Content="Réduire les animations"
-                              Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                              Style="{StaticResource Settings.PreferenceCheckBox}"
                               IsChecked="{Binding ReduceMotion, Mode=TwoWay}"/>
+                    <CheckBox x:Name="AutoProtectRecognizedArtifactsToggle"
+                              Content="Protéger automatiquement les nouveaux dossiers reconnus"
+                              Style="{StaticResource Settings.PreferenceCheckBox}"
+                              IsChecked="{Binding AutoProtectRecognizedArtifacts, Mode=TwoWay}"
+                              Margin="0,12,0,0"/>
                     <Button x:Name="SaveSettingsButton"
                             Style="{DynamicResource PlayStead.Button.Primary}"
                             Content="Enregistrer"

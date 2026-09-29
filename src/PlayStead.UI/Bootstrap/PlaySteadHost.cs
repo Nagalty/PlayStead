@@ -434,11 +434,17 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             ShellViewModel>();
 
+        builder.Services.AddSingleton<IUserDefinedLocalArtifactStore, SqliteUserDefinedLocalArtifactStore>();
+        builder.Services.AddSingleton<UserDefinedLocalArtifactService>(services =>
+            new UserDefinedLocalArtifactService(
+                services.GetRequiredService<IUserDefinedLocalArtifactStore>(),
+                LocalArtifactRuleCatalog.Rules));
         builder.Services.AddSingleton<IGameLocalArtifactDiscoveryService>(
-            _ => new LocalArtifactDiscoveryService(LocalArtifactRuleCatalog.Rules));
+            services => new LocalArtifactDiscoveryService(LocalArtifactRuleCatalog.Rules, services.GetRequiredService<IUserDefinedLocalArtifactStore>()));
         builder.Services.AddSingleton<IArtifactFingerprintService, Sha256ArtifactFingerprintService>();
         builder.Services.AddSingleton<ILocalArtifactBaselineStore, SqliteLocalArtifactBaselineStore>();
         builder.Services.AddSingleton<LocalArtifactBaselineComparisonService>();
+        builder.Services.AddSingleton<ILocalProtectionSetupService, LocalProtectionSetupService>();
         builder.Services.AddSingleton<ILocalArtifactSnapshotStore, SqliteLocalArtifactSnapshotStore>();
         builder.Services.AddSingleton<ILocalArtifactSnapshotService>(services =>
             new LocalArtifactSnapshotService(
@@ -478,6 +484,8 @@ public static class PlaySteadHost
                     services.GetRequiredService<PlayStead.Core.Modding.IModEvidenceStore>());
                 viewModel.AttachModEvidenceRefreshService(
                     services.GetRequiredService<PlayStead.Core.Modding.ModEvidenceRefreshService>());
+                viewModel.AttachLocalProtectionSetupService(
+                    services.GetRequiredService<PlayStead.Core.LocalArtifacts.ILocalProtectionSetupService>());
                 return viewModel;
             });
 

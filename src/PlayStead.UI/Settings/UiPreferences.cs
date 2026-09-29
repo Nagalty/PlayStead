@@ -7,4 +7,7 @@ public sealed record UiPreferences(
     LibraryViewMode LibraryViewMode = LibraryViewMode.Grid,
     string LibrarySortKey = "Title",
     string? LibraryFilterKey = null,
-    Guid? LastDormantGameId = null);
+    Guid? LastDormantGameId = null,
+    bool ProtectionOnboardingCompleted = false,
+    bool AutoProtectRecognizedArtifacts = false,
+    IReadOnlyDictionary<Guid, bool>? LocalProtectionEnabledByGame = null);

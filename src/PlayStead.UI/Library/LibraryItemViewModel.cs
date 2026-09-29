@@ -16,7 +16,8 @@ public sealed record LibraryItemViewModel(
     SteamUpdateState? SteamState = null,
     bool IsSessionActive = false,
     CatalogContentId? CanonicalContentId = null,
-    string? ProviderGameId = null)
+    string? ProviderGameId = null,
+    bool IsLocallyProtected = false)
     : INotifyPropertyChanged
 {
     private string? _coverPath;
@@ -86,6 +87,8 @@ public sealed record LibraryItemViewModel(
 
     public bool HasSteamStatus =>
         SteamState is not null;
+
+    public string ProtectionBadgeTooltip => "Protégé par PlayStead";
 
     public string SteamStatusLabel =>
         SteamState switch

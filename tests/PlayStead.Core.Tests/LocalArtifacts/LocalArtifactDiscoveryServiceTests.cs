@@ -131,4 +131,25 @@ public sealed class LocalArtifactDiscoveryServiceTests
 
         Assert.Empty(unknown);
     }
+
+    [Fact]
+    public void Catalog_contains_verified_save_rules_for_currently_known_games()
+    {
+        var expected = new[]
+        {
+            (AppId: "377160", Path: @"%USERPROFILE%\Documents\My Games\Fallout4\Saves"),
+            (AppId: "1172710", Path: @"%LOCALAPPDATA%\DuneSandbox\Saved"),
+            (AppId: "1144200", Path: @"%LOCALAPPDATA%\ReadyOrNot\Saved\SaveGames"),
+            (AppId: "1643320", Path: @"%LOCALAPPDATA%\Stalker2\Saved\SaveGames")
+        };
+
+        foreach (var item in expected)
+        {
+            Assert.Contains(LocalArtifactRuleCatalog.Rules, rule =>
+                rule.Provider == ProviderKind.Steam &&
+                rule.ProviderGameId == item.AppId &&
+                rule.Kind == GameLocalArtifactKind.SaveData &&
+                rule.PathTemplate == item.Path);
+        }
+    }
 }

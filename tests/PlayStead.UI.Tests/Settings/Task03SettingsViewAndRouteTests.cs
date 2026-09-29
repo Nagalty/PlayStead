@@ -138,6 +138,35 @@ public sealed class Task03SettingsViewAndRouteTests
     }
 
     [Fact]
+    public void SettingsView_declares_the_visibility_converter_used_by_protection_card()
+    {
+        var source = File.ReadAllText(FindUiFile("Settings/SettingsView.xaml"));
+
+        Assert.Contains("<BooleanToVisibilityConverter x:Key=\"BooleanToVisibilityConverter\"", source, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"{Binding IsProtectionCardVisible, Converter={StaticResource BooleanToVisibilityConverter}}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"{Binding IsChoosingProtectionGames, Converter={StaticResource BooleanToVisibilityConverter}}\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SettingsView_uses_protection_copy_and_dark_preference_checkbox_style()
+    {
+        var source = File.ReadAllText(FindUiFile("Settings/SettingsView.xaml"));
+
+        Assert.Contains("ProtectionSummaryLabel", source, StringComparison.Ordinal);
+        Assert.Contains("ProtectedGamesSummaryLabel", source, StringComparison.Ordinal);
+        Assert.Contains("ProtectedArtifactsSummaryLabel", source, StringComparison.Ordinal);
+        Assert.Contains("Revoir la protection", source, StringComparison.Ordinal);
+        Assert.Contains("Voir les jeux protégés", source, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding IsSelected, Mode=TwoWay}\"", source, StringComparison.Ordinal);
+        Assert.Contains("LocalProtectionEnabledByGame", File.ReadAllText(FindUiFile("Settings/SettingsViewModel.cs")), StringComparison.Ordinal);
+        Assert.DoesNotContain("dossiers importants\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Préférences\"", source, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"Settings.PreferenceCheckBox\"", source, StringComparison.Ordinal);
+        Assert.Contains("PlayStead.Brush.Copper", source, StringComparison.Ordinal);
+        Assert.Contains("Style=\"{StaticResource Settings.PreferenceCheckBox}\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Host_registers_ui_preferences_store_and_SettingsViewModel()
     {
         var source =

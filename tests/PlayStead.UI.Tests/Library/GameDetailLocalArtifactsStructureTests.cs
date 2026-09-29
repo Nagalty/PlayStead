@@ -3,13 +3,16 @@ namespace PlayStead.UI.Tests.Library;
 public sealed class GameDetailLocalArtifactsStructureTests
 {
     [Fact]
-    public void Game_detail_has_conditional_local_artifact_section_and_safe_open_action()
+    public void Game_detail_has_local_artifact_section_and_safe_custom_folder_actions()
     {
         var path = Path.Combine(FindRoot(), "src", "PlayStead.UI", "Library", "GameDetailView.xaml");
         var xaml = File.ReadAllText(path);
 
         Assert.Contains("x:Name=\"LocalArtifactsSection\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Visibility=\"{Binding HasLocalArtifacts", xaml, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"Visible\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Je ne connais encore aucun dossier important pour ce jeu.", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding AddUserDefinedArtifactCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding DataContext.RemoveUserDefinedArtifactCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding LocalArtifacts}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding KindLabel}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Path}\"", xaml, StringComparison.Ordinal);

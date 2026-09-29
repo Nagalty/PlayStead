@@ -18,6 +18,7 @@ using PlayStead.Core.Notifications;
 using PlayStead.Core.ProviderActivity;
 using PlayStead.Core.Collections;
 using PlayStead.Core.Modding;
+using PlayStead.Core.LocalArtifacts;
 
 namespace PlayStead.UI.Library;
 
@@ -64,6 +65,7 @@ public sealed class LibraryViewModel :
 
     private IReadOnlyList<GameInstallation> _installations =
         Array.Empty<GameInstallation>();
+    private LibrarySnapshot? _lastSnapshot;
 
     private bool _isSteamChecking;
     private string _steamVerificationError = string.Empty;
@@ -77,6 +79,9 @@ public sealed class LibraryViewModel :
     private HashSet<GameId> _attentionGameIds = [];
     private IReadOnlyDictionary<GameId, ModDetectionState> _modStatesByGame = new Dictionary<GameId, ModDetectionState>();
     private IModEvidenceStore? _modEvidenceStore;
+    private ILocalProtectionSetupService? _localProtectionSetupService;
+    private IReadOnlySet<GameId> _locallyProtectedGameIds = new HashSet<GameId>();
+    private IReadOnlyDictionary<Guid, bool> _protectionOverrides = new Dictionary<Guid, bool>();
     private ModEvidenceRefreshService? _modEvidenceRefreshService;
     private IReadOnlyDictionary<GameId, LibraryActivityProjection> _activityByGame =
         new Dictionary<GameId, LibraryActivityProjection>();
@@ -243,6 +248,13 @@ public sealed class LibraryViewModel :
 
     public void AttachEffectiveActivityService(IEffectiveActivityService service) =>
         _effectiveActivityService = service;
+
+    public void AttachLocalProtectionSetupService(ILocalProtectionSetupService service)
+    {
+        _localProtectionSetupService = service ?? throw new ArgumentNullException(nameof(service));
+        if (_uiPreferencesStore is not null)
+            _uiPreferencesStore.Changed += UiPreferencesStoreOnChanged;
+    }
 
     public IProviderGameMetadataStore? ProviderGameMetadataStore { get; }
 
@@ -702,6 +714,9 @@ public sealed class LibraryViewModel :
 
         SetFilterKey(
             preferences.LibraryFilterKey);
+
+        _protectionOverrides = preferences.LocalProtectionEnabledByGame
+            ?? new Dictionary<Guid, bool>();
     }
 
     public void Dispose()
@@ -710,6 +725,8 @@ public sealed class LibraryViewModel :
             _attentionService.Changed -= AttentionServiceOnChanged;
         if (_sessionMonitor is not null)
             _sessionMonitor.SnapshotUpdated -= SessionMonitor_OnSnapshotUpdated;
+        if (_uiPreferencesStore is not null)
+            _uiPreferencesStore.Changed -= UiPreferencesStoreOnChanged;
     }
 
     public async Task SaveUiPreferencesAsync(
@@ -729,7 +746,11 @@ public sealed class LibraryViewModel :
                 existing.ReduceMotion,
                 ViewMode,
                 SortKey,
-                FilterKey),
+                FilterKey,
+                existing.LastDormantGameId,
+                existing.ProtectionOnboardingCompleted,
+                existing.AutoProtectRecognizedArtifacts,
+                existing.LocalProtectionEnabledByGame),
             cancellationToken);
     }
 
@@ -1203,8 +1224,11 @@ public sealed class LibraryViewModel :
         var snapshot =
             await _libraryStore.LoadSnapshotAsync(
                 cancellationToken);
+        _lastSnapshot = snapshot;
 
         await RefreshActivityProjectionAsync(snapshot.Installations, cancellationToken);
+
+        await RefreshLocalProtectionProjectionAsync(snapshot, cancellationToken);
 
         await RefreshProviderMetadataProjectionAsync(cancellationToken);
         await RefreshModEvidenceProjectionAsync(cancellationToken);
@@ -1400,7 +1424,8 @@ public sealed class LibraryViewModel :
                             activeGameIds.Contains(
                                 game.Id),
                             game.CanonicalContentId,
-                            installation.ExternalId);
+                            installation.ExternalId,
+                            _locallyProtectedGameIds.Contains(game.Id));
 
                     ApplyCachedCover(
                         item,
@@ -1418,6 +1443,67 @@ public sealed class LibraryViewModel :
                 StringComparer
                     .CurrentCultureIgnoreCase)
             .ToArray();
+    }
+
+    private async Task RefreshLocalProtectionProjectionAsync(
+        LibrarySnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        if (_localProtectionSetupService is null)
+        {
+            _locallyProtectedGameIds = new HashSet<GameId>();
+            return;
+        }
+
+        try
+        {
+            if (_uiPreferencesStore is not null)
+            {
+                var preferences = await _uiPreferencesStore.LoadAsync(cancellationToken);
+                _protectionOverrides = preferences.LocalProtectionEnabledByGame
+                    ?? new Dictionary<Guid, bool>();
+            }
+            var contexts = snapshot.Installations
+                .Where(x => x.IsPresent)
+                .GroupBy(x => x.GameId)
+                .Select(x => new LocalProtectionGameContext(x.Key, x.First().Provider, x.First().ExternalId))
+                .ToArray();
+            var inventory = await _localProtectionSetupService.InspectAsync(contexts, cancellationToken);
+            _locallyProtectedGameIds = inventory.Artifacts
+            .Where(x => x.State == LocalProtectionState.Protected)
+            .Select(x => x.Artifact.GameId)
+                .Where(gameId => !_protectionOverrides.TryGetValue(gameId.Value, out var enabled) || enabled)
+                .ToHashSet();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            _locallyProtectedGameIds = new HashSet<GameId>();
+        }
+    }
+
+    private async void UiPreferencesStoreOnChanged(object? sender, UiPreferences preferences)
+    {
+        _protectionOverrides = preferences.LocalProtectionEnabledByGame
+            ?? new Dictionary<Guid, bool>();
+
+        if (_lastSnapshot is null || _localProtectionSetupService is null)
+            return;
+
+        try
+        {
+            await RefreshLocalProtectionProjectionAsync(_lastSnapshot, CancellationToken.None);
+            Items = Items
+                .Select(item => item with { IsLocallyProtected = _locallyProtectedGameIds.Contains(item.GameId) })
+                .ToArray();
+        }
+        catch
+        {
+            // Protection preference changes are cosmetic for the library; keep the current projection on failure.
+        }
     }
 
     private void ApplyCachedCover(
