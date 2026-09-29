@@ -18,6 +18,7 @@ public sealed class GameQuickPanelViewModel :
     private readonly SessionCorrectionPolicy? _sessionCorrectionPolicy;
     private IProviderActivityMetadataStore? _providerActivityStore;
     private IProviderObservedSessionStore? _providerSessionStore;
+    private IEffectiveActivityService? _effectiveActivityService;
     private GameBuildHistoryService? _gameBuildHistoryService;
 
     private bool _hasSessionHistory;
@@ -64,6 +65,9 @@ public sealed class GameQuickPanelViewModel :
         _gameBuildHistoryService = gameBuildHistoryService;
         _providerSessionStore = providerSessionStore;
     }
+
+    public void AttachEffectiveActivityService(IEffectiveActivityService service) =>
+        _effectiveActivityService = service;
 
     public GameQuickPanelViewModel(
         LibraryItemViewModel game,
@@ -196,7 +200,7 @@ public sealed class GameQuickPanelViewModel :
             LastSessionDateLabel = "—";
             LastSessionDurationLabel = "—";
             PlaySteadTotalPlayTimeLabel = "0 min";
-            TotalPlayTimeLabel = ProviderPlayTimeLabel ?? PlaySteadTotalPlayTimeLabel;
+            TotalPlayTimeLabel = ProviderPlayTimeLabel ?? "Inconnu";
             OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
             SessionCountLabel = "0 session";
             return;
@@ -234,7 +238,7 @@ public sealed class GameQuickPanelViewModel :
             LastSessionDateLabel = "—";
             LastSessionDurationLabel = "—";
             PlaySteadTotalPlayTimeLabel = "0 min";
-            TotalPlayTimeLabel = ProviderPlayTimeLabel ?? PlaySteadTotalPlayTimeLabel;
+            TotalPlayTimeLabel = ProviderPlayTimeLabel ?? "Inconnu";
             OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
             SessionCountLabel = "0 session";
             return;
@@ -267,13 +271,35 @@ public sealed class GameQuickPanelViewModel :
                 TimeSpan.Zero,
                 (current, item) => current + (item.EndedAtUtc - item.StartedAtUtc));
         PlaySteadTotalPlayTimeLabel = FormatDuration(playSteadTotal);
-        TotalPlayTimeLabel = ProviderPlayTimeLabel ?? FormatDuration(total);
+        TotalPlayTimeLabel = ProviderPlayTimeLabel ?? "Inconnu";
         OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
 
         SessionCountLabel =
             segments.Count == 1
                 ? "1 session"
                 : $"{segments.Count} sessions";
+
+        if (_effectiveActivityService is not null)
+        {
+            var effective = await _effectiveActivityService.GetAsync(
+                Game.GameId, Game.Provider, cancellationToken);
+            TotalPlayTimeLabel = effective.EffectiveTotalPlayTime is { } totalPlaytime
+                ? FormatDuration(totalPlaytime)
+                : "Inconnu";
+            LastActivityLabel = effective.EffectiveLastPlayedAtUtc is { } lastPlayed
+                ? FormatTimestamp(lastPlayed)
+                : "—";
+            LastSessionDateLabel = LastActivityLabel;
+            PlaySteadTotalPlayTimeLabel = FormatDuration(effective.PlaySteadObservedTime);
+            SessionCountLabel = effective.PlaySteadSessionCount == 1
+                ? "1 session"
+                : $"{effective.PlaySteadSessionCount} sessions";
+            OnPropertyChanged(nameof(TotalPlayTimeLabel));
+            OnPropertyChanged(nameof(LastActivityLabel));
+            OnPropertyChanged(nameof(LastSessionDateLabel));
+            OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
+            OnPropertyChanged(nameof(SessionCountLabel));
+        }
     }
 
     public void SetAttentionState(bool hasAttention)

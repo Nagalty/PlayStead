@@ -33,6 +33,7 @@ public sealed class LibraryViewModel :
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;
     private readonly IProviderActivityMetadataStore? _providerActivityStore;
     private readonly ISessionStore? _sessionStore;
+    private IEffectiveActivityService? _effectiveActivityService;
     private IGameCollectionStore? _collectionStore;
     private readonly object _verifySteamGate = new();
     private readonly Dispatcher? _uiDispatcher =
@@ -239,6 +240,9 @@ public sealed class LibraryViewModel :
 
     public event PropertyChangedEventHandler?
         PropertyChanged;
+
+    public void AttachEffectiveActivityService(IEffectiveActivityService service) =>
+        _effectiveActivityService = service;
 
     public IProviderGameMetadataStore? ProviderGameMetadataStore { get; }
 
@@ -1526,6 +1530,17 @@ public sealed class LibraryViewModel :
             var provider = providerByGame.TryGetValue(installation.GameId, out var value)
                 ? value
                 : null;
+            if (_effectiveActivityService is not null)
+            {
+                var effective = await _effectiveActivityService.GetAsync(
+                    installation.GameId, installation.Provider, cancellationToken);
+                projection[installation.GameId] = new LibraryActivityProjection(
+                    effective.EffectiveTotalPlayTime,
+                    effective.EffectiveLastPlayedAtUtc,
+                    effective.PlaySteadObservedTime,
+                    effective.EffectiveLastPlayedAtUtc);
+                continue;
+            }
             TimeSpan? observedPlaytime = null;
             DateTimeOffset? observedLastPlayed = null;
             if (_sessionStore is not null)
@@ -1654,7 +1669,9 @@ public sealed class LibraryViewModel :
     {
         public static LibraryActivityProjection Empty { get; } = new(null, null, null, null);
 
-        public TimeSpan? Playtime => ProviderPlaytime ?? ObservedPlaytime;
+        // Only provider lifetime playtime is suitable for the lifetime sort.
+        // ObservedPlaytime is bounded activity and must remain unknown here.
+        public TimeSpan? Playtime => ProviderPlaytime;
 
         public DateTimeOffset? LastPlayedAtUtc =>
             GetLastPlayedAtUtc();

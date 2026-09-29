@@ -73,6 +73,40 @@ public sealed class HomeDormantGameProjectorTests
     }
 
     [Fact]
+    public void Effective_activity_snapshot_prevents_recent_provider_activity_from_being_marked_dormant()
+    {
+        var primary = Game("Primary");
+        var game = Game("Recently played by provider");
+        var input = Input(
+            [primary, game],
+            shortlist: [Shortlist(primary, 0)],
+            recent: [Completed(game, Now.AddDays(-90))]) with
+        {
+            EffectiveActivity = new Dictionary<GameId, EffectiveActivitySnapshot>
+            {
+                [game.Id] = new EffectiveActivitySnapshot(
+                    game.Id,
+                    TimeSpan.FromHours(4),
+                    EffectiveActivitySource.ProviderLifetime,
+                    EffectiveActivityCoverage.Lifetime,
+                    Now.AddDays(-2),
+                    EffectiveActivitySource.ProviderLifetime,
+                    TimeSpan.Zero,
+                    0,
+                    TimeSpan.Zero,
+                    0,
+                    null,
+                    null,
+                    Now)
+            }
+        };
+
+        var snapshot = HomeEditorialProjector.Project(input);
+
+        Assert.Null(snapshot.DormantGame);
+    }
+
+    [Fact]
     public void Completed_less_than_45_days_ago_is_excluded()
     {
         var primary = Game("Primary");

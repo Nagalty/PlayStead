@@ -81,7 +81,7 @@ public sealed class GameQuickPanelViewModelTests
         Assert.True(viewModel.HasSessionHistory);
         Assert.Equal("2 sessions", viewModel.SessionCountLabel);
         Assert.Equal("1 h 00 min", viewModel.LastSessionDurationLabel);
-        Assert.Equal("2 h 00 min", viewModel.TotalPlayTimeLabel);
+        Assert.Equal("Inconnu", viewModel.TotalPlayTimeLabel);
         Assert.NotEqual("—", viewModel.LastSessionDateLabel);
         Assert.NotEqual("Aucune activité PlayStead", viewModel.LastActivityLabel);
     }
@@ -117,7 +117,7 @@ public sealed class GameQuickPanelViewModelTests
 
         Assert.False(viewModel.HasSessionHistory);
         Assert.Equal("0 session", viewModel.SessionCountLabel);
-        Assert.Equal("0 min", viewModel.TotalPlayTimeLabel);
+        Assert.Equal("Inconnu", viewModel.TotalPlayTimeLabel);
         Assert.Equal("—", viewModel.LastSessionDurationLabel);
     }
 

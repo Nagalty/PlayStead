@@ -45,6 +45,7 @@ public sealed class HomeViewModel :
     private readonly IWeeklyActivitySummaryService? _weeklyActivitySummaryService;
     private readonly IAttentionService? _attentionService;
     private readonly IProviderActivityMetadataStore? _providerActivityStore;
+    private IEffectiveActivityService? _effectiveActivityService;
     private readonly ProviderActivityReconciliationService? _providerActivityReconciliation;
     private readonly IProviderGameMetadataStore? _providerGameMetadataStore;
     private readonly HomeSuggestionSelector? _homeSuggestionSelector;
@@ -85,6 +86,8 @@ public sealed class HomeViewModel :
     private readonly SemaphoreSlim _dormantSelectionGate = new(1, 1);
     private HashSet<Guid> _activeSessionIds = [];
     private IReadOnlyList<ProviderGameMetadata> _providerMetadata = [];
+    private IReadOnlyDictionary<Guid, EffectiveActivitySnapshot> _effectiveActivityByGame =
+        new Dictionary<Guid, EffectiveActivitySnapshot>();
     private HomeEditorialPrimary _editorialPrimary = new(
         HomeEditorialPrimarySourceKind.Placeholder,
         null);
@@ -263,6 +266,12 @@ public sealed class HomeViewModel :
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    public void AttachEffectiveActivityService(IEffectiveActivityService service)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        _effectiveActivityService = service;
+    }
+
     public int LibraryGameCount =>
         _libraryViewModel.Items.Count;
 
@@ -281,7 +290,16 @@ public sealed class HomeViewModel :
             var seenGameIds = new HashSet<Guid>();
             var games = new List<HomeRecentlyPlayedGameViewModel>(RecentlyPlayedGameLimit);
 
-            foreach (var session in RecentSessions)
+            var sessions = RecentSessions
+                .Select((session, index) => (session, index))
+                .OrderByDescending(item =>
+                    _effectiveActivityByGame.TryGetValue(item.session.GameId, out var effective)
+                        ? effective.EffectiveLastPlayedAtUtc ?? DateTimeOffset.MinValue
+                        : DateTimeOffset.MinValue)
+                .ThenBy(item => item.index)
+                .Select(item => item.session);
+
+            foreach (var session in sessions)
             {
                 if (!seenGameIds.Add(session.GameId))
                 {
@@ -739,6 +757,7 @@ public sealed class HomeViewModel :
                 ? []
                 : await _providerGameMetadataStore.GetAllAsync(cancellationToken);
             _providerMetadata = providerMetadata;
+            _effectiveActivityByGame = await LoadEffectiveActivityAsync(library, cancellationToken);
             var suggestion = _homeSuggestionSelector is null
                 ? null
                 : await _homeSuggestionSelector.SelectAsync(
@@ -764,7 +783,10 @@ public sealed class HomeViewModel :
                 weekly,
                 attention,
                 _timeProvider.GetUtcNow(),
-                providerActivity));
+                providerActivity,
+                _effectiveActivityByGame.ToDictionary(
+                    pair => new GameId(pair.Key),
+                    pair => pair.Value)));
             await EnsureDormantSelectionAsync(snapshot.EligibleDormantGames, cancellationToken);
             _buildChangeCounts = await LoadBuildChangeCountsAsync(library, cancellationToken);
             ApplyEditorialSnapshot(snapshot, suggestion);
@@ -812,6 +834,34 @@ public sealed class HomeViewModel :
         {
             _logger?.LogWarning(exception, "Home featured game refresh failed.");
         }
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, EffectiveActivitySnapshot>> LoadEffectiveActivityAsync(
+        LibrarySnapshot library,
+        CancellationToken cancellationToken)
+    {
+        if (_effectiveActivityService is null)
+        {
+            return new Dictionary<Guid, EffectiveActivitySnapshot>();
+        }
+
+        var snapshots = new Dictionary<Guid, EffectiveActivitySnapshot>();
+        foreach (var installation in library.Installations.Where(item => item.IsPresent))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var snapshot = await _effectiveActivityService.GetAsync(
+                installation.GameId,
+                installation.Provider,
+                cancellationToken);
+            if (!snapshots.TryGetValue(installation.GameId.Value, out var current) ||
+                (snapshot.EffectiveLastPlayedAtUtc ?? DateTimeOffset.MinValue) >
+                (current.EffectiveLastPlayedAtUtc ?? DateTimeOffset.MinValue))
+            {
+                snapshots[installation.GameId.Value] = snapshot;
+            }
+        }
+
+        return snapshots;
     }
 
     private Dictionary<(Guid GameId, ProviderKind Provider), int> _buildChangeCounts = [];

@@ -71,4 +71,5 @@ public sealed record HomeEditorialProjectionInput(
     WeeklyActivitySummary WeeklySummary,
     IReadOnlyList<AttentionItem> AttentionItems,
     DateTimeOffset EvaluatedAtUtc,
-    IReadOnlyList<ProviderActivityMetadata>? ProviderActivity = null);
+    IReadOnlyList<ProviderActivityMetadata>? ProviderActivity = null,
+    IReadOnlyDictionary<GameId, EffectiveActivitySnapshot>? EffectiveActivity = null);

@@ -95,7 +95,7 @@ public sealed class GameDetailActivityTests
 
         Assert.True(activity.HasSessionHistory);
         Assert.Equal("1 session", activity.SessionCountLabel);
-        Assert.Equal("1 h 00 min", activity.TotalPlayTimeLabel);
+        Assert.Equal("Inconnu", activity.TotalPlayTimeLabel);
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public sealed class GameDetailActivityTests
 
         Assert.False(activity.HasSessionHistory);
         Assert.Equal("0 session", activity.SessionCountLabel);
-        Assert.Equal("0 min", activity.TotalPlayTimeLabel);
+        Assert.Equal("Inconnu", activity.TotalPlayTimeLabel);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public sealed class GameDetailActivityTests
         Assert.True(activity.HasRecentActivity);
         Assert.Equal("1 session", activity.SessionCountLabel);
         Assert.Equal("0 min", activity.PlaySteadTotalPlayTimeLabel);
-        Assert.Equal("1 h 59 min", activity.TotalPlayTimeLabel);
+        Assert.Equal("Inconnu", activity.TotalPlayTimeLabel);
         Assert.Single(activity.RecentActivitySessions);
     }
 

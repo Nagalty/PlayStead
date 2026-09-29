@@ -144,19 +144,36 @@ public static class HomeEditorialProjector
         var observedLastPlayed = recentHistory
             .GroupBy(session => new GameId(session.GameId))
             .ToDictionary(group => group.Key, group => group.Max(session => session.ObservedEndedAtUtc)!.Value.ToUniversalTime());
+        var effectiveActivity = input.EffectiveActivity ?? new Dictionary<GameId, EffectiveActivitySnapshot>();
+        var effectiveLastPlayed = effectiveActivity
+            .Where(pair => pair.Value.EffectiveLastPlayedAtUtc is not null)
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
         var dormantCandidates = observedLastPlayed.Keys
             .Concat(providerActivity.Keys)
+            .Concat(effectiveLastPlayed.Keys)
             .Distinct()
             .Select(gameId => new
             {
                 GameId = gameId,
-                LastCompletedAtUtc = observedLastPlayed.TryGetValue(gameId, out var observed) ? observed : (DateTimeOffset?)null
+                LastCompletedAtUtc = effectiveLastPlayed.TryGetValue(gameId, out var effective)
+                    ? effective.EffectiveLastPlayedAtUtc
+                    : observedLastPlayed.TryGetValue(gameId, out var observed) ? observed : (DateTimeOffset?)null
             });
         var eligibleDormantGames = dormantCandidates
             .Where(candidate => !excludedGameIds.Contains(candidate.GameId))
             .Where(candidate => providerActivity.ContainsKey(candidate.GameId) || candidate.LastCompletedAtUtc is not null)
             .Select(candidate =>
             {
+                if (effectiveLastPlayed.TryGetValue(candidate.GameId, out var effectiveSnapshot) &&
+                    effectiveSnapshot.EffectiveLastPlayedAtUtc is { } effectiveLastPlayedAtUtc)
+                {
+                    var effective = effectiveLastPlayedAtUtc.ToUniversalTime();
+                    var source = effectiveSnapshot.EffectiveLastPlayedSource is
+                        EffectiveActivitySource.ProviderLifetime or EffectiveActivitySource.ProviderRecoveredSessions
+                        ? HomeEditorialLastPlayedSource.Provider
+                        : HomeEditorialLastPlayedSource.Observed;
+                    return new DormantCandidate(candidate.GameId, effective, source, Resolve(candidate.GameId.Value), evaluatedAtUtc - effective);
+                }
                 if (providerActivity.TryGetValue(candidate.GameId, out var provider) && provider.LastPlayedAtUtc is { } providerLastPlayed)
                 {
                     var effective = providerLastPlayed.ToUniversalTime();

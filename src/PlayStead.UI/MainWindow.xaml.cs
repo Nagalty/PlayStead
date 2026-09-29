@@ -57,6 +57,7 @@ public partial class MainWindow : Window
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
     private readonly IProviderActivityMetadataStore? _providerActivityStore;
     private readonly IProviderObservedSessionStore? _providerObservedSessionStore;
+    private readonly IEffectiveActivityService? _effectiveActivityService;
     private readonly IGameLocalArtifactDiscoveryService? _localArtifactDiscoveryService;
     private readonly IArtifactFingerprintService? _artifactFingerprintService;
     private readonly ILocalArtifactBaselineStore? _artifactBaselineStore;
@@ -460,6 +461,7 @@ public partial class MainWindow : Window
         ILocalArtifactSnapshotService? artifactSnapshotService = null,
         ILocalArtifactRestoreService? artifactRestoreService = null,
         IProviderObservedSessionStore? providerObservedSessionStore = null,
+        IEffectiveActivityService? effectiveActivityService = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -474,6 +476,12 @@ public partial class MainWindow : Window
         _gameBuildHistoryService = gameBuildHistoryService;
         _providerActivityStore = providerActivityStore;
         _providerObservedSessionStore = providerObservedSessionStore;
+        _effectiveActivityService = effectiveActivityService;
+        if (effectiveActivityService is not null)
+        {
+            viewModel.AttachEffectiveActivityService(effectiveActivityService);
+            _homeViewModel?.AttachEffectiveActivityService(effectiveActivityService);
+        }
         _localArtifactDiscoveryService = localArtifactDiscoveryService;
         _artifactFingerprintService = artifactFingerprintService;
         _artifactBaselineStore = artifactBaselineStore;
@@ -565,6 +573,9 @@ public partial class MainWindow : Window
                     _providerActivityStore,
                     _gameBuildHistoryService,
                     _providerObservedSessionStore);
+
+        if (_effectiveActivityService is not null)
+            quickPanel.AttachEffectiveActivityService(_effectiveActivityService);
 
         quickPanel.SetAttentionState(libraryViewModel.AttentionGameIds.Contains(gameId));
         return quickPanel;

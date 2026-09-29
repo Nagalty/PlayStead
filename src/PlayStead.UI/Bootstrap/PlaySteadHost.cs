@@ -295,6 +295,7 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             IProviderObservedSessionStore,
             SqliteProviderObservedSessionStore>();
+        builder.Services.AddSingleton<IEffectiveActivityService, EffectiveActivityService>();
         builder.Services.AddSingleton<SteamProcessLogSessionParser>();
         builder.Services.AddSingleton<SteamProcessLogSessionImporter>();
         builder.Services.AddSingleton<SteamLocalProviderActivitySource>();
