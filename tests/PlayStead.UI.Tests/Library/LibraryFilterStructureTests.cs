@@ -30,7 +30,7 @@ public sealed class LibraryFilterStructureTests
         Assert.True(text.Contains("CreateCollectionButton_OnClick", StringComparison.Ordinal));
         Assert.True(text.Contains("RenameCollectionButton_OnClick", StringComparison.Ordinal));
         Assert.True(text.Contains("DeleteCollectionButton_OnClick", StringComparison.Ordinal));
-        Assert.True(text.Contains("Aucun jeu ne correspond à ces filtres.", StringComparison.Ordinal));
+        Assert.True(text.Contains("Rien ne correspond à ces filtres pour l’instant.", StringComparison.Ordinal));
 
         var sortTags = comboBox.Descendants()
             .Where(element => element.Name.LocalName == "ComboBoxItem")

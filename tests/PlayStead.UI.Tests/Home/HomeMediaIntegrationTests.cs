@@ -43,7 +43,7 @@ public sealed class HomeMediaIntegrationTests
         Assert.DoesNotContain(hero.Descendants(), element =>
             (string?)element.Attribute("Binding") == "{Binding HasIdleHeroImage}" ||
             (string?)element.Attribute("ImageSource") == "{Binding IdleHeroImageSource}");
-        Assert.Contains(hero.Descendants(), element => (string?)element.Attribute("Text") == "Aucune aventure en cours");
+        Assert.Contains(hero.Descendants(), element => (string?)element.Attribute("Text") == "Rien en cours pour l’instant.");
         Assert.Contains(hero.Descendants(), element => (string?)element.Attribute("Text") == "Prêt à replonger ?");
         Assert.Contains(hero.Descendants(), element => (string?)element.Attribute("Text") == "Lance un jeu, PlayStead s’occupe du reste.");
     }
@@ -345,7 +345,7 @@ public sealed class HomeMediaIntegrationTests
 
         Assert.Equal(HomeEditorialPrimarySourceKind.Placeholder,
             Value<HomeEditorialPrimarySourceKind>(home, "PrimarySourceKind"));
-        Assert.Equal("Aucune aventure en cours", Value<string>(home, "EditorialEyebrow"));
+        Assert.Equal("Rien en cours pour l’instant.", Value<string>(home, "EditorialEyebrow"));
         Assert.Equal("Prêt à replonger ?", Value<string>(home, "EditorialTitle"));
         Assert.Equal("Lance un jeu, PlayStead s’occupe du reste.",
             Value<string>(home, "EditorialSupportingText"));
@@ -397,7 +397,7 @@ public sealed class HomeMediaIntegrationTests
 
         Assert.True(Value<bool>(home, "HasDormantGame"));
         Assert.Equal("Outriders", Value<string>(home, "DormantGameTitle"));
-        Assert.Equal("Pas joué depuis 60 jours", Value<string>(home, "DormantGameContext"));
+        Assert.Equal("Ça fait 60 jours que celui-là n’a pas tourné.", Value<string>(home, "DormantGameContext"));
         Assert.Equal("dormant-hero.jpg", Value<string>(home, "DormantGameMediaPath"));
 
         FindCommand(home, "OpenDormantGameDetailsCommand").Execute(null);
@@ -812,7 +812,7 @@ public sealed class HomeMediaIntegrationTests
         Assert.Null(Value<Guid?>(home, "FeaturedGameId"));
         Assert.False(Value<bool>(home, "HasHero"));
         Assert.False(Value<bool>(home, "HasActiveSessionHero"));
-        Assert.Equal("Aucune aventure en cours", Value<string>(home, "HeroEyebrow"));
+        Assert.Equal("Rien en cours pour l’instant.", Value<string>(home, "HeroEyebrow"));
         Assert.Equal("Prêt à replonger ?", Value<string>(home, "HeroTitle"));
     }
 

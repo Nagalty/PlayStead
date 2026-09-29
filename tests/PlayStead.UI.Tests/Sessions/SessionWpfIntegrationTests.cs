@@ -90,7 +90,7 @@ public sealed class SessionWpfIntegrationTests
                         text =>
                             string.Equals(
                                 text.Text,
-                                "Aucune session récente.",
+                                "Pas de session récente à te montrer.",
                                 StringComparison.Ordinal));
 
             Assert.NotNull(emptyMessage);

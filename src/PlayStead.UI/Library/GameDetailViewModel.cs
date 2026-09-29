@@ -264,8 +264,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public bool HasModEvidence => ModState != ModDetectionState.Unknown;
     public string ModStatusLabel => ModState switch
     {
-        ModDetectionState.ConfirmedModded => "Mods détectés",
-        ModDetectionState.PossiblyModded => "Indices de modifications détectés",
+        ModDetectionState.ConfirmedModded => "Toi, tu utilises des mods sur ce jeu, c’est certain. Je le vois, tu sais.",
+        ModDetectionState.PossiblyModded => "Il me semble que tu utilises des mods sur ce jeu, mais j’ai encore un doute.",
         _ => string.Empty
     };
 
@@ -284,7 +284,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     {
         public string ObservedAtLabel => ObservedAtUtc.ToLocalTime().ToString("d MMM yyyy HH:mm", CultureInfo.CurrentCulture);
         public string BuildTransitionLabel => IsBaseline
-            ? $"Première version observée · {BuildId}"
+            ? $"Premier point de repère · {BuildId}"
             : $"{PreviousBuildId} → {BuildId}";
         public string SinceLastPlayLabel => IsSinceLastPlay ? "Depuis ta dernière partie" : string.Empty;
     }
@@ -297,7 +297,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ? "PlayStead commencera à suivre les versions observées ici."
         : BuildChangeCountSinceLastPlay > 0
             ? $"{BuildChangeCountSinceLastPlay} changement{(BuildChangeCountSinceLastPlay == 1 ? string.Empty : "s")} observé{(BuildChangeCountSinceLastPlay == 1 ? string.Empty : "s")} depuis ta dernière partie"
-            : HasBuildChanges ? "Historique des versions observées" : "Pas encore de changement observé.";
+            : HasBuildChanges ? "Celui-là a bougé depuis la dernière fois." : "Rien n’a bougé depuis que je garde un œil dessus.";
 
     public IReadOnlyList<GameLocalArtifact> LocalArtifacts { get; private set; } = [];
     public bool HasLocalArtifacts => LocalArtifacts.Count > 0;
@@ -468,7 +468,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public bool HasDeveloper => !string.IsNullOrWhiteSpace(DeveloperDisplay);
     public bool HasPublisher => !string.IsNullOrWhiteSpace(PublisherDisplay);
     public bool HasReleaseDate => !string.IsNullOrWhiteSpace(ReleaseDateDisplay);
-    public bool HasGeneralInfo => HasDeveloper || HasPublisher || HasReleaseDate || HasGenres || HasGameModes || HasModEvidence;
+    public bool HasGeneralInfo => HasDeveloper || HasPublisher || HasReleaseDate || HasGenres || HasGameModes;
 
     private void ApplyProviderMetadata(ProviderGameMetadata? metadata)
     {

@@ -716,7 +716,7 @@
         <TextBlock Grid.Row="2"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
-                   Text="Aucun jeu ne correspond à ces filtres."
+                   Text="Rien ne correspond à ces filtres pour l’instant."
                    Style="{DynamicResource PlayStead.Text.BodySecondary}"
                    Visibility="{Binding IsAdvancedFilterEmpty, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
@@ -1219,7 +1219,12 @@
                     <Setter Property="Visibility"
                             Value="Visible"/>
                     <Style.Triggers>
-                        <DataTrigger Binding="{Binding HasItems}"
+                        <DataTrigger Binding="{Binding HasVisibleItems}"
+                                     Value="True">
+                            <Setter Property="Visibility"
+                                    Value="Collapsed"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsAdvancedFilterEmpty}"
                                      Value="True">
                             <Setter Property="Visibility"
                                     Value="Collapsed"/>
@@ -1229,13 +1234,14 @@
             </StackPanel.Style>
 
             <TextBlock x:Name="EmptyStateText"
-                       Text="Aucun jeu local détecté."
+                       Text="{Binding EmptyStateMessage, TargetNullValue=Je n’ai trouvé aucun jeu installé pour l’instant., FallbackValue=Je n’ai trouvé aucun jeu installé pour l’instant.}"
+                       TextWrapping="Wrap"
                        Foreground="#A9AFB7"
                        FontSize="15"
                        HorizontalAlignment="Center"/>
 
             <Button x:Name="RescanButton"
-                    Content="Relancer l’analyse"
+                    Content="Jeter un nouvel œil"
                     Click="RescanButton_OnClick"
                     Margin="0,14,0,0"
                     HorizontalAlignment="Center"

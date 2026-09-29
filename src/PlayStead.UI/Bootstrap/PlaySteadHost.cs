@@ -306,6 +306,7 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<IProviderGameMetadataStore, SqliteProviderGameMetadataStore>();
         builder.Services.AddSingleton<PlayStead.Core.Modding.IModEvidenceStore, PlayStead.Data.Modding.SqliteModEvidenceStore>();
         builder.Services.AddSingleton<PlayStead.Core.Modding.IModEvidenceDetector, PlayStead.Providers.Steam.SteamWorkshopModEvidenceDetector>();
+        builder.Services.AddSingleton<PlayStead.Core.Modding.IModEvidenceDetector, PlayStead.Providers.Steam.SteamGameSpecificModEvidenceDetector>();
         builder.Services.AddSingleton<PlayStead.Core.Modding.ModEvidenceRefreshService>();
         builder.Services.AddSingleton<SteamLocalGameMetadataSource>();
         builder.Services.AddSingleton<HttpClient>(_ =>

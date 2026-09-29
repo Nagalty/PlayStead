@@ -83,7 +83,7 @@ public sealed class GameQuickPanelViewModelTests
         Assert.Equal("1 h 00 min", viewModel.LastSessionDurationLabel);
         Assert.Equal("Inconnu", viewModel.TotalPlayTimeLabel);
         Assert.NotEqual("—", viewModel.LastSessionDateLabel);
-        Assert.NotEqual("Aucune activité PlayStead", viewModel.LastActivityLabel);
+        Assert.NotEqual("Pas encore d’activité connue pour ce jeu.", viewModel.LastActivityLabel);
     }
 
     [Fact]
@@ -226,7 +226,7 @@ public sealed class GameQuickPanelViewModelTests
         await viewModel.LoadSessionSummaryAsync(CancellationToken.None);
 
         Assert.True(viewModel.HasSinceLastPlaySummary);
-        Assert.Equal("Build modifié depuis ta dernière session", viewModel.SinceLastPlaySummary);
+        Assert.Equal("Il s’est passé quelque chose depuis ta dernière partie.", viewModel.SinceLastPlaySummary);
     }
 
     private static GameSession EndedSession(

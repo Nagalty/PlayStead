@@ -208,7 +208,7 @@ public sealed class HomeViewStructureTests
         Assert.Contains(placeholder.Descendants(presentation + "TextBlock"), element =>
             (string?)element.Attribute("Text") == "Une place pour ta prochaine aventure");
         Assert.Contains(placeholder.Descendants(presentation + "TextBlock"), element =>
-            (string?)element.Attribute("Text") == "Cette zone accueillera bientôt une suggestion éditoriale.");
+            (string?)element.Attribute("Text") == "Je prépare encore une idée pour ta prochaine partie.");
         Assert.DoesNotContain(placeholder.Descendants(), element =>
             ((string?)element.Attribute("Text"))?.Contains("{Binding Editorial", StringComparison.Ordinal) == true ||
             ((string?)element.Attribute("Visibility"))?.Contains("HasPrimaryGame", StringComparison.Ordinal) == true);
@@ -326,7 +326,7 @@ public sealed class HomeViewStructureTests
         var heroText = hero.Descendants(presentation + "TextBlock").ToArray();
         Assert.Contains(heroText, element => (string?)element.Attribute("Text") == "SUGGESTION DU MOMENT");
         Assert.Contains(heroText, element => (string?)element.Attribute("Text") == "Une place pour ta prochaine aventure");
-        Assert.Contains(heroText, element => (string?)element.Attribute("Text") == "Cette zone accueillera bientôt une suggestion éditoriale.");
+        Assert.Contains(heroText, element => (string?)element.Attribute("Text") == "Je prépare encore une idée pour ta prochaine partie.");
         Assert.Contains(heroText, element => (string?)element.Attribute("Style") == "{DynamicResource PlayStead.Text.PageTitle}");
         Assert.Contains(heroText, element => (string?)element.Attribute("Style") == "{DynamicResource PlayStead.Text.BodySecondary}");
 
@@ -425,7 +425,7 @@ public sealed class HomeViewStructureTests
         Assert.Contains(hero.Descendants(presentation + "TextBlock"), element =>
             (string?)element.Attribute("Text") == "Une place pour ta prochaine aventure");
         Assert.Contains(hero.Descendants(presentation + "TextBlock"), element =>
-            (string?)element.Attribute("Text") == "Cette zone accueillera bientôt une suggestion éditoriale.");
+            (string?)element.Attribute("Text") == "Je prépare encore une idée pour ta prochaine partie.");
 
         var recent =
             Assert.Single(
@@ -571,7 +571,7 @@ public sealed class HomeViewStructureTests
         Assert.Contains(card.Descendants(presentation + "TextBlock"), element =>
             (string?)element.Attribute("Text") == "Une place pour ta prochaine aventure");
         Assert.Contains(card.Descendants(presentation + "TextBlock"), element =>
-            (string?)element.Attribute("Text") == "Cette zone accueillera bientôt une suggestion éditoriale.");
+            (string?)element.Attribute("Text") == "Je prépare encore une idée pour ta prochaine partie.");
         Assert.Empty(card.Descendants(presentation + "Button"));
         Assert.DoesNotContain(card.Descendants(), element =>
             ((string?)element.Attribute("Text"))?.Contains("{Binding Editorial", StringComparison.Ordinal) == true);

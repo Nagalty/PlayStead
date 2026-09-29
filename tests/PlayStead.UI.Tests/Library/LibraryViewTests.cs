@@ -27,8 +27,8 @@ public sealed class LibraryViewTests
                 view.FindName("RescanButton"));
 
             Assert.Equal("Bibliothèque", heading.Text);
-            Assert.Equal("Aucun jeu local détecté.", emptyState.Text);
-            Assert.Equal("Relancer l’analyse", rescanButton.Content);
+            Assert.Equal("Je n’ai trouvé aucun jeu installé pour l’instant.", emptyState.Text);
+            Assert.Equal("Jeter un nouvel œil", rescanButton.Content);
             Assert.NotNull(gameList);
 
             return 0;

@@ -267,8 +267,9 @@ public sealed class LibraryViewModel :
                 nameof(HasItems));
             OnPropertyChanged(
                 nameof(GridRows));
-            OnPropertyChanged(
-                nameof(VisibleItems));
+            OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(HasVisibleItems));
+        OnPropertyChanged(nameof(EmptyStateMessage));
 
             ReconcileSelectedItem();
         }
@@ -447,6 +448,16 @@ public sealed class LibraryViewModel :
     public IReadOnlyList<LibraryItemViewModel> VisibleItems =>
         ApplyProjection();
 
+    public bool HasVisibleItems => VisibleItems.Count > 0;
+
+    public string EmptyStateMessage => _quickFilter switch
+    {
+        LibraryQuickFilter.Attention => "Rien à te signaler pour l’instant.\nTout roule, je garde quand même un œil dessus.",
+        LibraryQuickFilter.Modded => "Je n’ai trouvé aucun jeu clairement moddé pour l’instant.\nSi j’ai un doute, je préfère te le dire plutôt que d’inventer.",
+        _ when IsSearchActive || HasAdvancedFilters => "Rien ne correspond à ces filtres pour l’instant.",
+        _ => "Je n’ai trouvé aucun jeu installé pour l’instant."
+    };
+
     public GameId? SelectedGameId =>
         _selectedGameId;
 
@@ -499,6 +510,8 @@ public sealed class LibraryViewModel :
         OnPropertyChanged(
             nameof(SortKey));
         OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(HasVisibleItems));
+        OnPropertyChanged(nameof(EmptyStateMessage));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
     }
@@ -515,6 +528,8 @@ public sealed class LibraryViewModel :
         OnPropertyChanged(nameof(IsAttentionQuickFilter));
         OnPropertyChanged(nameof(IsModdedQuickFilter));
         OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(HasVisibleItems));
+        OnPropertyChanged(nameof(EmptyStateMessage));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
     }
@@ -654,8 +669,9 @@ public sealed class LibraryViewModel :
             nameof(SearchQuery));
         OnPropertyChanged(
             nameof(IsSearchActive));
-        OnPropertyChanged(
-            nameof(VisibleItems));
+        OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(HasVisibleItems));
+        OnPropertyChanged(nameof(EmptyStateMessage));
         OnPropertyChanged(
             nameof(GridRows));
     }
@@ -1570,6 +1586,8 @@ public sealed class LibraryViewModel :
 
         _activityByGame = projection;
         OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(HasVisibleItems));
+        OnPropertyChanged(nameof(EmptyStateMessage));
         OnPropertyChanged(nameof(GridRows));
     }
 
@@ -1764,6 +1782,8 @@ public sealed class LibraryViewModel :
         OnPropertyChanged(nameof(HasAdvancedFilters));
         OnPropertyChanged(nameof(IsAdvancedFilterEmpty));
         OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(HasVisibleItems));
+        OnPropertyChanged(nameof(EmptyStateMessage));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
     }
@@ -1800,6 +1820,8 @@ public sealed class LibraryViewModel :
             .ToHashSet() ?? [];
         OnPropertyChanged(nameof(AttentionGameIds));
         OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(HasVisibleItems));
+        OnPropertyChanged(nameof(EmptyStateMessage));
         OnPropertyChanged(nameof(GridRows));
         ReconcileSelectedItem();
     }
@@ -1819,6 +1841,8 @@ public sealed class LibraryViewModel :
         }
         OnPropertyChanged(nameof(ModStatesByGame));
         OnPropertyChanged(nameof(VisibleItems));
+        OnPropertyChanged(nameof(HasVisibleItems));
+        OnPropertyChanged(nameof(EmptyStateMessage));
         OnPropertyChanged(nameof(GridRows));
     }
 

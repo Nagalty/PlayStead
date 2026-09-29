@@ -9,7 +9,7 @@ public sealed class GameDetailBuildHistoryStructureTests
         var xaml = File.ReadAllText(path);
 
         Assert.Contains("x:Name=\"BuildHistorySection\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Historique des changements", xaml, StringComparison.Ordinal);
+        Assert.Contains("Ce qui a bougé", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding BuildHistorySummary}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding BuildHistory}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("{Binding ObservedAtLabel}", xaml, StringComparison.Ordinal);

@@ -155,6 +155,22 @@ public sealed class GameDetailFoundationTests
     }
 
     [Fact]
+    public void Build_history_uses_playstead_voice_for_first_reference_and_empty_change_state()
+    {
+        var entry = new GameDetailViewModel.BuildHistoryEntryViewModel(
+            null,
+            "25480438",
+            DateTimeOffset.UtcNow,
+            true,
+            false);
+
+        Assert.Equal("Premier point de repère · 25480438", entry.BuildTransitionLabel);
+        Assert.Contains("Rien n’a bougé depuis que je garde un œil dessus.",
+            "Rien n’a bougé depuis que je garde un œil dessus.",
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Detail_route_supplies_the_activity_projection()
     {
         var source =

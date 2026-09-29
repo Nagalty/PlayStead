@@ -343,7 +343,7 @@ public sealed class HomeViewModel :
     public string? DormantGameTitle => DormantGame?.Game.Title;
     public string? DormantGameContext => DormantGame is null
         ? null
-        : $"Pas joué depuis {DormantGame.DaysSinceLastPlayed} jours";
+        : $"Ça fait {DormantGame.DaysSinceLastPlayed} jours que celui-là n’a pas tourné.";
     public string? DormantGameDescription
     {
         get
@@ -380,7 +380,7 @@ public sealed class HomeViewModel :
         ? null
         : Suggestion.SelectionDay is DayOfWeek.Friday or DayOfWeek.Saturday or DayOfWeek.Sunday
             ? Suggestion.SelectionDay == DayOfWeek.Friday ? "Ce soir, on joue ensemble ?" : "On joue à plusieurs ?"
-            : "Une idée pour ta prochaine session.";
+            : "Je te garde une idée pour ta prochaine session.";
     public bool HasSuggestionWeekdayContext => Suggestion is not null && !HasSuggestionWeekendIdentity;
     public bool HasSuggestionWeekendIdentity => Suggestion is not null &&
         Suggestion.SelectionDay is DayOfWeek.Friday or DayOfWeek.Saturday or DayOfWeek.Sunday;
@@ -702,7 +702,7 @@ public sealed class HomeViewModel :
     {
         HomeEditorialPrimarySourceKind.GamesDuMoment => "Jeu du moment",
         HomeEditorialPrimarySourceKind.RecentCompletedSession => "Reprendre l’aventure",
-        _ => "Aucune aventure en cours"
+        _ => "Rien en cours pour l’instant."
     };
     public string EditorialTitle => _editorialPrimary.Game?.Title ?? "Prêt à replonger ?";
     public string EditorialSupportingText => PrimarySourceKind switch

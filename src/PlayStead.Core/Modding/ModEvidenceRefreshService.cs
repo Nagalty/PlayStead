@@ -14,9 +14,20 @@ public sealed class ModEvidenceRefreshService(
             var evidences = await detector.DetectAsync(installation, cancellationToken).ConfigureAwait(false);
             var matching = evidences.FirstOrDefault(evidence => evidence.GameId == installation.GameId);
             if (matching is null)
-                await store.RemoveAsync(installation.GameId, detector.DetectorId, ModEvidenceKind.WorkshopContentPresent, cancellationToken).ConfigureAwait(false);
+            {
+                foreach (var evidenceKind in Enum.GetValues<ModEvidenceKind>())
+                    await store.RemoveAsync(installation.GameId, detector.DetectorId, evidenceKind, cancellationToken).ConfigureAwait(false);
+            }
             else
-                await store.UpsertAsync(matching, cancellationToken).ConfigureAwait(false);
+            {
+                var current = evidences.Where(evidence => evidence.GameId == installation.GameId).ToArray();
+                foreach (var evidence in current)
+                    await store.UpsertAsync(evidence, cancellationToken).ConfigureAwait(false);
+
+                var presentKinds = current.Select(evidence => evidence.EvidenceKind).ToHashSet();
+                foreach (var evidenceKind in Enum.GetValues<ModEvidenceKind>().Where(kind => !presentKinds.Contains(kind)))
+                    await store.RemoveAsync(installation.GameId, detector.DetectorId, evidenceKind, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 

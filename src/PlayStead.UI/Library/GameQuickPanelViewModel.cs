@@ -22,7 +22,7 @@ public sealed class GameQuickPanelViewModel :
     private GameBuildHistoryService? _gameBuildHistoryService;
 
     private bool _hasSessionHistory;
-    private string _lastActivityLabel = "Aucune activité PlayStead";
+    private string _lastActivityLabel = "J’ai encore peu de recul sur celui-là.";
     private string _lastSessionDateLabel = "—";
     private string _lastSessionDurationLabel = "—";
     private string _totalPlayTimeLabel = "0 min";
@@ -122,7 +122,7 @@ public sealed class GameQuickPanelViewModel :
     public string SinceLastPlaySummary => HasAttention
         ? "Mise à jour disponible"
         : _hasBuildChangeSinceLastPlay
-            ? "Build modifié depuis ta dernière session"
+            ? "Il s’est passé quelque chose depuis ta dernière partie."
             : string.Empty;
 
     public string LastActivityLabel
@@ -205,7 +205,7 @@ public sealed class GameQuickPanelViewModel :
         {
             SetRecentActivitySessions(Array.Empty<RecentActivitySessionItemViewModel>());
             HasSessionHistory = false;
-            LastActivityLabel = "Aucune activité PlayStead";
+            LastActivityLabel = "J’ai encore peu de recul sur celui-là.";
             LastSessionDateLabel = "—";
             LastSessionDurationLabel = "—";
             PlaySteadTotalPlayTimeLabel = "0 min";
@@ -244,7 +244,7 @@ public sealed class GameQuickPanelViewModel :
         {
             SetRecentActivitySessions(Array.Empty<RecentActivitySessionItemViewModel>());
             HasSessionHistory = false;
-            LastActivityLabel = "Aucune activité PlayStead";
+            LastActivityLabel = "J’ai encore peu de recul sur celui-là.";
             LastSessionDateLabel = "—";
             LastSessionDurationLabel = "—";
             PlaySteadTotalPlayTimeLabel = "0 min";

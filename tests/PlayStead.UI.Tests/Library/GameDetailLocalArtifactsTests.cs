@@ -59,9 +59,24 @@ public sealed class GameDetailLocalArtifactsTests
 
             var projected = Assert.Single(viewModel.LocalArtifacts);
             Assert.Equal(LocalArtifactBaselineStatus.Unchanged, projected.BaselineStatus);
-            Assert.Equal("Conforme à la référence", projected.BaselineStatusLabel);
+            Assert.Equal("Rien n’a bougé depuis mon point de repère.", projected.BaselineStatusLabel);
         }
         finally { Directory.Delete(path, recursive: true); }
+    }
+
+    [Fact]
+    public void Baseline_copy_uses_playstead_voice_without_changing_sensitive_states()
+    {
+        var gameId = GameId.New();
+        static GameLocalArtifact Create(GameId id, LocalArtifactBaselineStatus status) =>
+            new(id, GameLocalArtifactKind.Configuration, @"C:\Config", GameLocalArtifactSource.ExplicitRule, GameLocalArtifactStatus.KnownAndExists, BaselineStatus: status);
+
+        Assert.Equal("J’ai encore aucun point de repère pour ce dossier.", Create(gameId, LocalArtifactBaselineStatus.NoBaseline).BaselineStatusLabel);
+        Assert.Equal("Ça a bougé depuis mon point de repère.", Create(gameId, LocalArtifactBaselineStatus.Changed).BaselineStatusLabel);
+        Assert.Equal("Introuvable", Create(gameId, LocalArtifactBaselineStatus.Missing).BaselineStatusLabel);
+        Assert.Equal("Indisponible", Create(gameId, LocalArtifactBaselineStatus.Unavailable).BaselineStatusLabel);
+        Assert.Equal("Prendre cet état comme point de repère", Create(gameId, LocalArtifactBaselineStatus.NoBaseline).BaselineActionLabel);
+        Assert.Equal("Mettre à jour mon point de repère", Create(gameId, LocalArtifactBaselineStatus.Changed).BaselineActionLabel);
     }
 
     private static GameDetailViewModel CreateViewModel(LibraryItemViewModel game, IReadOnlyList<GameLocalArtifact> artifacts) =>

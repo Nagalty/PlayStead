@@ -215,7 +215,7 @@
                     <StackPanel Margin="{DynamicResource PlayStead.Spacing.4}"
                                 MaxWidth="520"
                                 HorizontalAlignment="Left">
-                        <TextBlock Text="Aucune aventure en cours"
+                        <TextBlock Text="Rien en cours pour l’instant."
                                    FontSize="14">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource PlayStead.Text.Caption}">
@@ -303,7 +303,7 @@
                                    Style="{DynamicResource PlayStead.Text.PageTitle}"
                                    Margin="{DynamicResource PlayStead.Gap.Block.Small}"
                                    TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="Cette zone accueillera bientôt une suggestion éditoriale."
+                        <TextBlock Text="Je prépare encore une idée pour ta prochaine partie."
                                    Style="{DynamicResource PlayStead.Text.BodySecondary}" />
                     </StackPanel>
                     </Grid>

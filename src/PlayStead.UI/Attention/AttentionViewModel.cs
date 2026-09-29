@@ -9,7 +9,7 @@ public sealed class AttentionViewModel : INotifyPropertyChanged, IDisposable
     public AttentionViewModel() { }
     public AttentionViewModel(IAttentionService service) { _service = service; service.Changed += ServiceOnChanged; }
     public event PropertyChangedEventHandler? PropertyChanged;
-    public string EmptyMessage => "Aucune décision ni vérification à signaler pour le moment.";
+    public string EmptyMessage => "Rien à te signaler pour l’instant.";
     public IReadOnlyList<AttentionItem> Items => _service?.Items ?? [];
     public bool HasItems => Items.Count > 0;
     public async Task RefreshAsync(CancellationToken cancellationToken) { if (_service is not null) { await _service.RefreshAsync(cancellationToken); Notify(); } }

@@ -388,20 +388,32 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,10,0,0" Text="Modifications" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasModEvidence, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,10,0,0" Text="{Binding ModStatusLabel}" Style="{DynamicResource PlayStead.Text.Body}" Visibility="{Binding HasModEvidence, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
                     </StackPanel>
                 </Border>
 
+                <Border Grid.Row="4"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        Margin="0,18,0,0"
+                        Style="{DynamicResource PlayStead.Surface.Card}"
+                        Visibility="{Binding HasModEvidence, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel>
+                        <controls:SectionHeader Title="Mods" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="{Binding ModStatusLabel}"
+                                   Style="{DynamicResource PlayStead.Text.Body}" />
+                    </StackPanel>
+                </Border>
+
                 <Border x:Name="BuildHistorySection"
-                        Grid.Row="4"
+                        Grid.Row="5"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0"
                         Style="{DynamicResource PlayStead.Surface.Card}">
                     <StackPanel>
-                        <controls:SectionHeader Title="Historique des changements" />
+                        <controls:SectionHeader Title="Ce qui a bougé" />
                         <TextBlock Margin="0,8,0,0"
                                    Text="{Binding BuildHistorySummary}"
                                    Style="{DynamicResource PlayStead.Text.BodySecondary}" />
@@ -465,7 +477,7 @@
                                             <TextBlock Text="{Binding Path}"
                                                        Style="{DynamicResource PlayStead.Text.Body}"
                                                        TextWrapping="Wrap" />
-                                            <TextBlock Text="Emplacement connu mais absent"
+                                            <TextBlock Text="Je connais l’emplacement, mais le dossier n’est plus là."
                                                        Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
                                                        FontSize="13">
                                                 <TextBlock.Style>
@@ -481,7 +493,7 @@
                                             </TextBlock>
                                         </StackPanel>
                                         <StackPanel Grid.Row="2" Margin="0,4,0,0">
-                                            <TextBlock Text="État de référence"
+                                            <TextBlock Text="Point de repère"
                                                        Style="{DynamicResource PlayStead.Text.Caption}" />
                                             <TextBlock Text="{Binding BaselineStatusLabel}"
                                                        Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
@@ -500,7 +512,7 @@
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding CanCaptureBaseline}" />
                                             <Button Content="Créer une sauvegarde"
-                                                    ToolTip="Définissez d’abord un état de référence."
+                                                    ToolTip="Définissez d’abord un point de repère."
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CreateLocalArtifactSnapshotCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"

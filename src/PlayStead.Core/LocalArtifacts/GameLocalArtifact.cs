@@ -52,16 +52,16 @@ public sealed record GameLocalArtifact(
 
     public string BaselineStatusLabel => BaselineStatus switch
     {
-        LocalArtifactBaselineStatus.Unchanged => "Conforme à la référence",
-        LocalArtifactBaselineStatus.Changed => "Modifié depuis la référence",
+        LocalArtifactBaselineStatus.Unchanged => "Rien n’a bougé depuis mon point de repère.",
+        LocalArtifactBaselineStatus.Changed => "Ça a bougé depuis mon point de repère.",
         LocalArtifactBaselineStatus.Missing => "Introuvable",
         LocalArtifactBaselineStatus.Unavailable => "Indisponible",
-        _ => "Aucune référence"
+        _ => "J’ai encore aucun point de repère pour ce dossier."
     };
 
     public bool CanCaptureBaseline => Exists && BaselineStatus != LocalArtifactBaselineStatus.Unavailable;
     public bool HasBaseline => BaselineStatus is LocalArtifactBaselineStatus.Unchanged or LocalArtifactBaselineStatus.Changed;
-    public string BaselineActionLabel => HasBaseline ? "Mettre à jour l’état de référence" : "Définir l’état actuel comme référence";
+    public string BaselineActionLabel => HasBaseline ? "Mettre à jour mon point de repère" : "Prendre cet état comme point de repère";
 }
 
 public interface IGameLocalArtifactDiscoveryService
