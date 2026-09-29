@@ -167,6 +167,30 @@ public sealed class Task03SettingsViewAndRouteTests
     }
 
     [Fact]
+    public void Protection_and_preferences_titles_share_the_same_external_section_hierarchy()
+    {
+        var document = XDocument.Load(FindUiFile("Settings/SettingsView.xaml"));
+        var textBlocks = document.Descendants()
+            .Where(element => element.Name.LocalName == "TextBlock")
+            .Where(element => (string?)element.Attribute("Text") is "Protection locale" or "Préférences")
+            .ToArray();
+
+        Assert.Equal(2, textBlocks.Length);
+        Assert.All(textBlocks, title =>
+        {
+            Assert.Equal("18", (string?)title.Attribute("FontSize"));
+            Assert.Equal("SemiBold", (string?)title.Attribute("FontWeight"));
+            Assert.Equal("0,0,0,10", (string?)title.Attribute("Margin"));
+        });
+
+        var protectionTitle = textBlocks.Single(x => (string?)x.Attribute("Text") == "Protection locale");
+        Assert.Equal("StackPanel", protectionTitle.Parent?.Name.LocalName);
+        Assert.DoesNotContain(
+            document.Descendants().Where(element => element.Name.LocalName == "Border"),
+            border => border.Descendants().Contains(protectionTitle));
+    }
+
+    [Fact]
     public void Host_registers_ui_preferences_store_and_SettingsViewModel()
     {
         var source =

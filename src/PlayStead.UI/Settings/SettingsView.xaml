@@ -70,6 +70,7 @@
             <TextBlock Text="Personnalise le comportement visuel et les animations de PlayStead."
                        Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
                        TextWrapping="Wrap" Margin="0,8,0,24"/>
+            <TextBlock Text="Protection locale" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
             <Border Background="{DynamicResource PlayStead.Brush.Surface}"
                     BorderBrush="{DynamicResource PlayStead.Brush.Border}"
                     BorderThickness="1"
@@ -78,7 +79,6 @@
                     Margin="0,0,0,16"
                     Visibility="{Binding IsProtectionCardVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel>
-                    <TextBlock Text="Protection locale" FontSize="18" FontWeight="SemiBold" />
                     <StackPanel Visibility="{Binding IsProtectionOnboardingPending, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <TextBlock Text="{Binding ProtectionSummaryLabel}" Margin="0,8,0,0" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
                         <TextBlock Text="Je peux garder un œil dessus et protéger tes sauvegardes automatiquement." Margin="0,4,0,0" TextWrapping="Wrap" Style="{DynamicResource PlayStead.Text.BodySecondary}" />
