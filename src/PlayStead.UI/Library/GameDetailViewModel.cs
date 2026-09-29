@@ -129,8 +129,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         _userDefinedArtifactService = userDefinedArtifactService;
         _modEvidenceStore = modEvidenceStore;
         _artifactBaselineComparisonService = artifactBaselineComparisonService ?? new LocalArtifactBaselineComparisonService();
-        _openLocalArtifactFolderCommand = new RelayCommand<GameLocalArtifact>(OpenLocalArtifactFolder,
-            artifact => artifact?.Exists == true && Directory.Exists(artifact.Path));
+        _openLocalArtifactFolderCommand = new RelayCommand<GameLocalArtifact>(OpenLocalArtifact,
+            artifact => artifact?.Exists == true && artifact.Details is not null);
         CaptureLocalArtifactBaselineCommand = new AsyncRelayCommand<GameLocalArtifact>(CaptureLocalArtifactBaselineAsync,
             artifact => artifact?.CanCaptureBaseline == true);
         CreateLocalArtifactSnapshotCommand = new AsyncRelayCommand<GameLocalArtifact>(CreateLocalArtifactSnapshotAsync,
@@ -541,15 +541,14 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         };
     }
 
-    private static void OpenLocalArtifactFolder(GameLocalArtifact? artifact)
+    private static void OpenLocalArtifact(GameLocalArtifact? artifact)
     {
-        if (artifact?.Exists != true || !Directory.Exists(artifact.Path))
+        if (artifact?.Exists != true || artifact.Details is null)
             return;
 
         Process.Start(new ProcessStartInfo
         {
-            FileName = "explorer.exe",
-            Arguments = $"\"{artifact.Path}\"",
+            FileName = artifact.Path,
             UseShellExecute = true
         });
     }

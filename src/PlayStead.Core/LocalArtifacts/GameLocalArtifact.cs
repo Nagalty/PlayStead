@@ -41,7 +41,8 @@ public sealed record GameLocalArtifact(
     string? RuleIdentity = null,
     LocalArtifactBaselineStatus BaselineStatus = LocalArtifactBaselineStatus.NoBaseline,
     int SnapshotCount = 0,
-    DateTimeOffset? LastSnapshotAtUtc = null)
+    DateTimeOffset? LastSnapshotAtUtc = null,
+    LocalArtifactDetails? Details = null)
 {
     public bool Exists => Status == GameLocalArtifactStatus.KnownAndExists;
     public bool IsUserDefined => Source == GameLocalArtifactSource.UserDefined;
@@ -81,6 +82,42 @@ public sealed record GameLocalArtifact(
         _ => string.Empty
     };
     public bool HasSnapshots => SnapshotCount > 0;
+    public bool HasDetails => Details is not null;
+    public bool IsFile => Details?.IsFile == true;
+    public string OpenActionLabel => IsFile ? "Ouvrir le fichier" : "Ouvrir le dossier";
+    public string DetailsLabel
+    {
+        get
+        {
+            if (Details is null) return "Informations indisponibles.";
+            var parts = new List<string>();
+            if (Details.FileCount is int count)
+                parts.Add($"{count} fichier{(count == 1 ? string.Empty : "s")}");
+            if (Details.TotalBytes is long bytes)
+                parts.Add(FormatBytes(bytes));
+            if (Details.LastModifiedUtc is DateTimeOffset modified)
+                parts.Add($"modifié {FormatDate(modified)}");
+            return parts.Count == 0 ? "Informations indisponibles." : string.Join(" · ", parts);
+        }
+    }
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        >= 1_073_741_824 => $"{bytes / 1_073_741_824d:0.#} Go",
+        >= 1_048_576 => $"{bytes / 1_048_576d:0.#} Mo",
+        >= 1024 => $"{bytes / 1024d:0.#} Ko",
+        _ => $"{bytes} octets"
+    };
+
+    private static string FormatDate(DateTimeOffset value)
+    {
+        var local = value.ToLocalTime();
+        return local.Date == DateTimeOffset.Now.Date
+            ? $"aujourd’hui à {local:HH:mm}"
+            : local.Date == DateTimeOffset.Now.Date.AddDays(-1)
+                ? $"hier à {local:HH:mm}"
+                : $"le {local:dd/MM/yyyy} à {local:HH:mm}";
+    }
 }
 
 public interface IGameLocalArtifactDiscoveryService

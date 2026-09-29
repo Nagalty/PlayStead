@@ -23,6 +23,7 @@ public sealed record LocalArtifactSnapshot(
     {
         SnapshotReason.PreRestore => "Sauvegarde de sécurité",
         SnapshotReason.InitialProtection => "Première sauvegarde de sécurité",
+        SnapshotReason.PreUpdate => "Sauvegarde avant mise à jour",
         _ => string.Empty
     };
 }
@@ -31,7 +32,8 @@ public enum SnapshotReason
 {
     Manual = 0,
     PreRestore = 1,
-    InitialProtection = 2
+    InitialProtection = 2,
+    PreUpdate = 3
 }
 
 public interface ILocalArtifactSnapshotStore

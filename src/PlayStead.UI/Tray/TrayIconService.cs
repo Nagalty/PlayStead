@@ -3,13 +3,14 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using PlayStead.Core.Sessions;
+using PlayStead.Core.ProviderInstallUpdate;
 using PlayStead.UI.Sessions;
 using PlayStead.UI.SingleInstance;
 using Forms = System.Windows.Forms;
 
 namespace PlayStead.UI.Tray;
 
-public sealed class TrayIconService : IDisposable
+public sealed class TrayIconService : IDisposable, IWindowsSilentNotificationSink
 {
     private readonly IWindowActivator _windowActivator;
     private readonly WindowClosePolicy _closePolicy;
@@ -116,6 +117,13 @@ public sealed class TrayIconService : IDisposable
 
         return _windowActivator.ActivateAsync(
             cancellationToken);
+    }
+
+    public Task ShowAsync(string title, string message, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _notifyIcon?.ShowBalloonTip(5000, title, message, Forms.ToolTipIcon.None);
+        return Task.CompletedTask;
     }
 
     public void RequestExit()

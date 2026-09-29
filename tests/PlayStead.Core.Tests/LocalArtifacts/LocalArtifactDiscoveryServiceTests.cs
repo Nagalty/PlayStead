@@ -32,6 +32,46 @@ public sealed class LocalArtifactDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task Existing_file_and_directory_expose_bounded_details()
+    {
+        var gameId = GameId.New();
+        var root = Path.Combine(Path.GetTempPath(), $"playstead-artifact-details-{Guid.NewGuid():N}");
+        var saves = Path.Combine(root, "saves");
+        Directory.CreateDirectory(Path.Combine(saves, "nested"));
+        var first = Path.Combine(saves, "one.sav");
+        var second = Path.Combine(saves, "nested", "two.sav");
+        var log = Path.Combine(root, "Player.log");
+        await File.WriteAllTextAsync(first, "1234");
+        await File.WriteAllTextAsync(second, "12");
+        await File.WriteAllTextAsync(log, "log");
+        try
+        {
+            var service = new LocalArtifactDiscoveryService([
+                new(gameId, GameLocalArtifactKind.SaveData, saves),
+                new(gameId, GameLocalArtifactKind.Log, log)]);
+
+            var artifacts = await service.DiscoverAsync(gameId, CancellationToken.None);
+            var directory = Assert.Single(artifacts, x => x.Kind == GameLocalArtifactKind.SaveData);
+            var file = Assert.Single(artifacts, x => x.Kind == GameLocalArtifactKind.Log);
+
+            Assert.NotNull(directory.Details);
+            Assert.False(directory.Details!.IsFile);
+            Assert.Equal(2, directory.Details.FileCount);
+            Assert.Equal(6, directory.Details.TotalBytes);
+            Assert.NotNull(directory.Details.LastModifiedUtc);
+            Assert.Equal("2 fichiers · 6 octets", directory.DetailsLabel.Split(" · modifié")[0]);
+            Assert.Equal("1 fichier · 3 octets", file.DetailsLabel.Split(" · modifié")[0]);
+            Assert.True(file.IsFile);
+            Assert.Equal("Ouvrir le fichier", file.OpenActionLabel);
+            Assert.Equal("Ouvrir le dossier", directory.OpenActionLabel);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Environment_variables_expand_and_missing_paths_remain_known()
     {
         var gameId = GameId.New();

@@ -343,7 +343,8 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateStateReconciliationService>(services =>
             new PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateStateReconciliationService(
                 services.GetServices<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateStateSource>(),
-                services.GetRequiredService<GameBuildHistoryService>()));
+                services.GetRequiredService<GameBuildHistoryService>(),
+                services.GetRequiredService<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateProtectionService>()));
         builder.Services.AddSingleton<SteamInstallUpdateLiveRefreshService>();
         builder.Services.AddSingleton<IHomeSuggestionSelectionStore>(_ =>
             new JsonHomeSuggestionSelectionStore(
@@ -455,6 +456,15 @@ public static class PlaySteadHost
                 services.GetRequiredService<ILocalArtifactSnapshotStore>(),
                 Path.Combine(dataRoot, "Snapshots"),
                 services.GetRequiredService<ILocalSnapshotStorageService>()));
+        builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IWindowsSilentNotificationSink>(services =>
+            services.GetRequiredService<TrayIconService>());
+        builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateProtectionService>(services =>
+            new PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateProtectionService(
+                services.GetRequiredService<PlayStead.Core.LocalArtifacts.ILocalProtectionSetupService>(),
+                services.GetRequiredService<PlayStead.Core.LocalArtifacts.ILocalArtifactSnapshotService>(),
+                services.GetRequiredService<PlayStead.Core.Notifications.INotificationCenterService>(),
+                services.GetRequiredService<PlayStead.Core.Persistence.ILibraryStore>(),
+                services.GetRequiredService<PlayStead.Core.ProviderInstallUpdate.IWindowsSilentNotificationSink>()));
         builder.Services.AddSingleton<ILocalArtifactRestoreService>(services =>
             new LocalArtifactRestoreService(
                 services.GetRequiredService<IArtifactFingerprintService>(),

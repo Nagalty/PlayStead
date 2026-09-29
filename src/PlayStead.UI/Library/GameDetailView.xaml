@@ -479,12 +479,16 @@
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0"
+                                            <TextBlock Grid.Row="0"
                                                    Text="{Binding KindLabel}"
                                                    Style="{DynamicResource PlayStead.Text.Caption}" />
                                         <StackPanel Grid.Row="1" Margin="16,0,12,0">
                                             <TextBlock Text="{Binding Path}"
                                                        Style="{DynamicResource PlayStead.Text.Body}"
+                                                       TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding DetailsLabel}"
+                                                       Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                                       Margin="0,3,0,0"
                                                        TextWrapping="Wrap" />
                                             <TextBlock Text="Je connais l’emplacement, mais le dossier n’est plus là."
                                                        Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
@@ -523,23 +527,24 @@
                                                        Visibility="{Binding HasSnapshots, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         </StackPanel>
                                         <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,6,0,0">
-                                            <Button Content="Ouvrir le dossier"
+                                            <Button Content="{Binding OpenActionLabel}"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.OpenLocalArtifactFolderCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
-                                                    IsEnabled="{Binding Exists}"
-                                                    Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                    Visibility="{Binding HasDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <Button Content="{Binding BaselineActionLabel}"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CaptureLocalArtifactBaselineCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
-                                                    IsEnabled="{Binding CanCaptureBaseline}" />
+                                                    IsEnabled="{Binding CanCaptureBaseline}"
+                                                    Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <Button Content="Créer une sauvegarde"
                                                     ToolTip="Définissez d’abord un point de repère."
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CreateLocalArtifactSnapshotCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
-                                                    IsEnabled="{Binding Exists}" />
+                                                    IsEnabled="{Binding Exists}"
+                                                    Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <Button Content="Retirer de PlayStead"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.RemoveUserDefinedArtifactCommand, ElementName=GameDetailRoot}"
@@ -574,7 +579,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </StackPanel>
-                        <Button Content="Ajouter un dossier"
+                        <Button Content="Ajouter un dossier à surveiller"
                                 Margin="0,8,0,0"
                                 HorizontalAlignment="Left"
                                 Style="{DynamicResource PlayStead.Button.Secondary}"

@@ -7,15 +7,18 @@ public sealed class ProviderInstallUpdateStateReconciliationService
 {
     private readonly IReadOnlyList<IProviderInstallUpdateStateSource> _sources;
     private readonly GameBuildHistoryService? _gameBuildHistory;
+    private readonly IProviderInstallUpdateProtectionService? _protection;
     private readonly Dictionary<(GameId GameId, ProviderKind Provider), ProviderInstallUpdateState> _current = [];
 
     public ProviderInstallUpdateStateReconciliationService(
         IEnumerable<IProviderInstallUpdateStateSource> sources,
-        GameBuildHistoryService? gameBuildHistory = null)
+        GameBuildHistoryService? gameBuildHistory = null,
+        IProviderInstallUpdateProtectionService? protection = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
         _sources = sources.ToArray();
         _gameBuildHistory = gameBuildHistory;
+        _protection = protection;
     }
 
     public event EventHandler? Changed;
@@ -83,6 +86,21 @@ public sealed class ProviderInstallUpdateStateReconciliationService
 
                 _current[key] = value;
                 changed = true;
+                if (_protection is not null && value.Status == ProviderInstallUpdateStatus.UpdateAvailable)
+                {
+                    try
+                    {
+                        await _protection.ProtectBeforeUpdateAsync(value, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch
+                    {
+                        // Protection failure is surfaced through its attention notification.
+                    }
+                }
             }
 
             var validGameIds = scoped.Select(x => x.GameId).ToHashSet();

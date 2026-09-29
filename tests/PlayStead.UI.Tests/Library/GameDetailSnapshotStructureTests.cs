@@ -13,6 +13,17 @@ public sealed class GameDetailSnapshotStructureTests
         Assert.Contains("RestoreLocalArtifactSnapshotCommand", xaml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Game_detail_exposes_local_artifact_metadata_and_conditional_opening()
+    {
+        var path = Path.Combine(FindRoot(), "src", "PlayStead.UI", "Library", "GameDetailView.xaml");
+        var xaml = File.ReadAllText(path);
+        Assert.Contains("{Binding DetailsLabel}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{Binding OpenActionLabel}", xaml, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"{Binding HasDetails, Converter={StaticResource BooleanToVisibilityConverter}}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("OpenLocalArtifactFolderCommand", xaml, StringComparison.Ordinal);
+    }
+
     private static string FindRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

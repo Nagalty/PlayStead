@@ -36,15 +36,15 @@ public sealed class LocalArtifactDiscoveryService : IGameLocalArtifactDiscoveryS
             if (!TryNormalizePath(rule.PathTemplate, out var path))
                 continue;
 
+            var exists = File.Exists(path) || Directory.Exists(path);
             artifacts.Add(new GameLocalArtifact(
                 gameId,
                 rule.Kind,
                 path,
                 rule.Source,
-                File.Exists(path) || Directory.Exists(path)
-                    ? GameLocalArtifactStatus.KnownAndExists
-                    : GameLocalArtifactStatus.KnownButMissing,
-                rule.PathTemplate));
+                exists ? GameLocalArtifactStatus.KnownAndExists : GameLocalArtifactStatus.KnownButMissing,
+                rule.PathTemplate,
+                Details: exists ? LocalArtifactDetailsReader.Read(path) : null));
         }
 
         if (_userDefinedStore is not null)
@@ -58,13 +58,15 @@ public sealed class LocalArtifactDiscoveryService : IGameLocalArtifactDiscoveryS
                     continue;
                 if (!builtInPaths.Add((custom.Kind, NormalizeForComparison(path))))
                     continue;
+                var exists = File.Exists(path) || Directory.Exists(path);
                 artifacts.Add(new GameLocalArtifact(
                     gameId,
                     custom.Kind,
                     path,
                     GameLocalArtifactSource.UserDefined,
-                    Directory.Exists(path) ? GameLocalArtifactStatus.KnownAndExists : GameLocalArtifactStatus.KnownButMissing,
-                    $"user:{custom.Id:D}"));
+                    exists ? GameLocalArtifactStatus.KnownAndExists : GameLocalArtifactStatus.KnownButMissing,
+                    $"user:{custom.Id:D}",
+                    Details: exists ? LocalArtifactDetailsReader.Read(path) : null));
             }
         }
 
