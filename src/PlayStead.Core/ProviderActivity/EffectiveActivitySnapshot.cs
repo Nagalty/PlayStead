@@ -30,5 +30,15 @@ public sealed record EffectiveActivitySnapshot(
     int ProviderRecoveredSessionCount,
     DateTimeOffset? ProviderRecoveredCoverageStartUtc,
     DateTimeOffset? ProviderRecoveredCoverageEndUtc,
-    DateTimeOffset ObservedAtUtc);
+    DateTimeOffset ObservedAtUtc)
+{
+    // Count of complete, reconciled episodes across provider-recovered and
+    // PlayStead-observed sources. LastPlayed metadata never contributes an episode.
+    public int EffectiveSessionCount { get; init; }
 
+    public DateTimeOffset? KnownSessionHistoryStartUtc { get; init; }
+
+    public DateTimeOffset? KnownSessionHistoryEndUtc { get; init; }
+
+    public bool KnownSessionHistoryIsComplete { get; init; }
+}

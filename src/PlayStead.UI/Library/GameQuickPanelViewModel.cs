@@ -27,6 +27,7 @@ public sealed class GameQuickPanelViewModel :
     private string _lastSessionDurationLabel = "—";
     private string _totalPlayTimeLabel = "0 min";
     private string _sessionCountLabel = "0 session";
+    private string _knownSessionHistoryLabel = string.Empty;
     private IReadOnlyList<RecentActivitySessionItemViewModel> _recentActivitySessions =
         Array.Empty<RecentActivitySessionItemViewModel>();
     private bool _hasAttention;
@@ -167,6 +168,14 @@ public sealed class GameQuickPanelViewModel :
         private set => SetField(ref _sessionCountLabel, value);
     }
 
+    public string KnownSessionHistoryLabel
+    {
+        get => _knownSessionHistoryLabel;
+        private set => SetField(ref _knownSessionHistoryLabel, value);
+    }
+
+    public bool HasKnownSessionHistory => !string.IsNullOrEmpty(KnownSessionHistoryLabel);
+
     public IReadOnlyList<RecentActivitySessionItemViewModel> RecentActivitySessions =>
         _recentActivitySessions;
 
@@ -202,7 +211,8 @@ public sealed class GameQuickPanelViewModel :
             PlaySteadTotalPlayTimeLabel = "0 min";
             TotalPlayTimeLabel = ProviderPlayTimeLabel ?? "Inconnu";
             OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
-            SessionCountLabel = "0 session";
+            SessionCountLabel = "0 session connue";
+            SetKnownSessionHistory(null);
             return;
         }
 
@@ -240,7 +250,8 @@ public sealed class GameQuickPanelViewModel :
             PlaySteadTotalPlayTimeLabel = "0 min";
             TotalPlayTimeLabel = ProviderPlayTimeLabel ?? "Inconnu";
             OnPropertyChanged(nameof(PlaySteadTotalPlayTimeLabel));
-            SessionCountLabel = "0 session";
+            SessionCountLabel = "0 session connue";
+            SetKnownSessionHistory(null);
             return;
         }
         var recentActivity = segments
@@ -276,8 +287,9 @@ public sealed class GameQuickPanelViewModel :
 
         SessionCountLabel =
             segments.Count == 1
-                ? "1 session"
-                : $"{segments.Count} sessions";
+                ? "1 session connue"
+                : $"{segments.Count} sessions connues";
+        SetKnownSessionHistory(segments.Min(item => item.StartedAtUtc));
 
         if (_effectiveActivityService is not null)
         {
@@ -291,9 +303,10 @@ public sealed class GameQuickPanelViewModel :
                 : "—";
             LastSessionDateLabel = LastActivityLabel;
             PlaySteadTotalPlayTimeLabel = FormatDuration(effective.PlaySteadObservedTime);
-            SessionCountLabel = effective.PlaySteadSessionCount == 1
-                ? "1 session"
-                : $"{effective.PlaySteadSessionCount} sessions";
+            SessionCountLabel = effective.EffectiveSessionCount == 1
+                ? "1 session connue"
+                : $"{effective.EffectiveSessionCount} sessions connues";
+            SetKnownSessionHistory(effective.KnownSessionHistoryStartUtc);
             OnPropertyChanged(nameof(TotalPlayTimeLabel));
             OnPropertyChanged(nameof(LastActivityLabel));
             OnPropertyChanged(nameof(LastSessionDateLabel));
@@ -362,6 +375,17 @@ public sealed class GameQuickPanelViewModel :
         FormatTimestampForDisplay(
             timestamp,
             DateTimeOffset.Now);
+
+    private void SetKnownSessionHistory(DateTimeOffset? startUtc)
+    {
+        KnownSessionHistoryLabel = startUtc is { } start
+            ? $"Historique connu depuis {FormatCoverageDate(start)}"
+            : string.Empty;
+        OnPropertyChanged(nameof(HasKnownSessionHistory));
+    }
+
+    private static string FormatCoverageDate(DateTimeOffset timestamp) =>
+        timestamp.ToLocalTime().ToString("d MMM yyyy", CultureInfo.GetCultureInfo("fr-FR"));
 
     public static string FormatTimestampForDisplay(
         DateTimeOffset timestamp,

@@ -47,6 +47,11 @@ public sealed class EffectiveActivityService : IEffectiveActivityService
 
         var observedMerged = Merge(observed.Select(x => (x.SessionId, x.Start, x.End)));
         var recoveredMerged = Merge(recovered);
+        var effectiveMerged = Merge(
+            recovered.Select(x => (x.SessionId, x.Start, x.End))
+                .Concat(observed.Select(x => (x.SessionId, x.Start, x.End))));
+        var knownHistoryStart = effectiveMerged.Select(x => (DateTimeOffset?)x.Start).Min();
+        var knownHistoryEnd = effectiveMerged.Select(x => (DateTimeOffset?)x.End).Max();
         var providerLast = metadata?.LastPlayedAtUtc;
         var recoveredLast = recoveredMerged.Select(x => (DateTimeOffset?)x.End).Max();
         var observedLast = observedMerged.Select(x => (DateTimeOffset?)x.End).Max();
@@ -73,7 +78,16 @@ public sealed class EffectiveActivityService : IEffectiveActivityService
             lastCandidates.Value, lastCandidates.Source,
             observedMerged.Aggregate(TimeSpan.Zero, (sum, x) => sum + (x.End - x.Start)), observedMerged.Count,
             recoveredMerged.Aggregate(TimeSpan.Zero, (sum, x) => sum + (x.End - x.Start)), recoveredMerged.Count,
-            recoveredMerged.Select(x => (DateTimeOffset?)x.Start).Min(), recoveredMerged.Select(x => (DateTimeOffset?)x.End).Max(), now);
+            recoveredMerged.Select(x => (DateTimeOffset?)x.Start).Min(), recoveredMerged.Select(x => (DateTimeOffset?)x.End).Max(), now)
+        {
+            EffectiveSessionCount = effectiveMerged.Count,
+            KnownSessionHistoryStartUtc = knownHistoryStart,
+            KnownSessionHistoryEndUtc = knownHistoryEnd,
+            // Neither Steam's rolling process log nor PlayStead's observed
+            // sessions proves that the period before the first known episode
+            // is empty.
+            KnownSessionHistoryIsComplete = false
+        };
     }
 
     private static IReadOnlyList<(Guid SessionId, DateTimeOffset Start, DateTimeOffset End)> Merge(

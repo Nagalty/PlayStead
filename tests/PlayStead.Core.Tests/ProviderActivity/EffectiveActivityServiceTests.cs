@@ -50,26 +50,166 @@ public sealed class EffectiveActivityServiceTests
         Assert.Equal(TimeSpan.FromMinutes(30), snapshot.ProviderRecoveredTime);
     }
 
+    [Fact]
+    public async Task Effective_session_count_includes_recovered_episodes()
+    {
+        var gameId = GameId.New();
+        var service = CreateService(
+            gameId,
+            recovered:
+            [
+                Recovered(gameId, TimeSpan.FromMinutes(30)),
+                Recovered(gameId, TimeSpan.FromMinutes(20), Now.AddHours(-3)),
+                Recovered(gameId, TimeSpan.FromMinutes(15), Now.AddHours(-6))
+            ]);
+
+        var snapshot = await service.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Equal(3, snapshot.EffectiveSessionCount);
+    }
+
+    [Fact]
+    public async Task Known_history_start_uses_the_earliest_recovered_episode()
+    {
+        var gameId = GameId.New();
+        var earliestEnd = Now.AddHours(-4);
+        var service = CreateService(
+            gameId,
+            recovered: [Recovered(gameId, TimeSpan.FromMinutes(30), earliestEnd)]);
+
+        var snapshot = await service.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Equal(earliestEnd.AddMinutes(-30), snapshot.KnownSessionHistoryStartUtc);
+        Assert.False(snapshot.KnownSessionHistoryIsComplete);
+    }
+
+    [Fact]
+    public async Task Known_history_start_uses_the_earliest_playstead_episode()
+    {
+        var gameId = GameId.New();
+        var started = Now.AddHours(-5);
+        var service = CreateService(
+            gameId,
+            observed: [Ended(gameId.Value, started, TimeSpan.FromMinutes(20))]);
+
+        var snapshot = await service.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Equal(started, snapshot.KnownSessionHistoryStartUtc);
+        Assert.False(snapshot.KnownSessionHistoryIsComplete);
+    }
+
+    [Fact]
+    public async Task Known_history_start_uses_the_earliest_of_both_sources()
+    {
+        var gameId = GameId.New();
+        var recoveredEnd = Now.AddHours(-2);
+        var observedStart = Now.AddHours(-5);
+        var service = CreateService(
+            gameId,
+            recovered: [Recovered(gameId, TimeSpan.FromMinutes(30), recoveredEnd)],
+            observed: [Ended(gameId.Value, observedStart, TimeSpan.FromMinutes(20))]);
+
+        var snapshot = await service.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Equal(observedStart, snapshot.KnownSessionHistoryStartUtc);
+    }
+
+    [Fact]
+    public async Task No_known_sessions_have_no_history_coverage_start()
+    {
+        var gameId = GameId.New();
+        var snapshot = await CreateService(gameId).GetAsync(
+            gameId, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Null(snapshot.KnownSessionHistoryStartUtc);
+    }
+
+    [Fact]
+    public async Task Effective_session_count_deduplicates_overlapping_recovered_and_observed_episodes()
+    {
+        var gameId = GameId.New();
+        var start = Now.AddHours(-2);
+        var recovered = Recovered(gameId, TimeSpan.FromHours(1), start.AddHours(1));
+        var observed = Ended(gameId.Value, start.AddMinutes(15), TimeSpan.FromMinutes(30));
+        var service = CreateService(gameId, recovered: [recovered], observed: [observed]);
+
+        var snapshot = await service.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Equal(1, snapshot.EffectiveSessionCount);
+    }
+
+    [Fact]
+    public async Task Effective_session_count_keeps_distinct_recovered_and_observed_episodes()
+    {
+        var gameId = GameId.New();
+        var recovered = Recovered(gameId, TimeSpan.FromHours(1), Now.AddHours(-3));
+        var observed = Ended(gameId.Value, Now.AddHours(-1), TimeSpan.FromMinutes(30));
+        var service = CreateService(gameId, recovered: [recovered], observed: [observed]);
+
+        var snapshot = await service.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Equal(2, snapshot.EffectiveSessionCount);
+    }
+
+    [Fact]
+    public async Task Last_played_metadata_does_not_synthesize_a_session()
+    {
+        var gameId = GameId.New();
+        var service = CreateService(
+            gameId,
+            metadata: [new ProviderActivityMetadata(
+                gameId, ProviderKind.Steam, "1", null, Now, Now,
+                ProviderActivityAvailability.Partial)]);
+
+        var snapshot = await service.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Equal(0, snapshot.EffectiveSessionCount);
+    }
+
+    [Fact]
+    public async Task Incomplete_recovered_episode_does_not_increment_effective_count()
+    {
+        var gameId = GameId.New();
+        var incomplete = new ProviderObservedSession(
+            Guid.NewGuid(), gameId, ProviderKind.Steam, "1",
+            Now.AddHours(-1), null, "test", ProviderObservedSessionCompleteness.Incomplete);
+        var service = CreateService(gameId, recovered: [incomplete]);
+
+        var snapshot = await service.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Equal(0, snapshot.EffectiveSessionCount);
+    }
+
     private static EffectiveActivityService CreateService(
         GameId gameId,
-        IReadOnlyList<ProviderActivityMetadata> metadata,
-        IReadOnlyList<ProviderObservedSession> recovered) =>
+        IReadOnlyList<ProviderActivityMetadata>? metadata = null,
+        IReadOnlyList<ProviderObservedSession>? recovered = null,
+        IReadOnlyList<GameSession>? observed = null) =>
         new(
-            new MetadataStore(metadata),
-            new RecoveredStore(recovered),
-            new SessionStore(),
+            new MetadataStore(metadata ?? []),
+            new RecoveredStore(recovered ?? []),
+            new SessionStore(observed ?? []),
             new FrozenTimeProvider(Now));
 
-    private static ProviderObservedSession Recovered(GameId gameId, TimeSpan duration) =>
+    private static ProviderObservedSession Recovered(
+        GameId gameId,
+        TimeSpan duration,
+        DateTimeOffset? endedAt = null) =>
         new(
             Guid.NewGuid(),
             gameId,
             ProviderKind.Steam,
             "1",
-            Now - duration,
-            Now,
+            (endedAt ?? Now) - duration,
+            endedAt ?? Now,
             "test",
             ProviderObservedSessionCompleteness.Complete);
+
+    private static GameSession Ended(Guid gameId, DateTimeOffset startedAt, TimeSpan duration) =>
+        new(
+            Guid.NewGuid(), gameId, startedAt, startedAt + duration, startedAt + duration,
+            SessionState.Ended, SessionEndReason.ProcessExited, SessionDetectionSource.ProcessMonitor,
+            startedAt, startedAt + duration);
 
     private sealed class MetadataStore(IReadOnlyList<ProviderActivityMetadata> values) : IProviderActivityMetadataStore
     {
@@ -83,13 +223,14 @@ public sealed class EffectiveActivityServiceTests
         public Task UpsertAsync(ProviderObservedSession session, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
-    private sealed class SessionStore : ISessionStore
+    private sealed class SessionStore(IReadOnlyList<GameSession> sessions) : ISessionStore
     {
         public Task UpsertAsync(GameSession session, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<GameSession?> GetAsync(Guid sessionId, CancellationToken cancellationToken) => Task.FromResult<GameSession?>(null);
         public Task<IReadOnlyList<GameSession>> GetActiveAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameSession>>([]);
         public Task<IReadOnlyList<GameSession>> GetRecentAsync(int limit, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameSession>>([]);
-        public Task<IReadOnlyList<GameSession>> GetByGameAsync(Guid gameId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameSession>>([]);
+        public Task<IReadOnlyList<GameSession>> GetByGameAsync(Guid gameId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<GameSession>>(sessions.Where(x => x.GameId == gameId).ToArray());
     }
 
     private sealed class FrozenTimeProvider(DateTimeOffset now) : TimeProvider

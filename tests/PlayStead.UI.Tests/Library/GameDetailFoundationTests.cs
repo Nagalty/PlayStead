@@ -119,7 +119,7 @@ public sealed class GameDetailFoundationTests
         await InvokeLoadAsync(viewModel, CancellationToken.None);
 
         Assert.True(activity.HasSessionHistory);
-        Assert.Equal("1 session", activity.SessionCountLabel);
+        Assert.Equal("1 session connue", activity.SessionCountLabel);
     }
 
     [Fact]

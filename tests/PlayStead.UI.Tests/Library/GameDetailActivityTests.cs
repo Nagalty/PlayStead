@@ -94,7 +94,7 @@ public sealed class GameDetailActivityTests
         await detail.LoadAsync(CancellationToken.None);
 
         Assert.True(activity.HasSessionHistory);
-        Assert.Equal("1 session", activity.SessionCountLabel);
+        Assert.Equal("1 session connue", activity.SessionCountLabel);
         Assert.Equal("Inconnu", activity.TotalPlayTimeLabel);
     }
 
@@ -122,7 +122,7 @@ public sealed class GameDetailActivityTests
         await detail.LoadAsync(CancellationToken.None);
 
         Assert.False(activity.HasSessionHistory);
-        Assert.Equal("0 session", activity.SessionCountLabel);
+        Assert.Equal("0 session connue", activity.SessionCountLabel);
         Assert.Equal("Inconnu", activity.TotalPlayTimeLabel);
     }
 
@@ -144,7 +144,7 @@ public sealed class GameDetailActivityTests
         await new GameDetailViewModel(item, launch: null, activity).LoadAsync(CancellationToken.None);
 
         Assert.True(activity.HasRecentActivity);
-        Assert.Equal("1 session", activity.SessionCountLabel);
+        Assert.Equal("1 session connue", activity.SessionCountLabel);
         Assert.Equal("0 min", activity.PlaySteadTotalPlayTimeLabel);
         Assert.Equal("Inconnu", activity.TotalPlayTimeLabel);
         Assert.Single(activity.RecentActivitySessions);

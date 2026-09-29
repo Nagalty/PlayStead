@@ -79,7 +79,7 @@ public sealed class GameQuickPanelViewModelTests
             CancellationToken.None);
 
         Assert.True(viewModel.HasSessionHistory);
-        Assert.Equal("2 sessions", viewModel.SessionCountLabel);
+        Assert.Equal("2 sessions connues", viewModel.SessionCountLabel);
         Assert.Equal("1 h 00 min", viewModel.LastSessionDurationLabel);
         Assert.Equal("Inconnu", viewModel.TotalPlayTimeLabel);
         Assert.NotEqual("—", viewModel.LastSessionDateLabel);
@@ -116,9 +116,11 @@ public sealed class GameQuickPanelViewModelTests
             CancellationToken.None);
 
         Assert.False(viewModel.HasSessionHistory);
-        Assert.Equal("0 session", viewModel.SessionCountLabel);
+        Assert.Equal("0 session connue", viewModel.SessionCountLabel);
         Assert.Equal("Inconnu", viewModel.TotalPlayTimeLabel);
         Assert.Equal("—", viewModel.LastSessionDurationLabel);
+        Assert.False(viewModel.HasKnownSessionHistory);
+        Assert.Empty(viewModel.KnownSessionHistoryLabel);
     }
 
     [Fact]
@@ -150,6 +152,36 @@ public sealed class GameQuickPanelViewModelTests
         Assert.Equal("0 min", viewModel.PlaySteadTotalPlayTimeLabel);
         Assert.Equal("Steam", viewModel.ProviderActivitySourceLabel);
         Assert.NotNull(viewModel.ProviderLastPlayedLabel);
+    }
+
+    [Fact]
+    public async Task Session_count_label_uses_the_reconciled_effective_count()
+    {
+        var gameId = GameId.New();
+        var game = new LibraryItemViewModel(gameId, "Game", ProviderKind.Steam, "Steam", @"C:\Game", null);
+        var observed = EndedSession(Guid.NewGuid(), gameId.Value, DateTimeOffset.UtcNow.AddHours(-1), TimeSpan.FromMinutes(20));
+        var viewModel = new GameQuickPanelViewModel(
+            game,
+            new NavigationService(),
+            launch: null,
+            new FakeSessionStore([observed]),
+            new FakeCorrectionStore(new Dictionary<Guid, SessionCorrection>()),
+            new SessionCorrectionPolicy());
+        viewModel.AttachEffectiveActivityService(new FakeEffectiveActivityService(
+            new EffectiveActivitySnapshot(
+                gameId, null, EffectiveActivitySource.Unknown, EffectiveActivityCoverage.Unknown,
+                DateTimeOffset.UtcNow, EffectiveActivitySource.PlaySteadObservedSessions,
+                TimeSpan.FromMinutes(20), 1, TimeSpan.FromHours(2), 2,
+                DateTimeOffset.UtcNow.AddHours(-2), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
+            {
+                EffectiveSessionCount = 3,
+                KnownSessionHistoryStartUtc = new DateTimeOffset(2025, 2, 14, 10, 0, 0, TimeSpan.Zero)
+            }));
+
+        await viewModel.LoadSessionSummaryAsync(CancellationToken.None);
+
+        Assert.Equal("3 sessions connues", viewModel.SessionCountLabel);
+        Assert.StartsWith("Historique connu depuis ", viewModel.KnownSessionHistoryLabel, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -287,6 +319,14 @@ public sealed class GameQuickPanelViewModelTests
 
         public Task UpsertAsync(ProviderActivityMetadata metadata, CancellationToken cancellationToken) =>
             Task.CompletedTask;
+    }
+
+    private sealed class FakeEffectiveActivityService(EffectiveActivitySnapshot snapshot) : IEffectiveActivityService
+    {
+        public Task<EffectiveActivitySnapshot> GetAsync(
+            GameId gameId,
+            ProviderKind provider,
+            CancellationToken cancellationToken) => Task.FromResult(snapshot);
     }
 
     private sealed class FakeBuildHistoryStore(IReadOnlyList<GameBuildObservation> observations) : IGameBuildHistoryStore

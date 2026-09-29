@@ -285,6 +285,7 @@ public static class PlaySteadHost
 
         builder.Services.AddSingleton<
             SteamAppManifestReader>();
+        builder.Services.AddSingleton<SteamLocalConfigActivityReader>();
 
         builder.Services.AddSingleton<
             ILocalLibrarySource,
