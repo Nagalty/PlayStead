@@ -51,8 +51,10 @@ using PlayStead.UI.Tray;
 using PlayStead.UI.Updates;
 using PlayStead.Core.Updates;
 using PlayStead.Core.LocalArtifacts;
+using PlayStead.Core.Graphics;
 using PlayStead.Data.LocalArtifacts;
 using PlayStead.Providers.Updates;
+using PlayStead.Providers.Graphics;
 
 namespace PlayStead.UI.Bootstrap;
 
@@ -447,6 +449,20 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<LocalArtifactBaselineComparisonService>();
         builder.Services.AddSingleton<ILocalArtifactComparisonService, LocalArtifactComparisonService>();
         builder.Services.AddSingleton<ILocalProtectionSetupService, LocalProtectionSetupService>();
+        builder.Services.AddSingleton<IGraphicsTechnologySupportSource>(services =>
+        {
+            var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(10)
+            };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("PlayStead/0.4");
+            return new AmdOfficialGraphicsTechnologySupportSource(
+                client,
+                Path.Combine(dataRoot, "Cache", "graphics-technology-catalog.json"));
+        });
+        builder.Services.AddSingleton<IGraphicsTechnologyDetectionService>(services =>
+            new LocalGraphicsTechnologyDetectionService(
+                services.GetRequiredService<IGraphicsTechnologySupportSource>()));
         builder.Services.AddSingleton<ILocalArtifactSnapshotStore, SqliteLocalArtifactSnapshotStore>();
         builder.Services.AddSingleton<ILocalSnapshotStorageService>(services =>
             new LocalSnapshotStorageService(

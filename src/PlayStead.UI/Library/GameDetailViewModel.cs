@@ -14,6 +14,7 @@ using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.Core.GameBuildHistory;
 using PlayStead.Core.Modding;
 using PlayStead.Core.LocalArtifacts;
+using PlayStead.Core.Graphics;
 using CommunityToolkit.Mvvm.Input;
 using System.Globalization;
 using System.Diagnostics;
@@ -38,6 +39,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly ILocalArtifactRestoreService? _localArtifactRestoreService;
     private readonly UserDefinedLocalArtifactService? _userDefinedArtifactService;
     private readonly ILocalArtifactComparisonService? _localArtifactComparisonService;
+    private readonly IGraphicsTechnologyDetectionService? _graphicsTechnologyDetectionService;
     private readonly IModEvidenceStore? _modEvidenceStore;
     private readonly LocalArtifactBaselineComparisonService _artifactBaselineComparisonService = new();
     private bool _isShortlistOperationInProgress;
@@ -79,7 +81,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ILocalArtifactRestoreService? artifactRestoreService = null,
         IModEvidenceStore? modEvidenceStore = null,
         UserDefinedLocalArtifactService? userDefinedArtifactService = null,
-        ILocalArtifactComparisonService? localArtifactComparisonService = null)
+        ILocalArtifactComparisonService? localArtifactComparisonService = null,
+        IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null)
     {
         ArgumentNullException.ThrowIfNull(
             game);
@@ -131,6 +134,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         _localArtifactRestoreService = artifactRestoreService;
         _userDefinedArtifactService = userDefinedArtifactService;
         _localArtifactComparisonService = localArtifactComparisonService;
+        _graphicsTechnologyDetectionService = graphicsTechnologyDetectionService;
         _modEvidenceStore = modEvidenceStore;
         _artifactBaselineComparisonService = artifactBaselineComparisonService ?? new LocalArtifactBaselineComparisonService();
         _openLocalArtifactFolderCommand = new RelayCommand<GameLocalArtifact>(OpenLocalArtifact,
@@ -171,8 +175,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ILocalArtifactRestoreService? artifactRestoreService = null,
         IModEvidenceStore? modEvidenceStore = null,
         UserDefinedLocalArtifactService? userDefinedArtifactService = null,
-        ILocalArtifactComparisonService? localArtifactComparisonService = null)
-        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService, localArtifactComparisonService)
+        ILocalArtifactComparisonService? localArtifactComparisonService = null,
+        IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null)
+        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService, localArtifactComparisonService, graphicsTechnologyDetectionService)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -236,6 +241,12 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
 
         await LoadBuildHistoryAsync(cancellationToken);
         await LoadLocalArtifactsAsync(cancellationToken);
+        if (_graphicsTechnologyDetectionService is not null)
+        {
+            GraphicsTechnologies = await _graphicsTechnologyDetectionService.DetectAsync(GameId, InstallPath, Title, cancellationToken);
+            OnPropertyChanged(nameof(GraphicsTechnologies));
+            OnPropertyChanged(nameof(HasGraphicsTechnologies));
+        }
 
         if (_catalogStore is null || Game.CanonicalContentId is not CatalogContentId contentId)
             return;
@@ -315,6 +326,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             : HasBuildChanges ? "Celui-là a bougé depuis la dernière fois." : "Rien n’a bougé depuis que je garde un œil dessus.";
 
     public IReadOnlyList<GameLocalArtifact> LocalArtifacts { get; private set; } = [];
+    public IReadOnlyList<GraphicsTechnologyObservation> GraphicsTechnologies { get; private set; } = [];
+    public bool HasGraphicsTechnologies => GraphicsTechnologies.Count > 0;
     public bool HasLocalArtifacts => LocalArtifacts.Count > 0;
     public bool ShowLocalArtifactHelper => !HasLocalArtifacts;
     public bool HasLocalArtifactArea => true;

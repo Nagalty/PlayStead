@@ -8,6 +8,7 @@ using PlayStead.Core.Media;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.ProviderActivity;
 using PlayStead.Core.LocalArtifacts;
+using PlayStead.Core.Graphics;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
@@ -65,6 +66,7 @@ public partial class MainWindow : Window
     private readonly ILocalArtifactRestoreService? _artifactRestoreService;
     private readonly UserDefinedLocalArtifactService? _userDefinedArtifactService;
     private readonly ILocalArtifactComparisonService? _localArtifactComparisonService;
+    private readonly IGraphicsTechnologyDetectionService? _graphicsTechnologyDetectionService;
     private LibraryUiState? _libraryStateBeforeGameDetail;
 
     public MainWindow()
@@ -466,6 +468,7 @@ public partial class MainWindow : Window
         IEffectiveActivityService? effectiveActivityService = null,
         UserDefinedLocalArtifactService? userDefinedArtifactService = null,
         ILocalArtifactComparisonService? localArtifactComparisonService = null,
+        IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -493,6 +496,7 @@ public partial class MainWindow : Window
         _artifactRestoreService = artifactRestoreService;
         _userDefinedArtifactService = userDefinedArtifactService;
         _localArtifactComparisonService = localArtifactComparisonService;
+        _graphicsTechnologyDetectionService = graphicsTechnologyDetectionService;
         _aboutViewModel = distributionChannelProvider is null
             ? null
             : new AboutViewModel(distributionChannelProvider);
@@ -891,7 +895,8 @@ public partial class MainWindow : Window
                         _artifactRestoreService,
                         libraryViewModel.ModEvidenceStore,
                         _userDefinedArtifactService,
-                        _localArtifactComparisonService)
+                        _localArtifactComparisonService,
+                        _graphicsTechnologyDetectionService)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -912,7 +917,8 @@ public partial class MainWindow : Window
                         _artifactRestoreService,
                         libraryViewModel.ModEvidenceStore,
                         _userDefinedArtifactService,
-                        _localArtifactComparisonService);
+                        _localArtifactComparisonService,
+                        _graphicsTechnologyDetectionService);
 
                 MainContent.Content =
                     new GameDetailView(
