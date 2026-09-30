@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - name: Restore catalog builder
+        run: dotnet restore tools/PlayStead.CatalogBuilder/PlayStead.CatalogBuilder.csproj
       - name: Build catalog builder
         run: dotnet build tools/PlayStead.CatalogBuilder/PlayStead.CatalogBuilder.csproj -c Release --no-restore -p:UseSharedCompilation=false
       - name: Generate catalog
