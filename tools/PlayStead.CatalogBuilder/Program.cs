@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using PlayStead.Core.Catalog;
 
 var parsed = Arguments.Parse(args);
@@ -68,14 +69,26 @@ internal sealed record Arguments(string? InputPath, string OutputPath, bool DryR
     }
 }
 
-internal static class IgdbClient
+public static class IgdbClient
 {
-    public static async Task<IgdbRecord[]> FetchAsync()
+    public static async Task<IgdbRecord[]> FetchAsync(HttpClient? httpClient = null)
     {
         var clientId = Environment.GetEnvironmentVariable("IGDB_CLIENT_ID"); var secret = Environment.GetEnvironmentVariable("IGDB_CLIENT_SECRET");
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(secret)) throw new InvalidOperationException("IGDB_CLIENT_ID and IGDB_CLIENT_SECRET are required for --igdb.");
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        using var tokenResponse = await client.PostAsync($"https://id.twitch.tv/oauth2/token?client_id={Uri.EscapeDataString(clientId)}&client_secret={Uri.EscapeDataString(secret)}&grant_type=client_credentials", null); tokenResponse.EnsureSuccessStatusCode();
+        using var ownedClient = httpClient is null ? new HttpClient { Timeout = TimeSpan.FromSeconds(30) } : null;
+        var client = httpClient ?? ownedClient!;
+        using var tokenBody = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["client_id"] = clientId,
+            ["client_secret"] = secret,
+            ["grant_type"] = "client_credentials"
+        });
+        using var tokenResponse = await client.PostAsync("https://id.twitch.tv/oauth2/token", tokenBody);
+        if (!tokenResponse.IsSuccessStatusCode)
+        {
+            var detail = await tokenResponse.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Twitch OAuth failed: HTTP {(int)tokenResponse.StatusCode} - {SanitizeError(detail, clientId, secret)}");
+        }
         var token = (await JsonSerializer.DeserializeAsync<Token>(await tokenResponse.Content.ReadAsStreamAsync()))?.AccessToken ?? throw new InvalidDataException("IGDB token response missing access_token.");
         client.DefaultRequestHeaders.Add("Client-ID", clientId); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var records = new List<IgdbRecord>();
@@ -84,6 +97,12 @@ internal static class IgdbClient
             using var body = new StringContent("fields id,name,first_release_date; limit 500; offset " + offset + ";", Encoding.UTF8, "text/plain"); using var response = await client.PostAsync("https://api.igdb.com/v4/games", body); response.EnsureSuccessStatusCode(); using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()); var page = document.RootElement.EnumerateArray().Select(ParseGame).ToArray(); records.AddRange(page); if (page.Length < 500) break;
         }
         return records.ToArray();
+    }
+    internal static string SanitizeError(string detail, string clientId, string secret)
+    {
+        var sanitized = detail.Replace(secret, "[redacted]", StringComparison.Ordinal)
+            .Replace(clientId, "[redacted]", StringComparison.Ordinal);
+        return Regex.Replace(sanitized, @"(?i)(access[_-]?token\s*[:=]\s*[""']?)[^\s,;""'}]+", "$1[redacted]");
     }
     private static IgdbRecord ParseGame(JsonElement game) => new(game.GetProperty("id").GetInt64().ToString(), game.GetProperty("name").GetString() ?? string.Empty, null, null, [], [], game.TryGetProperty("first_release_date", out var date) ? date.GetInt64() : null);
     private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);
