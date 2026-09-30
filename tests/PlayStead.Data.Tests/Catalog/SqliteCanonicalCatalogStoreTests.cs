@@ -21,7 +21,7 @@ public sealed class SqliteCanonicalCatalogStoreTests : IDisposable
             await store.GetMetadataAsync(
                 CancellationToken.None);
 
-        Assert.Equal(1, metadata.SchemaVersion);
+        Assert.Equal(2, metadata.SchemaVersion);
         Assert.Equal(0L, metadata.CatalogVersion);
         Assert.Equal(DateTimeOffset.UnixEpoch, metadata.GeneratedAtUtc);
         Assert.True(File.Exists(options.CatalogPath));

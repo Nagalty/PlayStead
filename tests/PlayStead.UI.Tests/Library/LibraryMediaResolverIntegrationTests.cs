@@ -124,16 +124,19 @@ public sealed class LibraryMediaResolverIntegrationTests
     }
 
     [Fact]
-    public async Task EnsureCoverAsync_does_not_resolve_non_Steam_item()
+    public async Task EnsureCoverAsync_allows_manual_identity_bridge_to_resolve()
     {
-        var resolver = new RecordingGameMediaResolver(null);
+        var resolver = new RecordingGameMediaResolver(null)
+        {
+            ResolvedPath = @"C:\Media\manual\cover.jpg"
+        };
         var (viewModel, item) = await CreateLoadedLibraryAsync(resolver, ProviderKind.Manual);
 
         await viewModel.EnsureCoverAsync(item, CancellationToken.None);
 
-        Assert.Equal(0, resolver.ResolveAndCacheCalls);
-        Assert.Null(item.CoverPath);
-        Assert.False(item.HasCover);
+        Assert.Equal(1, resolver.ResolveAndCacheCalls);
+        Assert.Equal(resolver.ResolvedPath, item.CoverPath);
+        Assert.True(item.HasCover);
     }
 
     [Fact]
@@ -222,7 +225,8 @@ public sealed class LibraryMediaResolverIntegrationTests
 
         // Populate the existing installation snapshot through its real public refresh path.
         await viewModel.RefreshAsync(CancellationToken.None);
-        Assert.Equal(0, resolver.ResolveAndCacheCalls);
+        if (provider == ProviderKind.Steam)
+            Assert.Equal(0, resolver.ResolveAndCacheCalls);
         return (viewModel, Assert.Single(viewModel.Items));
     }
 

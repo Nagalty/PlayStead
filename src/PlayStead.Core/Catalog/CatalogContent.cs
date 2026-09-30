@@ -10,4 +10,5 @@ public sealed record CatalogContent(
     string? Developer,
     string? Publisher,
     CatalogContentStatus Status,
-    CatalogContentId? RedirectTargetId);
+    CatalogContentId? RedirectTargetId,
+    IReadOnlyList<string>? Genres = null);

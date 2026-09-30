@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using PlayStead.Core.Catalog;
 
@@ -193,23 +194,26 @@ public sealed class SqliteCanonicalCatalogStore : PlayStead.Core.Persistence.ICa
             (CatalogContentKind)reader.GetInt32(2),
             reader.GetString(3),
             reader.GetString(4),
-            reader.IsDBNull(5)
+            reader.IsDBNull(5) || string.IsNullOrEmpty(reader.GetString(5))
                 ? null
                 : DateOnly.ParseExact(
                     reader.GetString(5),
                     "yyyy-MM-dd",
                     CultureInfo.InvariantCulture),
-            reader.IsDBNull(6)
+            reader.IsDBNull(6) || string.IsNullOrEmpty(reader.GetString(6))
                 ? null
                 : reader.GetString(6),
-            reader.IsDBNull(7)
+            reader.IsDBNull(7) || string.IsNullOrEmpty(reader.GetString(7))
                 ? null
                 : reader.GetString(7),
             (CatalogContentStatus)reader.GetInt32(8),
             reader.IsDBNull(9)
                 ? null
                 : new CatalogContentId(
-            Guid.Parse(reader.GetString(9))));
+            Guid.Parse(reader.GetString(9))),
+            reader.IsDBNull(10)
+                ? null
+                : JsonSerializer.Deserialize<string[]>(reader.GetString(10)));
 
     private const string ContentSelect = """
         SELECT
@@ -222,7 +226,8 @@ public sealed class SqliteCanonicalCatalogStore : PlayStead.Core.Persistence.ICa
             developer,
             publisher,
             status,
-            redirect_target_id
+            redirect_target_id,
+            genres_json
         FROM catalog_contents
         """;
 }

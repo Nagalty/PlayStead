@@ -10,6 +10,7 @@ using PlayStead.Core.Identity;
 using PlayStead.Core.Notifications;
 using PlayStead.Core.Home;
 using PlayStead.Core.Persistence;
+using PlayStead.Data.ManualMetadata;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Sessions.Discovery;
@@ -101,6 +102,23 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<SqliteCanonicalCatalogStore>();
         builder.Services.AddSingleton<PlayStead.Core.Persistence.ICanonicalCatalogStore>(
             services => services.GetRequiredService<SqliteCanonicalCatalogStore>());
+        builder.Services.AddSingleton<CanonicalCatalogBatchImporter>();
+        var catalogManifest = Environment.GetEnvironmentVariable("PLAYSTEAD_CANONICAL_CATALOG_MANIFEST_URL");
+        if (Uri.TryCreate(catalogManifest, UriKind.Absolute, out var catalogManifestUri))
+        {
+            builder.Services.AddSingleton(new CanonicalCatalogSyncOptions(
+                catalogManifestUri,
+                Path.Combine(dataRoot, "CatalogCache")));
+            builder.Services.AddSingleton<HttpClient>();
+            builder.Services.AddSingleton<PlayStead.Core.Persistence.ICanonicalCatalogSyncService>(services =>
+                new HttpCanonicalCatalogSyncService(
+                    services.GetRequiredService<HttpClient>(),
+                    services.GetRequiredService<CanonicalCatalogSyncOptions>(),
+                    services.GetRequiredService<CanonicalCatalogBatchImporter>(),
+                    services.GetRequiredService<Func<CancellationToken, Task<long>>>()));
+            builder.Services.AddSingleton<Func<CancellationToken, Task<long>>>(services =>
+                token => services.GetRequiredService<SqliteCanonicalCatalogStore>().GetMetadataAsync(token).ContinueWith(task => task.Result.CatalogVersion, token));
+        }
 
         builder.Services.AddSingleton<
             ILibraryStore,
@@ -108,6 +126,7 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<IManualGameStore>(services =>
             (IManualGameStore)services.GetRequiredService<ILibraryStore>());
         builder.Services.AddSingleton<ManualGameService>();
+        builder.Services.AddSingleton<IManualMetadataLinkStore, SqliteManualMetadataLinkStore>();
 
         builder.Services.AddSingleton<
             IGameIdentityResolver,
@@ -284,9 +303,11 @@ public static class PlaySteadHost
                 services.GetRequiredService<ISteamMediaTransport>(),
                 storeClient: services.GetRequiredService<ISteamStoreAppDetailsClient>()));
 
-        builder.Services.AddSingleton<
-            IGameMediaResolver,
-            GameMediaResolver>();
+        builder.Services.AddSingleton<GameMediaResolver>();
+        builder.Services.AddSingleton<IGameMediaResolver>(services =>
+            new ManualMediaIdentityBridge(
+                services.GetRequiredService<GameMediaResolver>(),
+                services.GetRequiredService<IManualMetadataLinkStore>()));
 
         builder.Services.AddSingleton<
             SteamLibraryFoldersReader>();
@@ -523,7 +544,8 @@ public static class PlaySteadHost
                     services.GetRequiredService<PlayStead.Core.Shortlist.IGamesDuMomentService>(),
                     services.GetRequiredService<IProviderGameMetadataStore>(),
                     services.GetRequiredService<IProviderActivityMetadataStore>(),
-                    services.GetRequiredService<ISessionStore>());
+                    services.GetRequiredService<ISessionStore>(),
+                    services.GetRequiredService<IManualMetadataLinkStore>());
                 viewModel.AttachCollectionStore(
                     services.GetRequiredService<PlayStead.Core.Collections.IGameCollectionStore>());
                 viewModel.AttachAttentionService(

@@ -29,7 +29,7 @@ public sealed class CatalogDatabaseInitializerTests : IDisposable
             File.Exists(options.CatalogPath));
 
         Assert.Equal(
-            1,
+            2,
             await ReadSchemaVersionAsync(
                 options.CatalogPath));
 
@@ -71,7 +71,7 @@ public sealed class CatalogDatabaseInitializerTests : IDisposable
         var before = File.GetLastWriteTimeUtc(options.CatalogPath);
         await initializer.InitializeAsync(CancellationToken.None);
 
-        Assert.Equal(1, await ReadSchemaVersionAsync(options.CatalogPath));
+        Assert.Equal(2, await ReadSchemaVersionAsync(options.CatalogPath));
         Assert.Equal(0L, await ReadCatalogVersionAsync(options.CatalogPath));
         Assert.Equal(before, File.GetLastWriteTimeUtc(options.CatalogPath));
     }

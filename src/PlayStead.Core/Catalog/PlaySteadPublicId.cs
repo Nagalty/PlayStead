@@ -1,13 +1,24 @@
 namespace PlayStead.Core.Catalog;
 
+using System.Text.Json.Serialization;
+
 public readonly record struct PlaySteadPublicId
 {
     private const string GamePrefix = "PlayStead-";
     private const string DlcPrefix = "PlayStead-DLC-";
 
-    private PlaySteadPublicId(string value)
+    [JsonConstructor]
+    public PlaySteadPublicId(string value)
     {
-        Value = value;
+        var trimmed = value?.Trim() ?? string.Empty;
+        var digits = trimmed.StartsWith(DlcPrefix, StringComparison.Ordinal)
+            ? trimmed[DlcPrefix.Length..]
+            : trimmed.StartsWith(GamePrefix, StringComparison.Ordinal)
+                ? trimmed[GamePrefix.Length..]
+                : string.Empty;
+        if (digits.Length < 6 || !digits.All(char.IsAsciiDigit))
+            throw new FormatException($"Invalid PlayStead public id: '{value}'.");
+        Value = trimmed;
     }
 
     public string Value { get; }

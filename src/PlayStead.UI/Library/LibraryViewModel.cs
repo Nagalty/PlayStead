@@ -38,6 +38,7 @@ public sealed class LibraryViewModel :
     private IEffectiveActivityService? _effectiveActivityService;
     private IGameCollectionStore? _collectionStore;
     private ManualGameService? _manualGameService;
+    private readonly IManualMetadataLinkStore? _manualMetadataLinkStore;
     private readonly object _verifySteamGate = new();
     private readonly Dispatcher? _uiDispatcher =
         Application.Current?.Dispatcher
@@ -180,12 +181,14 @@ public sealed class LibraryViewModel :
         IGamesDuMomentService? gamesDuMomentService,
         IProviderGameMetadataStore? providerGameMetadataStore,
         IProviderActivityMetadataStore? providerActivityStore,
-        ISessionStore? sessionStore)
+        ISessionStore? sessionStore,
+        IManualMetadataLinkStore? manualMetadataLinkStore = null)
         : this(libraryStore, steamReferenceRuntime, sessionMonitor, uiPreferencesStore,
             gameMediaResolver, canonicalCatalogStore, gamesDuMomentService, providerGameMetadataStore)
     {
         _providerActivityStore = providerActivityStore;
         _sessionStore = sessionStore;
+        _manualMetadataLinkStore = manualMetadataLinkStore;
     }
 
     public LibraryViewModel(
@@ -290,6 +293,34 @@ public sealed class LibraryViewModel :
             return installation;
 
         var match = matches[0];
+        var refs = await CanonicalCatalogStore.GetProviderRefsAsync(match.Id, cancellationToken);
+        var mediaRefs = refs
+            .Where(x => x.Confidence == CatalogConfidence.Deterministic)
+            .Where(x => x.Provider is CatalogProviderKind.Steam or CatalogProviderKind.Epic or CatalogProviderKind.Gog)
+            .ToArray();
+        var mediaRef = mediaRefs.Length == 1 ? mediaRefs[0] : null;
+
+        if (_manualMetadataLinkStore is not null)
+        {
+            var mediaSource = mediaRef is null
+                ? null
+                : new MediaSourceIdentity(
+                    mediaRef.Provider switch
+                    {
+                        CatalogProviderKind.Steam => ProviderKind.Steam,
+                        CatalogProviderKind.Epic => ProviderKind.Epic,
+                        CatalogProviderKind.Gog => ProviderKind.Gog,
+                        _ => throw new InvalidOperationException()
+                    },
+                    mediaRef.ExternalId);
+            await _manualMetadataLinkStore.UpsertAsync(
+                new ManualMetadataLink(
+                    installation.GameId,
+                    match.Id,
+                    mediaSource,
+                    DateTimeOffset.UtcNow),
+                cancellationToken);
+        }
         if (!string.Equals(match.CanonicalTitle, definition.Title, StringComparison.Ordinal) &&
             _manualGameService is not null)
         {
@@ -338,9 +369,47 @@ public sealed class LibraryViewModel :
         var service = _manualGameService
             ?? throw new InvalidOperationException("Manual game support is unavailable.");
         var removed = await service.RemoveAsync(gameId, cancellationToken);
+        if (removed && _manualMetadataLinkStore is not null)
+            await _manualMetadataLinkStore.RemoveAsync(gameId, cancellationToken);
         if (removed)
             await RefreshAsync(cancellationToken);
         return removed;
+    }
+
+    public async Task<bool> ReassignManualMetadataAsync(
+        GameId gameId,
+        CatalogContentId? canonicalCatalogId,
+        CancellationToken cancellationToken)
+    {
+        if (_manualMetadataLinkStore is null)
+            return false;
+        if (canonicalCatalogId is null)
+        {
+            await _manualMetadataLinkStore.RemoveAsync(gameId, cancellationToken);
+            return true;
+        }
+
+        if (CanonicalCatalogStore is null)
+            return false;
+        var content = await CanonicalCatalogStore.GetByIdAsync(canonicalCatalogId.Value, cancellationToken);
+        if (content is null)
+            return false;
+        var refs = await CanonicalCatalogStore.GetProviderRefsAsync(content.Id, cancellationToken);
+        var providerRefs = refs
+            .Where(x => x.Confidence == CatalogConfidence.Deterministic)
+            .Where(x => x.Provider is CatalogProviderKind.Steam or CatalogProviderKind.Epic or CatalogProviderKind.Gog)
+            .ToArray();
+        var providerRef = providerRefs.Length == 1 ? providerRefs[0] : null;
+        var source = providerRef is null ? null : new MediaSourceIdentity(
+            providerRef.Provider switch
+            {
+                CatalogProviderKind.Steam => ProviderKind.Steam,
+                CatalogProviderKind.Epic => ProviderKind.Epic,
+                CatalogProviderKind.Gog => ProviderKind.Gog,
+                _ => throw new InvalidOperationException()
+            }, providerRef.ExternalId);
+        await _manualMetadataLinkStore.UpsertAsync(new ManualMetadataLink(gameId, content.Id, source, DateTimeOffset.UtcNow), cancellationToken);
+        return true;
     }
 
     public void AttachLocalProtectionSetupService(ILocalProtectionSetupService service)
@@ -1015,8 +1084,7 @@ public sealed class LibraryViewModel :
                 cancellationToken);
         }
 
-        if (item.HasCover ||
-            item.Provider != ProviderKind.Steam)
+        if (item.HasCover)
         {
             return Task.CompletedTask;
         }
@@ -1164,8 +1232,7 @@ public sealed class LibraryViewModel :
                 cancellationToken);
         }
 
-        if (item.HasLogo ||
-            item.Provider != ProviderKind.Steam)
+        if (item.HasLogo)
         {
             return Task.CompletedTask;
         }
@@ -1627,9 +1694,7 @@ public sealed class LibraryViewModel :
         LibraryItemViewModel item,
         GameInstallation installation)
     {
-        if (installation.Provider != ProviderKind.Steam ||
-            string.IsNullOrWhiteSpace(
-                installation.ExternalId))
+        if (string.IsNullOrWhiteSpace(installation.ExternalId))
         {
             return;
         }
@@ -1650,9 +1715,7 @@ public sealed class LibraryViewModel :
         LibraryItemViewModel item,
         GameInstallation installation)
     {
-        if (installation.Provider != ProviderKind.Steam ||
-            string.IsNullOrWhiteSpace(
-                installation.ExternalId))
+        if (string.IsNullOrWhiteSpace(installation.ExternalId))
         {
             return;
         }

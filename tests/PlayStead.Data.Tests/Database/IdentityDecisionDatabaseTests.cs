@@ -12,7 +12,7 @@ public sealed class IdentityDecisionDatabaseTests
         await new DatabaseInitializer(fixture.Options).InitializeAsync(CancellationToken.None);
 
         await using var connection = await fixture.OpenAsync();
-        Assert.Equal(25, await ScalarAsync(connection, "SELECT MAX(version) FROM schema_migrations;"));
+        Assert.Equal(26, await ScalarAsync(connection, "SELECT MAX(version) FROM schema_migrations;"));
         Assert.Equal(1L, await ScalarAsync(connection, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='game_identity_decisions';"));
         Assert.Equal(2L, await ScalarAsync(connection, "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'ux_game_identity_decisions_active_%';"));
     }

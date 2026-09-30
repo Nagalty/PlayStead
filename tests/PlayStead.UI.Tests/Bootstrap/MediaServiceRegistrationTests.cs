@@ -80,8 +80,10 @@ public sealed class MediaServiceRegistrationTests :
         Assert.IsType<SteamMediaProvider>(
             provider);
 
-        Assert.IsType<GameMediaResolver>(
+        Assert.IsType<ManualMediaIdentityBridge>(
             resolver);
+        Assert.IsType<GameMediaResolver>(
+            host.Services.GetRequiredService<GameMediaResolver>());
 
         Assert.IsType<PlayStead.UI.Media.TraceMediaDiagnostics>(
             host.Services.GetRequiredService<IMediaDiagnostics>());
