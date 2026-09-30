@@ -6,6 +6,7 @@ using PlayStead.Platform.Paths;
 using PlayStead.UI.Bootstrap;
 using PlayStead.UI.Sessions;
 using PlayStead.Providers.Epic;
+using PlayStead.Providers.Gog;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.Library;
 
@@ -14,7 +15,7 @@ namespace PlayStead.UI.Tests.Bootstrap;
 public sealed class TaskB3DiscoveryRegistrationTests
 {
     [Fact]
-    public void Host_registers_epic_alongside_steam_as_local_library_source()
+    public void Host_registers_epic_and_gog_alongside_steam_as_local_library_sources()
     {
         var root = Path.Combine(Path.GetTempPath(), "PlayStead.Tests", Guid.NewGuid().ToString("N"));
         using var host = PlaySteadHost.Build(UserDataLayout.FromRoot(root));
@@ -23,6 +24,7 @@ public sealed class TaskB3DiscoveryRegistrationTests
 
         Assert.Contains(sources, x => x.Provider == ProviderKind.Steam);
         Assert.Contains(sources, x => x.Provider == ProviderKind.Epic && x is EpicLocalLibrarySource);
+        Assert.Contains(sources, x => x.Provider == ProviderKind.Gog && x is GogLocalLibrarySource);
     }
 
     [Fact]

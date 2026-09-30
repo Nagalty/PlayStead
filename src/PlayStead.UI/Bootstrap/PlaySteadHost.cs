@@ -36,6 +36,7 @@ using PlayStead.Providers.Steam.Evidence;
 using PlayStead.Providers.Steam.Media;
 using PlayStead.Providers.Steam.Remote;
 using PlayStead.Providers.Epic;
+using PlayStead.Providers.Gog;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
@@ -301,6 +302,9 @@ public static class PlaySteadHost
                     "EpicGamesLauncher",
                     "Data",
                     "Manifests")));
+        builder.Services.AddSingleton<ILocalLibrarySource>(_ =>
+            new GogLocalLibrarySource(
+                GogRegistryInstallRootReader.ReadInstallRoots()));
         builder.Services.AddSingleton<
             IProviderActivityMetadataStore,
             SqliteProviderActivityMetadataStore>();

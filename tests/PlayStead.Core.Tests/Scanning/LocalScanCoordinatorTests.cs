@@ -81,6 +81,22 @@ public sealed class LocalScanCoordinatorTests
         Assert.Equal([ProviderKind.Steam, ProviderKind.Epic], results.Select(x => x.Provider));
     }
 
+    [Fact]
+    public async Task ScanAll_runs_steam_epic_and_gog_sources_together()
+    {
+        var observed = DateTimeOffset.UtcNow;
+        var sources = new ILocalLibrarySource[]
+        {
+            new StubSource(ProviderKind.Steam, SourceScanResult.Success(ProviderKind.Steam, observed, [])),
+            new StubSource(ProviderKind.Epic, SourceScanResult.Success(ProviderKind.Epic, observed, [])),
+            new StubSource(ProviderKind.Gog, SourceScanResult.Success(ProviderKind.Gog, observed, []))
+        };
+
+        var results = await new LocalScanCoordinator(sources).ScanAllAsync(CancellationToken.None);
+
+        Assert.Equal([ProviderKind.Steam, ProviderKind.Epic, ProviderKind.Gog], results.Select(x => x.Provider));
+    }
+
     private sealed class StubSource(
         ProviderKind provider,
         SourceScanResult result) : ILocalLibrarySource
