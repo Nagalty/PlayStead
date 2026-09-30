@@ -62,21 +62,31 @@ public sealed class EffectiveActivityService : IEffectiveActivityService
             (Value: observedLast, Source: EffectiveActivitySource.PlaySteadObservedSessions)
         }.Where(x => x.Value is not null).OrderByDescending(x => x.Value).FirstOrDefault();
 
-        // EffectiveTotalPlayTime is deliberately lifetime-only. Recovered and
-        // observed intervals are bounded activity and remain exposed through
-        // their dedicated provenance fields below.
-        var effectiveTotal = metadata?.TotalPlaytime;
-        var totalSource = effectiveTotal is not null
+        // Manual games have no external lifetime counter. Their only
+        // authoritative activity is the complete time PlayStead observed
+        // after the game was added. Keep that bounded provenance explicit;
+        // never use it as a fallback for Steam/provider games.
+        var observedTotal = observedMerged.Aggregate(
+            TimeSpan.Zero,
+            (sum, x) => sum + (x.End - x.Start));
+        var effectiveTotal = provider == ProviderKind.Manual
+            ? observedMerged.Count > 0 ? observedTotal : null
+            : metadata?.TotalPlaytime;
+        var totalSource = provider != ProviderKind.Manual && metadata?.TotalPlaytime is not null
             ? EffectiveActivitySource.ProviderLifetime
-            : EffectiveActivitySource.Unknown;
-        var coverage = effectiveTotal is not null
+            : provider == ProviderKind.Manual && observedMerged.Count > 0
+                ? EffectiveActivitySource.PlaySteadObservedSessions
+                : EffectiveActivitySource.Unknown;
+        var coverage = provider != ProviderKind.Manual && metadata?.TotalPlaytime is not null
             ? EffectiveActivityCoverage.Lifetime
-            : EffectiveActivityCoverage.Unknown;
+            : provider == ProviderKind.Manual && observedMerged.Count > 0
+                ? EffectiveActivityCoverage.Bounded
+                : EffectiveActivityCoverage.Unknown;
 
         return new EffectiveActivitySnapshot(
             gameId, effectiveTotal, totalSource, coverage,
             lastCandidates.Value, lastCandidates.Source,
-            observedMerged.Aggregate(TimeSpan.Zero, (sum, x) => sum + (x.End - x.Start)), observedMerged.Count,
+            observedTotal, observedMerged.Count,
             recoveredMerged.Aggregate(TimeSpan.Zero, (sum, x) => sum + (x.End - x.Start)), recoveredMerged.Count,
             recoveredMerged.Select(x => (DateTimeOffset?)x.Start).Min(), recoveredMerged.Select(x => (DateTimeOffset?)x.End).Max(), now)
         {

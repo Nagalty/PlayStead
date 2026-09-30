@@ -3,12 +3,16 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Win32;
+using Forms = System.Windows.Forms;
 using PlayStead.Core.Persistence;
 
 namespace PlayStead.UI.Library;
 
 public partial class ManualGameDialog : Window
 {
+    private bool _suppressInstallRootEditTracking;
+    private bool _installRootWasEdited;
+
     public ManualGameDialog(
         ManualGameExecutableSelection? initialSelection = null,
         ManualGameDefinition? initialDefinition = null)
@@ -47,7 +51,8 @@ public partial class ManualGameDialog : Window
                 TitleTextBox.Text,
                 ExecutableTextBox.Text,
                 string.IsNullOrWhiteSpace(WorkingDirectoryTextBox.Text) ? null : WorkingDirectoryTextBox.Text,
-                ArgumentsTextBox.Text);
+                ArgumentsTextBox.Text,
+                string.IsNullOrWhiteSpace(InstallRootPathTextBox.Text) ? null : InstallRootPathTextBox.Text);
             DialogResult = true;
         }
         catch (Exception exception)
@@ -57,6 +62,24 @@ public partial class ManualGameDialog : Window
     }
 
     private void CancelButton_OnClick(object sender, RoutedEventArgs e) => DialogResult = false;
+
+    private void InstallRootBrowseButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        using var dialog = new Forms.FolderBrowserDialog
+        {
+            Description = "Choisir le dossier d’installation"
+        };
+        if (!string.IsNullOrWhiteSpace(InstallRootPathTextBox.Text) && Directory.Exists(InstallRootPathTextBox.Text))
+            dialog.SelectedPath = InstallRootPathTextBox.Text;
+        if (dialog.ShowDialog() == Forms.DialogResult.OK)
+            SetInstallRootText(dialog.SelectedPath, edited: true);
+    }
+
+    private void InstallRootPathTextBox_OnTextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (!_suppressInstallRootEditTracking)
+            _installRootWasEdited = true;
+    }
 
     private void Dialog_OnKeyDown(object sender, KeyEventArgs e)
     {
@@ -72,8 +95,11 @@ public partial class ManualGameDialog : Window
         ExecutableTextBox.Text = selection.ExecutablePath;
         if (overwriteOptionalFields || string.IsNullOrWhiteSpace(TitleTextBox.Text))
             TitleTextBox.Text = selection.DisplayName;
-        if (overwriteOptionalFields || string.IsNullOrWhiteSpace(WorkingDirectoryTextBox.Text))
-            WorkingDirectoryTextBox.Text = selection.WorkingDirectory;
+        WorkingDirectoryTextBox.Text = selection.WorkingDirectory;
+        if (overwriteOptionalFields)
+            _installRootWasEdited = false;
+        if (overwriteOptionalFields || !_installRootWasEdited)
+            SetInstallRootText(selection.InstallRootPath, edited: false);
     }
 
     private void ApplyDefinition(ManualGameDefinition definition)
@@ -81,14 +107,40 @@ public partial class ManualGameDialog : Window
         TitleTextBox.Text = definition.Title;
         ExecutableTextBox.Text = definition.ExecutablePath;
         WorkingDirectoryTextBox.Text = definition.WorkingDirectory;
+        SetInstallRootText(definition.InstallRootPath ?? definition.WorkingDirectory, edited: true);
         ArgumentsTextBox.Text = definition.LaunchArguments ?? string.Empty;
+    }
+
+    private void SetInstallRootText(string value, bool edited)
+    {
+        _suppressInstallRootEditTracking = true;
+        try
+        {
+            InstallRootPathTextBox.Text = value;
+            _installRootWasEdited = edited;
+        }
+        finally
+        {
+            _suppressInstallRootEditTracking = false;
+        }
     }
 }
 
 public sealed record ManualGameExecutableSelection(
     string ExecutablePath,
     string WorkingDirectory,
-    string DisplayName);
+    string DisplayName,
+    string InstallRootPath);
+
+internal static class ManualGamePrefill
+{
+    public static (string WorkingDirectory, string InstallRootPath) Build(string executablePath)
+    {
+        var fullPath = Path.GetFullPath(executablePath);
+        var workingDirectory = Path.GetDirectoryName(fullPath) ?? string.Empty;
+        return (workingDirectory, ManualInstallRootHeuristics.Suggest(fullPath));
+    }
+}
 
 internal static class ManualGameExecutablePicker
 {
@@ -113,7 +165,7 @@ internal static class ManualGameExecutablePicker
     private static ManualGameExecutableSelection FromPath(string path)
     {
         var fullPath = Path.GetFullPath(path);
-        var directory = Path.GetDirectoryName(fullPath) ?? string.Empty;
+        var (directory, installRootPath) = ManualGamePrefill.Build(fullPath);
         var fallbackName = Path.GetFileNameWithoutExtension(fullPath);
         var displayName = fallbackName;
 
@@ -127,7 +179,7 @@ internal static class ManualGameExecutablePicker
             // Metadata is optional; the selected path remains usable.
         }
 
-        return new ManualGameExecutableSelection(fullPath, directory, displayName);
+        return new ManualGameExecutableSelection(fullPath, directory, displayName, installRootPath);
     }
 
     private static string FirstMeaningful(params string?[] candidates) =>

@@ -6,13 +6,15 @@ public sealed record ManualGameDefinition(
     string Title,
     string ExecutablePath,
     string WorkingDirectory,
-    string? LaunchArguments = null)
+    string? LaunchArguments = null,
+    string? InstallRootPath = null)
 {
     public static ManualGameDefinition Create(
         string title,
         string executablePath,
         string? workingDirectory,
-        string? launchArguments = null)
+        string? launchArguments = null,
+        string? installRootPath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
@@ -42,11 +44,18 @@ public sealed record ManualGameDefinition(
         if (new DirectoryInfo(directory).Attributes.HasFlag(FileAttributes.ReparsePoint))
             throw new InvalidOperationException("The working directory is a reparse point.");
 
+        var root = Path.GetFullPath(installRootPath ?? directory);
+        if (!Directory.Exists(root))
+            throw new DirectoryNotFoundException(root);
+        if (new DirectoryInfo(root).Attributes.HasFlag(FileAttributes.ReparsePoint))
+            throw new InvalidOperationException("The install root is a reparse point.");
+
         return new ManualGameDefinition(
             title.Trim(),
             executable,
             directory,
-            string.IsNullOrWhiteSpace(launchArguments) ? null : launchArguments);
+            string.IsNullOrWhiteSpace(launchArguments) ? null : launchArguments,
+            root);
     }
 }
 

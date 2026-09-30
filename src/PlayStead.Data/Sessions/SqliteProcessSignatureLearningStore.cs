@@ -1,12 +1,14 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using PlayStead.Core.Library;
+using PlayStead.Core.Persistence;
 using PlayStead.Core.Sessions.Discovery;
 using PlayStead.Data.Database;
 
 namespace PlayStead.Data.Sessions;
 
-public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearningStore
+public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearningStore,
+    ILegacyLearningStateReconciler
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { RespectRequiredConstructorParameters = true };
     private readonly DatabaseOptions _options;
@@ -144,18 +146,68 @@ public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearn
         return true;
     }
 
+    public async Task ReconcileAsync(ProviderKind provider, InstallationScope scope,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        if (provider != ProviderKind.Manual)
+            return;
+
+        await using var connection = await OpenAsync(cancellationToken);
+        using var transaction = connection.BeginTransaction(deferred: false);
+        using var read = connection.CreateCommand();
+        read.Transaction = transaction;
+        read.CommandText = "SELECT root_path FROM process_signature_learning WHERE installation_id=$installation;";
+        read.Parameters.AddWithValue("$installation", scope.InstallationId.ToString());
+        var storedRoot = await read.ExecuteScalarAsync(cancellationToken);
+        if (storedRoot is null || storedRoot is DBNull ||
+            PathEquals((string)storedRoot, scope.RootPath))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
+
+        using var delete = connection.CreateCommand();
+        delete.Transaction = transaction;
+        delete.CommandText = "DELETE FROM process_signature_learning WHERE installation_id=$installation;";
+        delete.Parameters.AddWithValue("$installation", scope.InstallationId.ToString());
+        await delete.ExecuteNonQueryAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private static async Task<bool> InstallationMatchesAsync(SqliteConnection connection,
         SqliteTransaction transaction, InstallationScope scope, CancellationToken cancellationToken)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "SELECT game_id, install_path, is_present FROM installations WHERE installation_id=$installation;";
+        command.CommandText = """
+            SELECT game_id, provider, install_path, executable_path, working_directory,
+                   install_root_path, is_present
+            FROM installations WHERE installation_id=$installation;
+            """;
         command.Parameters.AddWithValue("$installation", scope.InstallationId.ToString());
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var found = await reader.ReadAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return found && reader.GetString(0) == scope.GameId.ToString() && !reader.IsDBNull(1) &&
-            PathEquals(reader.GetString(1), scope.RootPath) && reader.GetBoolean(2) == scope.IsPresent;
+        if (!found || reader.GetString(0) != scope.GameId.ToString() || reader.GetBoolean(6) != scope.IsPresent)
+            return false;
+        if (reader.IsDBNull(2)) return false;
+        var storedRoot = reader.GetString(2);
+        if ((ProviderKind)reader.GetInt32(1) == ProviderKind.Manual &&
+            !reader.IsDBNull(3) && !reader.IsDBNull(4))
+        {
+            try
+            {
+                storedRoot = ManualInstallRootHeuristics.Resolve(
+                    reader.GetString(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5));
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+        return PathEquals(storedRoot, scope.RootPath);
     }
 
     private static T Deserialize<T>(string json) where T : class =>

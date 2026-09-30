@@ -35,7 +35,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-24,Convert.ToInt32(
+25,Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
         var tablesCommand = connection.CreateCommand();
@@ -88,7 +88,7 @@ public sealed class DatabaseSessionMigrationTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-24,Convert.ToInt32(
+25,Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
         var titleCommand = connection.CreateCommand();

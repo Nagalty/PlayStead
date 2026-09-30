@@ -451,7 +451,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                 last_seen_utc,
                 executable_path,
                 working_directory,
-                launch_arguments
+                launch_arguments,
+                install_root_path
             FROM installations
             ORDER BY game_id, installation_id;
             """;
@@ -463,15 +464,27 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
 
         while (await reader.ReadAsync(cancellationToken))
         {
+            var provider = (ProviderKind)reader.GetInt32(2);
+            var executablePath = reader.IsDBNull(9) ? null : reader.GetString(9);
+            var workingDirectory = reader.IsDBNull(10) ? null : reader.GetString(10);
+            var persistedInstallRoot = reader.IsDBNull(12) ? null : reader.GetString(12);
+            var installRoot = provider == ProviderKind.Manual &&
+                              !string.IsNullOrWhiteSpace(executablePath) &&
+                              !string.IsNullOrWhiteSpace(workingDirectory)
+                ? ManualInstallRootHeuristics.Resolve(executablePath!, workingDirectory!, persistedInstallRoot)
+                : persistedInstallRoot;
+
             result.Add(
                 new GameInstallation(
                     new InstallationId(
                         Guid.Parse(reader.GetString(0))),
                     new GameId(
                         Guid.Parse(reader.GetString(1))),
-                    (ProviderKind)reader.GetInt32(2),
+                    provider,
                     reader.GetString(3),
-                    reader.GetString(4),
+                    provider == ProviderKind.Manual
+                        ? installRoot ?? reader.GetString(4)
+                        : reader.GetString(4),
                     reader.IsDBNull(5)
                         ? null
                         : reader.GetInt64(5),
@@ -479,9 +492,10 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                     reader.GetInt64(7) != 0,
                     ParseUtc(reader.GetString(8)),
                     InstallationContentKind.Unknown,
-                    reader.IsDBNull(9) ? null : reader.GetString(9),
-                    reader.IsDBNull(10) ? null : reader.GetString(10),
-                    reader.IsDBNull(11) ? null : reader.GetString(11)));
+                    executablePath,
+                    workingDirectory,
+                    reader.IsDBNull(11) ? null : reader.GetString(11),
+                    installRoot ?? (provider == ProviderKind.Manual ? workingDirectory : null)));
         }
 
         return result;
@@ -493,6 +507,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
     {
         ArgumentNullException.ThrowIfNull(definition);
         var now = DateTimeOffset.UtcNow;
+        var installRootPath = definition.InstallRootPath ?? definition.WorkingDirectory;
+        var installedSizeBytes = await ManualInstallSizeCalculator.TryCalculateAsync(installRootPath, cancellationToken);
         var gameId = GameId.New();
         var externalId = $"manual:{Guid.NewGuid():D}";
         var installationId = InstallationId.New();
@@ -521,19 +537,21 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
             INSERT INTO installations(
                 installation_id,game_id,provider,external_id,install_path,
                 installed_size_bytes,is_preferred,is_present,last_seen_utc,
-                executable_path,working_directory,launch_arguments)
+                executable_path,working_directory,launch_arguments,install_root_path)
             VALUES($installationId,$gameId,$provider,$externalId,$installPath,
-                NULL,1,1,$lastSeen,$executablePath,$workingDirectory,$launchArguments);
+                $installedSizeBytes,1,1,$lastSeen,$executablePath,$workingDirectory,$launchArguments,$installRootPath);
             """;
         installation.Parameters.AddWithValue("$installationId", installationId.ToString());
         installation.Parameters.AddWithValue("$gameId", gameId.ToString());
         installation.Parameters.AddWithValue("$provider", (int)ProviderKind.Manual);
         installation.Parameters.AddWithValue("$externalId", externalId);
-        installation.Parameters.AddWithValue("$installPath", definition.WorkingDirectory);
+        installation.Parameters.AddWithValue("$installPath", installRootPath);
+        installation.Parameters.AddWithValue("$installedSizeBytes", (object?)installedSizeBytes ?? DBNull.Value);
         installation.Parameters.AddWithValue("$lastSeen", stamp);
         installation.Parameters.AddWithValue("$executablePath", definition.ExecutablePath);
         installation.Parameters.AddWithValue("$workingDirectory", definition.WorkingDirectory);
         installation.Parameters.AddWithValue("$launchArguments", (object?)definition.LaunchArguments ?? DBNull.Value);
+        installation.Parameters.AddWithValue("$installRootPath", installRootPath);
         await installation.ExecuteNonQueryAsync(cancellationToken);
 
         var reference = connection.CreateCommand();
@@ -546,8 +564,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
         await transaction.CommitAsync(cancellationToken);
 
         return new GameInstallation(installationId, gameId, ProviderKind.Manual, externalId,
-            definition.WorkingDirectory, null, true, true, now, InstallationContentKind.Game,
-            definition.ExecutablePath, definition.WorkingDirectory, definition.LaunchArguments);
+            installRootPath, installedSizeBytes, true, true, now, InstallationContentKind.Game,
+            definition.ExecutablePath, definition.WorkingDirectory, definition.LaunchArguments, installRootPath);
     }
 
     public async Task<GameInstallation?> UpdateAsync(
@@ -557,6 +575,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
     {
         ArgumentNullException.ThrowIfNull(definition);
         var now = DateTimeOffset.UtcNow;
+        var installRootPath = definition.InstallRootPath ?? definition.WorkingDirectory;
+        var installedSizeBytes = await ManualInstallSizeCalculator.TryCalculateAsync(installRootPath, cancellationToken);
         await using var connection = new SqliteConnection($"Data Source={_options.DatabasePath};Pooling=False");
         await connection.OpenAsync(cancellationToken);
         await EnableForeignKeysAsync(connection, cancellationToken);
@@ -566,8 +586,9 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
         update.Transaction = transaction;
         update.CommandText = """
             UPDATE games SET title=$title, updated_utc=$updated WHERE game_id=$gameId;
-            UPDATE installations SET install_path=$workingDirectory, executable_path=$executablePath,
+            UPDATE installations SET install_path=$installRootPath, installed_size_bytes=$installedSizeBytes, executable_path=$executablePath,
                 working_directory=$workingDirectory, launch_arguments=$launchArguments,
+                install_root_path=$installRootPath,
                 is_present=1, last_seen_utc=$updated
             WHERE game_id=$gameId AND provider=$provider;
             """;
@@ -578,6 +599,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
         update.Parameters.AddWithValue("$workingDirectory", definition.WorkingDirectory);
         update.Parameters.AddWithValue("$executablePath", definition.ExecutablePath);
         update.Parameters.AddWithValue("$launchArguments", (object?)definition.LaunchArguments ?? DBNull.Value);
+        update.Parameters.AddWithValue("$installRootPath", installRootPath);
+        update.Parameters.AddWithValue("$installedSizeBytes", (object?)installedSizeBytes ?? DBNull.Value);
         await update.ExecuteNonQueryAsync(cancellationToken);
 
         var select = connection.CreateCommand();
@@ -585,7 +608,7 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
         select.CommandText = """
             SELECT installation_id, external_id, install_path, installed_size_bytes,
                    is_preferred, is_present, last_seen_utc, executable_path,
-                   working_directory, launch_arguments
+                   working_directory, launch_arguments, install_root_path
             FROM installations
             WHERE game_id=$gameId AND provider=$provider
             LIMIT 1;
@@ -604,7 +627,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
             reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetInt64(3),
             reader.GetInt64(4) != 0, reader.GetInt64(5) != 0, ParseUtc(reader.GetString(6)),
             InstallationContentKind.Game, reader.IsDBNull(7) ? null : reader.GetString(7),
-            reader.IsDBNull(8) ? null : reader.GetString(8), reader.IsDBNull(9) ? null : reader.GetString(9));
+            reader.IsDBNull(8) ? null : reader.GetString(8), reader.IsDBNull(9) ? null : reader.GetString(9),
+            reader.IsDBNull(10) ? definition.WorkingDirectory : reader.GetString(10));
         await transaction.CommitAsync(cancellationToken);
         return installation;
     }

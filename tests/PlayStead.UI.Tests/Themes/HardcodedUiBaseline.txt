@@ -147,10 +147,10 @@ src/PlayStead.UI/Library/LibraryView.xaml|Spacing|20,16,0,0|1
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|8,0,0,0|8
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|8,3|2
 src/PlayStead.UI/Library/LibraryView.xaml|Spacing|8,5|1
-src/PlayStead.UI/Library/ManualGameDialog.xaml|Spacing|0,0,0,12|3
+src/PlayStead.UI/Library/ManualGameDialog.xaml|Spacing|0,0,0,12|4
 src/PlayStead.UI/Library/ManualGameDialog.xaml|Spacing|0,0,0,20|1
 src/PlayStead.UI/Library/ManualGameDialog.xaml|Spacing|0,0,0,6|1
-src/PlayStead.UI/Library/ManualGameDialog.xaml|Spacing|0,0,8,0|1
+src/PlayStead.UI/Library/ManualGameDialog.xaml|Spacing|0,0,8,0|2
 src/PlayStead.UI/Library/ManualGameDialog.xaml|Spacing|140,0,0,12|1
 src/PlayStead.UI/Library/ManualGameDialog.xaml|Spacing|16|1
 src/PlayStead.UI/Library/ManualGameDialog.xaml|Spacing|24|1

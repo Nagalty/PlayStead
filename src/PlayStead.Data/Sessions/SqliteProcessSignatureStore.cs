@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PlayStead.Core.Library;
+using PlayStead.Core.Persistence;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Sessions.Discovery;
 using PlayStead.Data.Database;
@@ -219,12 +220,27 @@ public sealed class SqliteProcessSignatureStore : IProcessSignatureStore, IProce
         InstallationScope scope, CancellationToken cancellationToken)
     {
         using (var command = Command(connection, transaction,
-            "SELECT game_id,install_path,is_present FROM installations WHERE installation_id=$installation",
+            "SELECT game_id,provider,install_path,executable_path,working_directory,install_root_path,is_present FROM installations WHERE installation_id=$installation",
             ("$installation", scope.InstallationId.ToString())))
         {
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken) || reader.GetString(0) != scope.GameId.ToString() ||
-                reader.IsDBNull(1) || !PathEquals(reader.GetString(1), scope.RootPath) || !reader.GetBoolean(2)) return false;
+                reader.IsDBNull(2) || !reader.GetBoolean(6)) return false;
+            var storedRoot = reader.GetString(2);
+            if ((ProviderKind)reader.GetInt32(1) == ProviderKind.Manual &&
+                !reader.IsDBNull(3) && !reader.IsDBNull(4))
+            {
+                try
+                {
+                    storedRoot = ManualInstallRootHeuristics.Resolve(
+                        reader.GetString(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5));
+                }
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+            }
+            if (!PathEquals(storedRoot, scope.RootPath)) return false;
         }
         using var roots = Command(connection, transaction,
             "SELECT install_path FROM installations WHERE is_present=1 AND installation_id<>$installation AND install_path IS NOT NULL",

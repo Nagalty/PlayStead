@@ -17,7 +17,22 @@ public sealed class ManualGameDefinitionTests : IDisposable
 
         Assert.Equal("My Game", definition.Title);
         Assert.Equal(Path.GetFullPath(_root), definition.WorkingDirectory);
+        Assert.Equal(Path.GetFullPath(_root), definition.InstallRootPath);
         Assert.Equal("--safe-mode", definition.LaunchArguments);
+    }
+
+    [Fact]
+    public void Valid_definition_preserves_a_distinct_install_root()
+    {
+        Directory.CreateDirectory(_root);
+        var retail = Directory.CreateDirectory(Path.Combine(_root, "Retail")).FullName;
+        var executable = Path.Combine(retail, "Game.exe");
+        File.WriteAllText(executable, string.Empty);
+
+        var definition = ManualGameDefinition.Create("Game", executable, retail, null, _root);
+
+        Assert.Equal(Path.GetFullPath(retail), definition.WorkingDirectory);
+        Assert.Equal(Path.GetFullPath(_root), definition.InstallRootPath);
     }
 
     [Fact]

@@ -27,6 +27,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock Text="Ajouter un jeu"
                        Style="{DynamicResource PlayStead.Text.SectionTitle}"
@@ -47,18 +48,24 @@
                 <TextBlock Text="Dossier de travail" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
                 <TextBox x:Name="WorkingDirectoryTextBox" Grid.Column="1" />
             </Grid>
-            <Grid Grid.Row="4" Margin="0,0,0,6">
+            <Grid Grid.Row="4" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <TextBlock Text="Dossier d’installation" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
+                <TextBox x:Name="InstallRootPathTextBox" Grid.Column="1" Margin="0,0,8,0" TextChanged="InstallRootPathTextBox_OnTextChanged" />
+                <Button Grid.Column="2" Content="Parcourir…" Click="InstallRootBrowseButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />
+            </Grid>
+            <Grid Grid.Row="5" Margin="0,0,0,6">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                 <TextBlock Text="Arguments" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
                 <TextBox x:Name="ArgumentsTextBox" Grid.Column="1" />
             </Grid>
             <TextBlock x:Name="ErrorTextBlock"
-                       Grid.Row="5"
+                       Grid.Row="6"
                        Foreground="{DynamicResource PlayStead.Brush.Warning}"
                        TextWrapping="Wrap"
                        Margin="140,0,0,12"
                        Visibility="Collapsed" />
-            <StackPanel Grid.Row="6"
+            <StackPanel Grid.Row="7"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
                 <Button Content="Annuler" IsCancel="True" Click="CancelButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />

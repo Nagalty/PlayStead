@@ -18,6 +18,25 @@ public sealed class GameDetailInstallationTests
         Assert.Equal("À jour", viewModel.SteamStatusLabel);
         Assert.Equal("En cours", viewModel.SessionStatusLabel);
     }
+
+    [Fact]
+    public void Manual_game_detail_uses_persisted_install_root_and_keeps_retail_working_directory_out_of_projection()
+    {
+        var item = new LibraryItemViewModel(
+            GameId.New(),
+            "007 First Light",
+            ProviderKind.Manual,
+            "Manuel",
+            @"H:\007 First Light",
+            null,
+            null,
+            IsSessionActive: false);
+
+        var viewModel = new GameDetailViewModel(item);
+
+        Assert.Equal(@"H:\007 First Light", viewModel.InstallPath);
+        Assert.Equal("H:", viewModel.InstallDriveLabel);
+    }
     [Fact]
     public void Installation_view_exposes_authoritative_local_fields()
     {

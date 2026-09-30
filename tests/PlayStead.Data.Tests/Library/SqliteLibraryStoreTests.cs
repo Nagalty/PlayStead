@@ -199,9 +199,11 @@ public sealed class SqliteLibraryStoreTests : IDisposable
         var manual = Assert.IsAssignableFrom<IManualGameStore>(store);
         var root = Path.Combine(_root, "ManualGame");
         Directory.CreateDirectory(root);
+        var installRoot = Path.Combine(_root, "ManualInstallRoot");
+        Directory.CreateDirectory(installRoot);
         var executable = Path.Combine(root, "game.exe");
         File.WriteAllText(executable, string.Empty);
-        var definition = ManualGameDefinition.Create("My Manual Game", executable, root, "--safe");
+        var definition = ManualGameDefinition.Create("My Manual Game", executable, root, "--safe", installRoot);
 
         var created = await manual.CreateAsync(definition, CancellationToken.None);
         var reloaded = await store.LoadSnapshotAsync(CancellationToken.None);
@@ -211,6 +213,8 @@ public sealed class SqliteLibraryStoreTests : IDisposable
         Assert.Equal(ProviderKind.Manual, persisted.Provider);
         Assert.Equal(executable, persisted.ExecutablePath);
         Assert.Equal(root, persisted.WorkingDirectory);
+        Assert.Equal(installRoot, persisted.InstallPath);
+        Assert.Equal(installRoot, persisted.InstallRootPath);
         Assert.Equal("--safe", persisted.LaunchArguments);
 
         var renamed = ManualGameDefinition.Create("Renamed Game", executable, root, "--other");
@@ -231,6 +235,62 @@ public sealed class SqliteLibraryStoreTests : IDisposable
         var afterRemoval = (await store.LoadSnapshotAsync(CancellationToken.None)).Installations;
         Assert.False(afterRemoval.Single(i => i.GameId == created.GameId).IsPresent);
         Assert.True(afterRemoval.Single(i => i.GameId == second.GameId).IsPresent);
+    }
+
+    [Fact]
+    public async Task Legacy_manual_row_without_install_root_falls_back_to_working_directory()
+    {
+        var (store, databasePath) = await CreateStoreAsync();
+        var manual = Assert.IsAssignableFrom<IManualGameStore>(store);
+        var root = Directory.CreateDirectory(Path.Combine(_root, "LegacyManual")).FullName;
+        var executable = Path.Combine(root, "game.exe");
+        File.WriteAllText(executable, string.Empty);
+        var created = await manual.CreateAsync(
+            ManualGameDefinition.Create("Legacy", executable, root),
+            CancellationToken.None);
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            var command = connection.CreateCommand();
+            command.CommandText = "UPDATE installations SET install_root_path=NULL WHERE game_id=$gameId;";
+            command.Parameters.AddWithValue("$gameId", created.GameId.ToString());
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var reloaded = (await store.LoadSnapshotAsync(CancellationToken.None)).Installations
+            .Single(i => i.GameId == created.GameId);
+        Assert.Equal(root, reloaded.WorkingDirectory);
+        Assert.Equal(root, reloaded.InstallPath);
+        Assert.Equal(root, reloaded.InstallRootPath);
+    }
+
+    [Fact]
+    public async Task Legacy_retail_root_equal_to_working_directory_is_repaired_on_projection()
+    {
+        var (store, databasePath) = await CreateStoreAsync();
+        var manual = Assert.IsAssignableFrom<IManualGameStore>(store);
+        var gameRoot = Directory.CreateDirectory(Path.Combine(_root, "RetailGame")).FullName;
+        var workingDirectory = Directory.CreateDirectory(Path.Combine(gameRoot, "Retail")).FullName;
+        var executable = Path.Combine(workingDirectory, "007FirstLight.exe");
+        File.WriteAllText(executable, string.Empty);
+        var created = await manual.CreateAsync(
+            ManualGameDefinition.Create("007 First Light", executable, workingDirectory, null, workingDirectory),
+            CancellationToken.None);
+
+        var reloaded = (await store.LoadSnapshotAsync(CancellationToken.None)).Installations
+            .Single(i => i.GameId == created.GameId);
+
+        Assert.Equal(workingDirectory, reloaded.WorkingDirectory);
+        Assert.Equal(gameRoot, reloaded.InstallRootPath);
+        Assert.Equal(gameRoot, reloaded.InstallPath);
+
+        await using var connection = new SqliteConnection($"Data Source={databasePath};Pooling=False");
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT install_root_path FROM installations WHERE game_id=$gameId;";
+        command.Parameters.AddWithValue("$gameId", created.GameId.ToString());
+        Assert.Equal(workingDirectory, (string?)await command.ExecuteScalarAsync());
     }
 
     private async Task<(ILibraryStore Store, string DatabasePath)> CreateStoreAsync()

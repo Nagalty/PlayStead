@@ -1121,7 +1121,8 @@ public partial class MainWindow : Window
             game.Title,
             installation.ExecutablePath,
             installation.WorkingDirectory ?? installation.InstallPath,
-            installation.LaunchArguments);
+            installation.LaunchArguments,
+            installation.InstallRootPath ?? installation.InstallPath);
         var dialog = new ManualGameDialog(initialDefinition: definition)
         {
             Owner = this

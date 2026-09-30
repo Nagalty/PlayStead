@@ -13,7 +13,7 @@ public sealed class DatabaseProcessSignatureDiscoveryMigrationTests
         using var fixture = new DiscoveryDatabaseFixture();
         await fixture.InitializeAsync(CancellationToken.None);
         await using var connection = await fixture.OpenAsync(CancellationToken.None);
-        Assert.Equal(24, await ScalarAsync(connection, "SELECT MAX(version) FROM schema_migrations;"));
+        Assert.Equal(25, await ScalarAsync(connection, "SELECT MAX(version) FROM schema_migrations;"));
         Assert.Equal(3, await ScalarAsync(connection, "SELECT COUNT(*) FROM pragma_table_info('process_signature_entries') WHERE name IN ('executable_path','validated_size_bytes','validated_last_write_utc');"));
         Assert.Equal(1, await ScalarAsync(connection, "SELECT COUNT(*) FROM sqlite_master WHERE name = 'process_signature_validation';"));
         Assert.Equal(1, await ScalarAsync(connection, "SELECT COUNT(*) FROM sqlite_master WHERE name = 'process_signature_learning';"));
@@ -40,7 +40,7 @@ public sealed class DatabaseProcessSignatureDiscoveryMigrationTests
             await using var upgraded = await fixture.OpenAsync(CancellationToken.None);
             var after = await RowsAsync(upgraded, "SELECT s.game_id,s.origin,s.updated_at_utc,e.ordinal,e.executable_name,e.kind FROM process_signatures s JOIN process_signature_entries e USING(game_id) ORDER BY s.game_id,e.ordinal;");
             Assert.Equal(before, after);
-            Assert.Equal(24, await ScalarAsync(upgraded, "SELECT MAX(version) FROM schema_migrations;"));
+            Assert.Equal(25, await ScalarAsync(upgraded, "SELECT MAX(version) FROM schema_migrations;"));
             Assert.Equal(1, await ScalarAsync(upgraded, "SELECT COUNT(*) FROM process_signature_validation;"));
         }
     }
@@ -98,7 +98,7 @@ public sealed class DatabaseProcessSignatureDiscoveryMigrationTests
         var before = Directory.GetFiles(fixture.Options.BackupsDirectory);
         await fixture.InitializeAsync(CancellationToken.None);
         await using var connection = await fixture.OpenAsync(CancellationToken.None);
-        Assert.Equal(24, await ScalarAsync(connection, "SELECT MAX(version) FROM schema_migrations;"));
+        Assert.Equal(25, await ScalarAsync(connection, "SELECT MAX(version) FROM schema_migrations;"));
         Assert.Equal(before, Directory.GetFiles(fixture.Options.BackupsDirectory));
     }
 

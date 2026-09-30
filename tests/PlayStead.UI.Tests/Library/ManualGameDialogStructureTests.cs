@@ -1,4 +1,5 @@
 using Xunit;
+using PlayStead.UI.Library;
 
 namespace PlayStead.UI.Tests.Library;
 
@@ -18,6 +19,9 @@ public sealed class ManualGameDialogStructureTests
         Assert.Contains("PlayStead.Brush.BorderStrong", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Parcourir…\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Click=\"BrowseButton_OnClick\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Dossier d’installation", xaml, StringComparison.Ordinal);
+        Assert.Contains("InstallRootPathTextBox", xaml, StringComparison.Ordinal);
+        Assert.Contains("Click=\"InstallRootBrowseButton_OnClick\"", xaml, StringComparison.Ordinal);
         Assert.Contains("PlayStead.Button.Primary", xaml, StringComparison.Ordinal);
         Assert.Contains("PlayStead.Button.Secondary", xaml, StringComparison.Ordinal);
     }
@@ -36,6 +40,28 @@ public sealed class ManualGameDialogStructureTests
         Assert.Contains("FileVersionInfo.GetVersionInfo", code, StringComparison.Ordinal);
         Assert.Contains("FileDescription", code, StringComparison.Ordinal);
         Assert.Contains("ProductName", code, StringComparison.Ordinal);
+        Assert.Contains("ManualInstallRootHeuristics.Suggest", code, StringComparison.Ordinal);
+        Assert.Contains("ManualGamePrefill.Build", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Manual_game_prefill_keeps_retail_as_working_directory_and_uses_game_root()
+    {
+        var prefill = ManualGamePrefill.Build("H:\\007 First Light\\Retail\\007FirstLight.exe");
+
+        Assert.Equal("H:\\007 First Light\\Retail", prefill.WorkingDirectory);
+        Assert.Equal("H:\\007 First Light", prefill.InstallRootPath);
+    }
+
+    [Theory]
+    [InlineData("C:\\Game\\Binaries\\Win64\\Game.exe", "C:\\Game", "C:\\Game\\Binaries\\Win64")]
+    [InlineData("C:\\Game\\Binaries\\Win64\\Shipping\\Game.exe", "C:\\Game", "C:\\Game\\Binaries\\Win64\\Shipping")]
+    public void Manual_game_prefill_uses_bounded_binaries_heuristics(string executable, string expectedRoot, string expectedWorkingDirectory)
+    {
+        var prefill = ManualGamePrefill.Build(executable);
+
+        Assert.Equal(expectedRoot, prefill.InstallRootPath);
+        Assert.Equal(expectedWorkingDirectory, prefill.WorkingDirectory);
     }
 
     [Fact]

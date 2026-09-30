@@ -155,6 +155,36 @@ public sealed class GameQuickPanelViewModelTests
     }
 
     [Fact]
+    public async Task Manual_game_uses_observed_effective_time_for_total_playtime()
+    {
+        var gameId = GameId.New();
+        var game = new LibraryItemViewModel(gameId, "Manual game", ProviderKind.Manual, "manual", @"C:\Game", null);
+        var viewModel = new GameQuickPanelViewModel(
+            game,
+            new NavigationService(),
+            launch: null,
+            new FakeSessionStore([EndedSession(Guid.NewGuid(), gameId.Value,
+                DateTimeOffset.UtcNow.AddMinutes(-50), TimeSpan.FromMinutes(50))]),
+            new FakeCorrectionStore(new Dictionary<Guid, SessionCorrection>()),
+            new SessionCorrectionPolicy());
+        viewModel.AttachEffectiveActivityService(new FakeEffectiveActivityService(
+            new EffectiveActivitySnapshot(
+                gameId, TimeSpan.FromMinutes(50), EffectiveActivitySource.PlaySteadObservedSessions,
+                EffectiveActivityCoverage.Bounded, DateTimeOffset.UtcNow,
+                EffectiveActivitySource.PlaySteadObservedSessions, TimeSpan.FromMinutes(50), 2,
+                TimeSpan.Zero, 0, null, null, DateTimeOffset.UtcNow)
+            {
+                EffectiveSessionCount = 2
+            }));
+
+        await viewModel.LoadSessionSummaryAsync(CancellationToken.None);
+
+        Assert.Equal("50 min", viewModel.TotalPlayTimeLabel);
+        Assert.Equal("50 min", viewModel.PlaySteadTotalPlayTimeLabel);
+        Assert.Equal("2 sessions connues", viewModel.SessionCountLabel);
+    }
+
+    [Fact]
     public async Task Session_count_label_uses_the_reconciled_effective_count()
     {
         var gameId = GameId.New();

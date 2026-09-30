@@ -13,4 +13,5 @@ public sealed record GameInstallation(
     InstallationContentKind ContentKind = InstallationContentKind.Unknown,
     string? ExecutablePath = null,
     string? WorkingDirectory = null,
-    string? LaunchArguments = null);
+    string? LaunchArguments = null,
+    string? InstallRootPath = null);

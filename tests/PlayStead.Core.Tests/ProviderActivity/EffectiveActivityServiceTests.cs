@@ -27,6 +27,38 @@ public sealed class EffectiveActivityServiceTests
     }
 
     [Fact]
+    public async Task Manual_game_projects_complete_PlayStead_time_as_observed_total()
+    {
+        var gameId = GameId.New();
+        var observed = new[]
+        {
+            Ended(gameId.Value, Now.AddHours(-2), TimeSpan.FromMinutes(30)),
+            Ended(gameId.Value, Now.AddHours(-1), TimeSpan.FromMinutes(20))
+        };
+        var snapshot = await CreateService(gameId, observed: observed).GetAsync(
+            gameId, ProviderKind.Manual, CancellationToken.None);
+
+        Assert.Equal(TimeSpan.FromMinutes(50), snapshot.EffectiveTotalPlayTime);
+        Assert.Equal(EffectiveActivitySource.PlaySteadObservedSessions, snapshot.EffectiveTotalPlayTimeSource);
+        Assert.Equal(EffectiveActivityCoverage.Bounded, snapshot.EffectiveTotalPlayTimeCoverage);
+        Assert.Equal(TimeSpan.FromMinutes(50), snapshot.PlaySteadObservedTime);
+        Assert.Equal(2, snapshot.EffectiveSessionCount);
+    }
+
+    [Fact]
+    public async Task Manual_game_without_sessions_remains_unknown()
+    {
+        var gameId = GameId.New();
+        var snapshot = await CreateService(gameId).GetAsync(
+            gameId, ProviderKind.Manual, CancellationToken.None);
+
+        Assert.Null(snapshot.EffectiveTotalPlayTime);
+        Assert.Equal(EffectiveActivitySource.Unknown, snapshot.EffectiveTotalPlayTimeSource);
+        Assert.Equal(TimeSpan.Zero, snapshot.PlaySteadObservedTime);
+        Assert.Equal(0, snapshot.EffectiveSessionCount);
+    }
+
+    [Fact]
     public async Task Provider_lifetime_total_remains_authoritative_over_bounded_activity()
     {
         var gameId = GameId.New();

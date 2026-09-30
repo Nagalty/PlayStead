@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -48,6 +49,110 @@ public sealed class TaskB3DiscoveryStartupTests : IDisposable
         Assert.Contains(context.Inventory.Candidates, candidate =>
             candidate.ExecutablePath.EndsWith("Game.exe", StringComparison.OrdinalIgnoreCase));
         await manager.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Legacy_manual_retail_entry_starts_without_learning_state_conflict()
+    {
+        Directory.CreateDirectory(_root);
+        var gameRoot = Directory.CreateDirectory(Path.Combine(_root, "007 First Light")).FullName;
+        var workingDirectory = Directory.CreateDirectory(Path.Combine(gameRoot, "Retail")).FullName;
+        var executable = Path.Combine(workingDirectory, "007FirstLight.exe");
+        await File.WriteAllTextAsync(executable, "binary");
+        var layout = UserDataLayout.FromRoot(_root);
+        layout.EnsureDirectoriesExist();
+        using var host = PlaySteadHost.Build(layout);
+        var services = host.Services;
+        await services.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        var manual = services.GetRequiredService<IManualGameStore>();
+        await manual.CreateAsync(
+            ManualGameDefinition.Create("007 First Light", executable, workingDirectory, null, workingDirectory),
+            CancellationToken.None);
+
+        var state = await services.GetRequiredService<LocalStartupPipeline>()
+            .InitializeAsync(CancellationToken.None);
+
+        Assert.True(state.Health.IsHealthy);
+        var installation = Assert.Single(state.Snapshot.Installations);
+        Assert.Equal(gameRoot, installation.InstallPath);
+        Assert.Equal(gameRoot, installation.InstallRootPath);
+        var learning = await services.GetRequiredService<IProcessSignatureLearningStore>()
+            .LoadAsync(installation.Id, CancellationToken.None);
+        Assert.NotNull(learning);
+        Assert.Equal(gameRoot, learning!.Inventory.Scope.RootPath);
+        await services.GetRequiredService<DiscoveryInventoryManager>()
+            .AwaitIdleAsync(CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.NotNull(services.GetRequiredService<DiscoveryInventoryManager>()
+            .GetCurrent(installation.Id));
+        await services.GetRequiredService<DiscoveryInventoryManager>().StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Legacy_manual_retail_learning_state_is_reconciled_before_startup_guard()
+    {
+        Directory.CreateDirectory(_root);
+        var gameRoot = Directory.CreateDirectory(Path.Combine(_root, "007 First Light")).FullName;
+        var workingDirectory = Directory.CreateDirectory(Path.Combine(gameRoot, "Retail")).FullName;
+        var executable = Path.Combine(workingDirectory, "007FirstLight.exe");
+        await File.WriteAllTextAsync(executable, "binary");
+        var layout = UserDataLayout.FromRoot(_root);
+        layout.EnsureDirectoriesExist();
+        using var host = PlaySteadHost.Build(layout);
+        var services = host.Services;
+        await services.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        var manual = services.GetRequiredService<IManualGameStore>();
+        var created = await manual.CreateAsync(
+            ManualGameDefinition.Create("007 First Light", executable, workingDirectory, null, workingDirectory),
+            CancellationToken.None);
+        var installation = Assert.Single((await services.GetRequiredService<ILibraryStore>()
+            .LoadSnapshotAsync(CancellationToken.None)).Installations);
+        var legacyScope = new InstallationScope(created.GameId, installation.Id, workingDirectory,
+            Guid.NewGuid(), true);
+        var legacyInventory = new ExecutableInventory(legacyScope, InventoryCompleteness.Complete,
+            [new ExecutableCandidate(executable, Path.GetFileName(executable),
+                new FileRevision(new FileInfo(executable).Length, File.GetLastWriteTimeUtc(executable)))], []);
+        var legacyState = new ProcessSignatureLearningState(legacyInventory,
+            ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, Guid.NewGuid(), 1, false, null, null, []);
+        await using (var connection = new SqliteConnection($"Data Source={layout.DatabasePath};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO process_signature_learning
+                    (installation_id, game_id, root_path, generation_id, policy_version,
+                     concurrency_token, last_sequence_number, has_ambiguous_installation,
+                     inventory_json, reasons_json)
+                VALUES ($installation, $game, $root, $generation, $policy, $token,
+                        $sequence, $ambiguous, $inventory, $reasons);
+                """;
+            command.Parameters.AddWithValue("$installation", installation.Id.ToString());
+            command.Parameters.AddWithValue("$game", created.GameId.ToString());
+            command.Parameters.AddWithValue("$root", workingDirectory);
+            command.Parameters.AddWithValue("$generation", legacyScope.GenerationId.ToString("D"));
+            command.Parameters.AddWithValue("$policy", legacyState.PolicyVersion);
+            command.Parameters.AddWithValue("$token", legacyState.ConcurrencyToken.ToString("N"));
+            command.Parameters.AddWithValue("$sequence", legacyState.LastSequenceNumber);
+            command.Parameters.AddWithValue("$ambiguous", false);
+            command.Parameters.AddWithValue("$inventory", JsonSerializer.Serialize(legacyState.Inventory));
+            command.Parameters.AddWithValue("$reasons", JsonSerializer.Serialize(legacyState.Reasons));
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var state = await services.GetRequiredService<LocalStartupPipeline>()
+            .InitializeAsync(CancellationToken.None);
+
+        Assert.True(state.Health.IsHealthy);
+        var resolved = Assert.Single(state.Snapshot.Installations);
+        Assert.Equal(gameRoot, resolved.InstallPath);
+        Assert.Equal(gameRoot, resolved.InstallRootPath);
+        var learning = await services.GetRequiredService<IProcessSignatureLearningStore>()
+            .LoadAsync(resolved.Id, CancellationToken.None);
+        Assert.NotNull(learning);
+        Assert.Equal(gameRoot, learning!.Inventory.Scope.RootPath);
+        Assert.Equal(0, learning.LastSequenceNumber);
+        Assert.Equal(created.GameId, resolved.GameId);
+        await services.GetRequiredService<DiscoveryInventoryManager>().StopAsync(CancellationToken.None);
     }
 
     [Fact]

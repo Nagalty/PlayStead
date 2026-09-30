@@ -364,6 +364,11 @@ public sealed class DiscoveryInventoryManager
         var knownGeneration = Guid.Empty;
         try
         {
+            var scope = new InstallationScope(installation.Installation.GameId, id,
+                installation.Root, Guid.NewGuid(), true);
+            if (_learningStore is ILegacyLearningStateReconciler reconciler)
+                await reconciler.ReconcileAsync(installation.Installation.Provider, scope,
+                    cancellationToken);
             var persistence = Stopwatch.StartNew();
             var persisted = await _learningStore.LoadAsync(id, cancellationToken);
             var persistenceMilliseconds = persistence.ElapsedMilliseconds;
@@ -376,7 +381,7 @@ public sealed class DiscoveryInventoryManager
                     StringComparison.OrdinalIgnoreCase)
                 ? persisted.Inventory.Scope.GenerationId : Guid.NewGuid();
             knownGeneration = generation;
-            var scope = new InstallationScope(installation.Installation.GameId, id,
+            scope = new InstallationScope(installation.Installation.GameId, id,
                 installation.Root, generation, true);
             ExecutableInventory inventory;
             long inventoryMilliseconds = 0;
