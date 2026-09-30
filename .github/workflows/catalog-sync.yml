@@ -1,0 +1,52 @@
+name: Canonical catalog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+      IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build catalog builder
+        run: dotnet build tools/PlayStead.CatalogBuilder/PlayStead.CatalogBuilder.csproj -c Release --no-restore -p:UseSharedCompilation=false
+      - name: Generate catalog
+        shell: bash
+        run: |
+          test -n "$IGDB_CLIENT_ID"
+          test -n "$IGDB_CLIENT_SECRET"
+          dotnet tools/PlayStead.CatalogBuilder/bin/Release/net10.0/PlayStead.CatalogBuilder.dll \
+            --igdb --output "$RUNNER_TEMP/catalog" --catalog-version "$GITHUB_RUN_NUMBER"
+      - name: Validate public artifact
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib, os
+          root = pathlib.Path(os.environ["RUNNER_TEMP"]) / "catalog"
+          manifest = json.loads((root / "catalog-manifest.json").read_text())
+          payload = root / "catalog-payload.json"
+          digest = hashlib.sha256(payload.read_bytes()).hexdigest().upper()
+          assert manifest["schemaVersion"] == 1
+          assert manifest["payloadSha256"].upper() == digest
+          assert manifest["payloadSizeBytes"] == payload.stat().st_size
+          assert manifest["entryCount"] == len(json.loads(payload.read_text())["entries"])
+          assert "IGDB_CLIENT_SECRET" not in payload.read_text()
+          assert "file://" not in payload.read_text().lower()
+          PY
+      - name: Upload validated catalog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: playstead-catalog-${{ github.run_number }}
+          path: ${{ runner.temp }}/catalog
+          retention-days: 90
