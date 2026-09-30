@@ -79,6 +79,20 @@ public sealed class GameDetailLocalArtifactsTests
         Assert.Equal("Mettre à jour mon point de repère", Create(gameId, LocalArtifactBaselineStatus.Changed).BaselineActionLabel);
     }
 
+    [Fact]
+    public void Compare_is_available_only_for_changed_existing_configuration_with_snapshot()
+    {
+        var gameId = GameId.New();
+        var changed = new GameLocalArtifact(gameId, GameLocalArtifactKind.Configuration, @"C:\Config\Game.ini", GameLocalArtifactSource.ExplicitRule, GameLocalArtifactStatus.KnownAndExists, "rule", LocalArtifactBaselineStatus.Changed, 1,
+            Details: new LocalArtifactDetails(true, 1, 12, DateTimeOffset.UtcNow));
+        var unchanged = changed with { BaselineStatus = LocalArtifactBaselineStatus.Unchanged };
+        var save = changed with { Kind = GameLocalArtifactKind.SaveData };
+
+        Assert.True(changed.CanCompare);
+        Assert.False(unchanged.CanCompare);
+        Assert.False(save.CanCompare);
+    }
+
     private static GameDetailViewModel CreateViewModel(LibraryItemViewModel game, IReadOnlyList<GameLocalArtifact> artifacts) =>
         new(game, launch: null, activity: null, heroPath: null,
             localArtifactDiscoveryService: new FakeDiscoveryService(artifacts));

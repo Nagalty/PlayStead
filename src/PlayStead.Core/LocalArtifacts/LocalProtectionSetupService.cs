@@ -131,6 +131,7 @@ public sealed class LocalProtectionSetupService(
     private async Task<IReadOnlyList<GameLocalArtifact>> DiscoverBuiltInAsync(LocalProtectionGameContext game, CancellationToken cancellationToken)
         => (await discovery.DiscoverAsync(game.GameId, game.Provider, game.ProviderGameId, cancellationToken).ConfigureAwait(false))
             .Where(x => x.Source != GameLocalArtifactSource.UserDefined)
+            .Where(x => x.Kind is GameLocalArtifactKind.Configuration or GameLocalArtifactKind.SaveData)
             .ToArray();
 
     private async Task<LocalProtectionArtifactSummary> SummarizeAsync(GameLocalArtifact artifact, CancellationToken cancellationToken)

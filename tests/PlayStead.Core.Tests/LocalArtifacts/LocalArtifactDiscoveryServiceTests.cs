@@ -151,8 +151,13 @@ public sealed class LocalArtifactDiscoveryServiceTests
             rule.Provider == ProviderKind.Steam && rule.ProviderGameId == "1284210" &&
             rule.Kind == GameLocalArtifactKind.Configuration);
         Assert.Contains(LocalArtifactRuleCatalog.Rules, rule =>
+            rule.Provider == ProviderKind.Steam && rule.ProviderGameId == "1284210" &&
+            rule.Kind == GameLocalArtifactKind.Configuration &&
+            rule.PathTemplate == @"%USERPROFILE%\Documents\Guild Wars 2\InputBinds");
+        Assert.Contains(LocalArtifactRuleCatalog.Rules, rule =>
             rule.Provider == ProviderKind.Steam && rule.ProviderGameId == "1203620" &&
-            rule.Kind == GameLocalArtifactKind.SaveData);
+            rule.Kind == GameLocalArtifactKind.Configuration &&
+            rule.PathTemplate == @"%USERPROFILE%\Saved Games\Enshrouded\enshrouded_user.json");
         Assert.DoesNotContain(LocalArtifactRuleCatalog.Rules, rule =>
             rule.ProviderGameId == "223850");
         await Task.CompletedTask;
@@ -178,7 +183,6 @@ public sealed class LocalArtifactDiscoveryServiceTests
         var expected = new[]
         {
             (AppId: "377160", Path: @"%USERPROFILE%\Documents\My Games\Fallout4\Saves"),
-            (AppId: "1172710", Path: @"%LOCALAPPDATA%\DuneSandbox\Saved"),
             (AppId: "1144200", Path: @"%LOCALAPPDATA%\ReadyOrNot\Saved\SaveGames"),
             (AppId: "1643320", Path: @"%LOCALAPPDATA%\Stalker2\Saved\SaveGames")
         };
@@ -191,5 +195,17 @@ public sealed class LocalArtifactDiscoveryServiceTests
                 rule.Kind == GameLocalArtifactKind.SaveData &&
                 rule.PathTemplate == item.Path);
         }
+
+        Assert.Contains(LocalArtifactRuleCatalog.Rules, rule =>
+            rule.Provider == ProviderKind.Steam && rule.ProviderGameId == "1172710" &&
+            rule.Kind == GameLocalArtifactKind.Configuration &&
+            rule.PathTemplate == @"%LOCALAPPDATA%\DuneSandbox\Saved\Config");
+        Assert.Contains(LocalArtifactRuleCatalog.Rules, rule =>
+            rule.Provider == ProviderKind.Steam && rule.ProviderGameId == "1172710" &&
+            rule.Kind == GameLocalArtifactKind.Log &&
+            rule.PathTemplate == @"%LOCALAPPDATA%\DuneSandbox\Saved\Logs");
+        Assert.DoesNotContain(LocalArtifactRuleCatalog.Rules, rule =>
+            rule.Provider == ProviderKind.Steam && rule.ProviderGameId == "1172710" &&
+            rule.Kind == GameLocalArtifactKind.SaveData);
     }
 }

@@ -64,6 +64,7 @@ public partial class MainWindow : Window
     private readonly ILocalArtifactSnapshotService? _artifactSnapshotService;
     private readonly ILocalArtifactRestoreService? _artifactRestoreService;
     private readonly UserDefinedLocalArtifactService? _userDefinedArtifactService;
+    private readonly ILocalArtifactComparisonService? _localArtifactComparisonService;
     private LibraryUiState? _libraryStateBeforeGameDetail;
 
     public MainWindow()
@@ -464,6 +465,7 @@ public partial class MainWindow : Window
         IProviderObservedSessionStore? providerObservedSessionStore = null,
         IEffectiveActivityService? effectiveActivityService = null,
         UserDefinedLocalArtifactService? userDefinedArtifactService = null,
+        ILocalArtifactComparisonService? localArtifactComparisonService = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -490,6 +492,7 @@ public partial class MainWindow : Window
         _artifactSnapshotService = artifactSnapshotService;
         _artifactRestoreService = artifactRestoreService;
         _userDefinedArtifactService = userDefinedArtifactService;
+        _localArtifactComparisonService = localArtifactComparisonService;
         _aboutViewModel = distributionChannelProvider is null
             ? null
             : new AboutViewModel(distributionChannelProvider);
@@ -887,7 +890,8 @@ public partial class MainWindow : Window
                         _artifactSnapshotService,
                         _artifactRestoreService,
                         libraryViewModel.ModEvidenceStore,
-                        _userDefinedArtifactService)
+                        _userDefinedArtifactService,
+                        _localArtifactComparisonService)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -907,7 +911,8 @@ public partial class MainWindow : Window
                         _artifactSnapshotService,
                         _artifactRestoreService,
                         libraryViewModel.ModEvidenceStore,
-                        _userDefinedArtifactService);
+                        _userDefinedArtifactService,
+                        _localArtifactComparisonService);
 
                 MainContent.Content =
                     new GameDetailView(

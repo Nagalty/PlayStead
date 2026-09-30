@@ -1470,6 +1470,24 @@ public sealed class LibraryViewModel :
                 .Select(x => new LocalProtectionGameContext(x.Key, x.First().Provider, x.First().ExternalId))
                 .ToArray();
             var inventory = await _localProtectionSetupService.InspectAsync(contexts, cancellationToken);
+            var enabledGameIds = contexts
+                .Where(context => _protectionOverrides.TryGetValue(context.GameId.Value, out var enabled)
+                    ? enabled
+                    : inventory.Artifacts.Any(artifact => artifact.Artifact.GameId == context.GameId && artifact.State == LocalProtectionState.Protected))
+                .Select(context => context.GameId)
+                .ToHashSet();
+            if (enabledGameIds.Count > 0)
+            {
+                var enabledContexts = contexts.Where(context => enabledGameIds.Contains(context.GameId)).ToArray();
+                await _localProtectionSetupService.ProtectAsync(enabledContexts, cancellationToken);
+                inventory = await _localProtectionSetupService.InspectAsync(enabledContexts, cancellationToken);
+                var disabledGameIds = contexts.Select(context => context.GameId).Except(enabledGameIds).ToHashSet();
+                var otherInventory = disabledGameIds.Count == 0
+                    ? []
+                    : (await _localProtectionSetupService.InspectAsync(
+                        contexts.Where(context => disabledGameIds.Contains(context.GameId)).ToArray(), cancellationToken)).Artifacts;
+                inventory = new LocalProtectionInventory(inventory.Artifacts.Concat(otherInventory).ToArray());
+            }
             _locallyProtectedGameIds = inventory.Artifacts
             .Where(x => x.State == LocalProtectionState.Protected)
             .Select(x => x.Artifact.GameId)

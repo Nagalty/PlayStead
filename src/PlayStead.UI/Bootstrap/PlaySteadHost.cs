@@ -445,6 +445,7 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<IArtifactFingerprintService, Sha256ArtifactFingerprintService>();
         builder.Services.AddSingleton<ILocalArtifactBaselineStore, SqliteLocalArtifactBaselineStore>();
         builder.Services.AddSingleton<LocalArtifactBaselineComparisonService>();
+        builder.Services.AddSingleton<ILocalArtifactComparisonService, LocalArtifactComparisonService>();
         builder.Services.AddSingleton<ILocalProtectionSetupService, LocalProtectionSetupService>();
         builder.Services.AddSingleton<ILocalArtifactSnapshotStore, SqliteLocalArtifactSnapshotStore>();
         builder.Services.AddSingleton<ILocalSnapshotStorageService>(services =>

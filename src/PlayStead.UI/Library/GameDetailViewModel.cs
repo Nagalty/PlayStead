@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.IO;
+using System.IO.Compression;
 using PlayStead.Core.Library;
 using PlayStead.Core.Catalog;
 using PlayStead.Core.Persistence;
@@ -36,6 +37,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly ILocalArtifactSnapshotService? _localArtifactSnapshotService;
     private readonly ILocalArtifactRestoreService? _localArtifactRestoreService;
     private readonly UserDefinedLocalArtifactService? _userDefinedArtifactService;
+    private readonly ILocalArtifactComparisonService? _localArtifactComparisonService;
     private readonly IModEvidenceStore? _modEvidenceStore;
     private readonly LocalArtifactBaselineComparisonService _artifactBaselineComparisonService = new();
     private bool _isShortlistOperationInProgress;
@@ -76,7 +78,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ILocalArtifactSnapshotService? artifactSnapshotService = null,
         ILocalArtifactRestoreService? artifactRestoreService = null,
         IModEvidenceStore? modEvidenceStore = null,
-        UserDefinedLocalArtifactService? userDefinedArtifactService = null)
+        UserDefinedLocalArtifactService? userDefinedArtifactService = null,
+        ILocalArtifactComparisonService? localArtifactComparisonService = null)
     {
         ArgumentNullException.ThrowIfNull(
             game);
@@ -127,6 +130,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         _localArtifactSnapshotService = artifactSnapshotService;
         _localArtifactRestoreService = artifactRestoreService;
         _userDefinedArtifactService = userDefinedArtifactService;
+        _localArtifactComparisonService = localArtifactComparisonService;
         _modEvidenceStore = modEvidenceStore;
         _artifactBaselineComparisonService = artifactBaselineComparisonService ?? new LocalArtifactBaselineComparisonService();
         _openLocalArtifactFolderCommand = new RelayCommand<GameLocalArtifact>(OpenLocalArtifact,
@@ -134,13 +138,16 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         CaptureLocalArtifactBaselineCommand = new AsyncRelayCommand<GameLocalArtifact>(CaptureLocalArtifactBaselineAsync,
             artifact => artifact?.CanCaptureBaseline == true);
         CreateLocalArtifactSnapshotCommand = new AsyncRelayCommand<GameLocalArtifact>(CreateLocalArtifactSnapshotAsync,
-            artifact => artifact?.Exists == true && artifact.HasBaseline && _localArtifactSnapshotService is not null);
+            artifact => artifact?.Exists == true && artifact.HasBaseline && artifact.IsSnapshotVisible && _localArtifactSnapshotService is not null);
+        ProtectLocalArtifactCommand = new AsyncRelayCommand<GameLocalArtifact>(ProtectLocalArtifactAsync,
+            artifact => artifact?.CanProtect == true && _localArtifactSnapshotService is not null);
         DeleteLocalArtifactSnapshotCommand = new AsyncRelayCommand<LocalArtifactSnapshot>(DeleteLocalArtifactSnapshotAsync,
             snapshot => snapshot is not null && _localArtifactSnapshotService is not null);
         RestoreLocalArtifactSnapshotCommand = new AsyncRelayCommand<LocalArtifactSnapshot>(RestoreLocalArtifactSnapshotAsync,
             snapshot => snapshot is not null && snapshot.IsValid && _localArtifactRestoreService is not null && LocalArtifacts.Any(a => a.Kind == snapshot.ArtifactKind && a.RuleIdentity == snapshot.RuleIdentity && a.Exists && a.HasBaseline) && !_localArtifactRestoreService.IsGameRunning(GameId));
         AddUserDefinedArtifactCommand = new AsyncRelayCommand(AddUserDefinedArtifactAsync, () => _userDefinedArtifactService is not null);
         RemoveUserDefinedArtifactCommand = new AsyncRelayCommand<GameLocalArtifact>(RemoveUserDefinedArtifactAsync, artifact => artifact?.Source == GameLocalArtifactSource.UserDefined && _userDefinedArtifactService is not null);
+        CompareLocalArtifactCommand = new AsyncRelayCommand<GameLocalArtifact>(CompareLocalArtifactAsync, artifact => artifact?.CanCompare == true && _localArtifactComparisonService is not null);
         AddToGamesDuMomentCommand = new AsyncRelayCommand(AddToGamesDuMomentAsync, () => CanChangeGamesDuMoment);
         RemoveFromGamesDuMomentCommand = new AsyncRelayCommand(RemoveFromGamesDuMomentAsync, () => CanChangeGamesDuMoment);
     }
@@ -163,8 +170,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ILocalArtifactSnapshotService? artifactSnapshotService = null,
         ILocalArtifactRestoreService? artifactRestoreService = null,
         IModEvidenceStore? modEvidenceStore = null,
-        UserDefinedLocalArtifactService? userDefinedArtifactService = null)
-        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService)
+        UserDefinedLocalArtifactService? userDefinedArtifactService = null,
+        ILocalArtifactComparisonService? localArtifactComparisonService = null)
+        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService, localArtifactComparisonService)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -314,10 +322,12 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly RelayCommand<GameLocalArtifact> _openLocalArtifactFolderCommand;
     public IAsyncRelayCommand<GameLocalArtifact> CaptureLocalArtifactBaselineCommand { get; }
     public IAsyncRelayCommand<GameLocalArtifact> CreateLocalArtifactSnapshotCommand { get; }
+    public IAsyncRelayCommand<GameLocalArtifact> ProtectLocalArtifactCommand { get; }
     public IAsyncRelayCommand<LocalArtifactSnapshot> DeleteLocalArtifactSnapshotCommand { get; }
     public IAsyncRelayCommand<LocalArtifactSnapshot> RestoreLocalArtifactSnapshotCommand { get; }
     public IAsyncRelayCommand AddUserDefinedArtifactCommand { get; }
     public IAsyncRelayCommand<GameLocalArtifact> RemoveUserDefinedArtifactCommand { get; }
+    public IAsyncRelayCommand<GameLocalArtifact> CompareLocalArtifactCommand { get; }
     public IReadOnlyList<LocalArtifactSnapshot> LocalArtifactSnapshots { get; private set; } = [];
     public bool HasLocalArtifactSnapshots => LocalArtifactSnapshots.Count > 0;
 
@@ -363,12 +373,17 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         LocalArtifacts = await ApplyBaselineStatusesAsync(discovered, cancellationToken);
         LocalArtifactSnapshots = _localArtifactSnapshotService is null
             ? []
-            : (await Task.WhenAll(LocalArtifacts.Where(a => a.RuleIdentity is not null).Select(a => _localArtifactSnapshotService.ListAsync(a, cancellationToken)))).SelectMany(x => x).OrderByDescending(x => x.CreatedAtUtc).Take(5).ToArray();
+            : (await Task.WhenAll(LocalArtifacts.Where(a => a.RuleIdentity is not null && a.IsSnapshotVisible).Select(a => _localArtifactSnapshotService.ListAsync(a, cancellationToken)))).SelectMany(x => x).OrderByDescending(x => x.CreatedAtUtc).Take(5).ToArray();
         if (_localArtifactSnapshotService is not null)
         {
             var withProtection = new List<GameLocalArtifact>(LocalArtifacts.Count);
             foreach (var artifact in LocalArtifacts)
             {
+                if (!artifact.IsSnapshotVisible)
+                {
+                    withProtection.Add(artifact with { SnapshotCount = 0, LastSnapshotAtUtc = null });
+                    continue;
+                }
                 var snapshots = artifact.RuleIdentity is null
                     ? []
                     : await _localArtifactSnapshotService.ListAsync(
@@ -387,6 +402,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ShowLocalArtifactHelper));
         OnPropertyChanged(nameof(LocalArtifactSnapshots));
         OnPropertyChanged(nameof(HasLocalArtifactSnapshots));
+        ProtectLocalArtifactCommand.NotifyCanExecuteChanged();
+        CreateLocalArtifactSnapshotCommand.NotifyCanExecuteChanged();
     }
 
     private async Task<IReadOnlyList<GameLocalArtifact>> ApplyBaselineStatusesAsync(
@@ -436,6 +453,52 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             return;
         }
         await LoadLocalArtifactsAsync(CancellationToken.None);
+    }
+
+    private async Task ProtectLocalArtifactAsync(GameLocalArtifact? artifact)
+    {
+        if (artifact is null || !artifact.CanProtect || _artifactFingerprintService is null || _localArtifactBaselineStore is null || _localArtifactSnapshotService is null)
+            return;
+        var current = await _artifactFingerprintService.ComputeAsync(artifact, CancellationToken.None);
+        if (!current.IsAvailable) return;
+        var fingerprint = current.Fingerprint!;
+        await _localArtifactBaselineStore.UpsertAsync(
+            new LocalArtifactBaseline(GameId, artifact.Kind, artifact.RuleIdentity!, fingerprint.Algorithm, fingerprint.Hash, fingerprint.FileCount, fingerprint.TotalSizeBytes, fingerprint.CapturedAtUtc),
+            CancellationToken.None);
+        if (artifact.Kind == GameLocalArtifactKind.SaveData)
+            await _localArtifactSnapshotService.CreateAsync(artifact with { BaselineStatus = LocalArtifactBaselineStatus.Unchanged }, CancellationToken.None, SnapshotReason.InitialProtection);
+        await LoadLocalArtifactsAsync(CancellationToken.None);
+    }
+
+    private async Task CompareLocalArtifactAsync(GameLocalArtifact? artifact)
+    {
+        if (artifact is null || !artifact.CanCompare || _localArtifactComparisonService is null) return;
+        var snapshot = LocalArtifactSnapshots.FirstOrDefault(x => x.ArtifactKind == artifact.Kind && x.RuleIdentity == artifact.RuleIdentity && x.IsValid);
+        if (snapshot is null) return;
+        var temp = Path.Combine(Path.GetTempPath(), $"playstead-compare-{Guid.NewGuid():N}{Path.GetExtension(artifact.Path)}");
+        try
+        {
+            using (var archive = ZipFile.OpenRead(snapshot.ArchivePath))
+            {
+                var entry = archive.Entries.FirstOrDefault(x => !string.Equals(x.FullName, "metadata.json", StringComparison.OrdinalIgnoreCase) && !x.FullName.EndsWith('/'));
+                if (entry is null) return;
+                entry.ExtractToFile(temp, overwrite: true);
+            }
+            var result = await _localArtifactComparisonService.CompareAsync(temp, artifact.Path, CancellationToken.None);
+            var body = result.Status switch
+            {
+                LocalArtifactComparisonStatus.Available => $"{result.ChangedLineCount} ligne(s) modifiée(s)\n\n" + string.Join("\n", result.DiffHunks.SelectMany(x => x.Lines).Take(80).Select(x => $"{(x.IsRemoved ? "-" : x.IsAdded ? "+" : " ")}{x.Text}")),
+                LocalArtifactComparisonStatus.Identical => "Rien n’a changé.",
+                _ => "La comparaison détaillée n’est pas disponible pour ce fichier."
+            };
+            MessageBox.Show(body, $"Ce qui a changé · {Path.GetFileName(artifact.Path)}", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (IOException) { }
+        catch (InvalidDataException) { }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+        }
     }
 
     private async Task DeleteLocalArtifactSnapshotAsync(LocalArtifactSnapshot? snapshot)

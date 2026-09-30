@@ -67,6 +67,24 @@ public sealed record GameLocalArtifact(
 
     public bool CanCaptureBaseline => Exists && BaselineStatus != LocalArtifactBaselineStatus.Unavailable;
     public bool HasBaseline => BaselineStatus is LocalArtifactBaselineStatus.Unchanged or LocalArtifactBaselineStatus.Changed;
+    public bool IsBaselineVisible => Kind == GameLocalArtifactKind.Configuration;
+    public bool IsSnapshotVisible => Kind is GameLocalArtifactKind.SaveData or GameLocalArtifactKind.Configuration;
+    public bool IsReadOnlyMetadata => Kind is GameLocalArtifactKind.Log;
+    public bool IsProtected => Exists && HasBaseline && (Kind != GameLocalArtifactKind.SaveData || SnapshotCount > 0);
+    public bool CanProtect => Kind is (GameLocalArtifactKind.Configuration or GameLocalArtifactKind.SaveData)
+        && Exists
+        && !string.IsNullOrWhiteSpace(RuleIdentity)
+        && !IsProtected;
+    public string ProtectionSummaryLabel => Kind == GameLocalArtifactKind.SaveData
+        ? IsProtected ? "Protégées par PlayStead" : "PlayStead peut garder des copies de sécurité de tes sauvegardes."
+        : IsProtected ? "Protégée par PlayStead" : "PlayStead peut garder un œil sur cette configuration.";
+    public string LastCopyLabel => LastSnapshotAtUtc is null ? string.Empty : $"Dernière copie : {LastSnapshotAtUtc.Value.ToLocalTime():dd/MM/yyyy HH:mm}";
+    public string CopyCountLabel => SnapshotCount switch
+    {
+        1 => "1 copie conservée",
+        > 1 => $"{SnapshotCount} copies conservées",
+        _ => string.Empty
+    };
     public string BaselineActionLabel => HasBaseline ? "Mettre à jour mon point de repère" : "Prendre cet état comme point de repère";
     public string ProtectionStatusLabel => BaselineStatus switch
     {
@@ -84,6 +102,7 @@ public sealed record GameLocalArtifact(
     public bool HasSnapshots => SnapshotCount > 0;
     public bool HasDetails => Details is not null;
     public bool IsFile => Details?.IsFile == true;
+    public bool CanCompare => Kind == GameLocalArtifactKind.Configuration && IsFile && Exists && BaselineStatus == LocalArtifactBaselineStatus.Changed && SnapshotCount > 0;
     public string OpenActionLabel => IsFile ? "Ouvrir le fichier" : "Ouvrir le dossier";
     public string DetailsLabel
     {

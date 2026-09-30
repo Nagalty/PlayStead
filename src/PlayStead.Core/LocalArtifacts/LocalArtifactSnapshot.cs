@@ -59,7 +59,7 @@ public sealed class LocalArtifactSnapshotService(
 {
     public async Task<LocalArtifactSnapshot> CreateAsync(GameLocalArtifact artifact, CancellationToken cancellationToken, SnapshotReason reason = SnapshotReason.Manual)
     {
-        if (!artifact.Exists || !artifact.HasBaseline || string.IsNullOrWhiteSpace(artifact.RuleIdentity))
+        if (artifact.Kind == GameLocalArtifactKind.Log || !artifact.Exists || !artifact.HasBaseline || string.IsNullOrWhiteSpace(artifact.RuleIdentity))
             throw new InvalidOperationException("Only an existing, identified artifact can be snapshotted.");
 
         var before = await fingerprintService.ComputeAsync(artifact, cancellationToken).ConfigureAwait(false);

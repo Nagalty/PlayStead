@@ -24,6 +24,8 @@ public sealed class LocalProtectionSetupServiceTests : IDisposable
 
         Assert.Equal(2, first.Protected);
         Assert.Equal(2, second.AlreadyProtected);
+        var inventory = await sut.InspectAsync([new(game, ProviderKind.Steam, "1")], CancellationToken.None);
+        Assert.All(inventory.Artifacts, artifact => Assert.Equal(LocalProtectionState.Protected, artifact.State));
         Assert.Single(snapshots.Items, x => x.Reason == SnapshotReason.InitialProtection);
         Assert.Equal(2, baselines.Items.Count);
     }
@@ -65,6 +67,48 @@ public sealed class LocalProtectionSetupServiceTests : IDisposable
         Assert.All(inventory.Artifacts, x => Assert.Equal(recognized, x.Artifact.GameId));
     }
 
+    [Fact]
+    public async Task Logs_are_excluded_from_global_protection()
+    {
+        Directory.CreateDirectory(_root);
+        var game = GameId.New();
+        var log = Artifact(game, GameLocalArtifactKind.Log, "log");
+        var baselines = new MemoryBaselines();
+        var snapshots = new MemorySnapshots(_root);
+        var sut = new LocalProtectionSetupService(new FakeDiscovery(log), new Sha256ArtifactFingerprintService(), baselines, snapshots.Service);
+
+        var inventory = await sut.InspectAsync([new(game, ProviderKind.Steam, "1")], CancellationToken.None);
+        var result = await sut.ProtectAsync([new(game, ProviderKind.Steam, "1")], CancellationToken.None);
+
+        Assert.Empty(inventory.Artifacts);
+        Assert.Equal(0, result.Protected);
+        Assert.Empty(baselines.Items);
+        Assert.Empty(snapshots.Items);
+    }
+
+    [Fact]
+    public async Task Newly_discovered_save_is_protected_without_duplicate_existing_snapshot()
+    {
+        Directory.CreateDirectory(_root);
+        var game = GameId.New();
+        var config = Artifact(game, GameLocalArtifactKind.Configuration, "config-new");
+        var save = Artifact(game, GameLocalArtifactKind.SaveData, "save-new");
+        var discovery = new MutableDiscovery(config);
+        var baselines = new MemoryBaselines();
+        var snapshots = new MemorySnapshots(_root);
+        var sut = new LocalProtectionSetupService(discovery, new Sha256ArtifactFingerprintService(), baselines, snapshots.Service);
+
+        await sut.ProtectAsync([new(game, ProviderKind.Steam, "1")], CancellationToken.None);
+        discovery.Artifacts = [config, save];
+        var result = await sut.ProtectAsync([new(game, ProviderKind.Steam, "1")], CancellationToken.None);
+        var third = await sut.ProtectAsync([new(game, ProviderKind.Steam, "1")], CancellationToken.None);
+
+        Assert.Equal(1, result.Protected);
+        Assert.Equal(2, third.AlreadyProtected);
+        Assert.Single(snapshots.Items, x => x.ArtifactKind == GameLocalArtifactKind.SaveData);
+        Assert.Equal(2, baselines.Items.Count);
+    }
+
     private GameLocalArtifact Artifact(GameId game, GameLocalArtifactKind kind, string name)
     {
         var path = Path.Combine(_root, name);
@@ -79,6 +123,13 @@ public sealed class LocalProtectionSetupServiceTests : IDisposable
     {
         public Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameLocalArtifact>>(artifacts);
         public Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(GameId gameId, ProviderKind? provider, string? providerGameId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameLocalArtifact>>(artifacts);
+    }
+
+    private sealed class MutableDiscovery(params GameLocalArtifact[] artifacts) : IGameLocalArtifactDiscoveryService
+    {
+        public IReadOnlyList<GameLocalArtifact> Artifacts { get; set; } = artifacts;
+        public Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult(Artifacts);
+        public Task<IReadOnlyList<GameLocalArtifact>> DiscoverAsync(GameId gameId, ProviderKind? provider, string? providerGameId, CancellationToken cancellationToken) => Task.FromResult(Artifacts);
     }
 
     private sealed class SelectiveDiscovery(params (GameId GameId, IReadOnlyList<GameLocalArtifact> Artifacts)[] entries) : IGameLocalArtifactDiscoveryService

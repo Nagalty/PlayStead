@@ -506,15 +506,30 @@
                                             </TextBlock>
                                         </StackPanel>
                                         <StackPanel Grid.Row="2" Margin="0,4,0,0">
+                                            <StackPanel Visibility="{Binding IsSnapshotVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                <TextBlock Text="{Binding ProtectionSummaryLabel}"
+                                                           Style="{DynamicResource PlayStead.Text.Body}" />
+                                                <TextBlock Text="{Binding LastCopyLabel}"
+                                                           Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                                           Margin="0,3,0,0"
+                                                           Visibility="{Binding HasSnapshots, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                <TextBlock Text="{Binding CopyCountLabel}"
+                                                           Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                                           Margin="0,2,0,0"
+                                                           Visibility="{Binding HasSnapshots, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            </StackPanel>
                                             <TextBlock Text="Point de repère"
-                                                       Style="{DynamicResource PlayStead.Text.Caption}" />
+                                                       Style="{DynamicResource PlayStead.Text.Caption}"
+                                                       Visibility="{Binding IsBaselineVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <TextBlock Text="{Binding BaselineStatusLabel}"
                                                        Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                                       FontSize="13" />
+                                                       FontSize="13"
+                                                       Visibility="{Binding IsBaselineVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <TextBlock Margin="0,4,0,0"
                                                        Text="{Binding ProtectionStatusLabel}"
                                                        Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                                       FontSize="13" />
+                                                       FontSize="13"
+                                                       Visibility="{Binding IsBaselineVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <TextBlock Margin="0,2,0,0"
                                                        Text="{Binding LastSnapshotLabel}"
                                                        Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
@@ -532,19 +547,30 @@
                                                     Command="{Binding DataContext.OpenLocalArtifactFolderCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
                                                     Visibility="{Binding HasDetails, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <Button Content="Comparer"
+                                                    Style="{DynamicResource PlayStead.Button.Secondary}"
+                                                    Command="{Binding DataContext.CompareLocalArtifactCommand, ElementName=GameDetailRoot}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding CanCompare, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <Button Content="{Binding BaselineActionLabel}"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CaptureLocalArtifactBaselineCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding CanCaptureBaseline}"
-                                                    Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                    Visibility="{Binding IsBaselineVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            <Button Content="Protéger"
+                                                    Style="{DynamicResource PlayStead.Button.Secondary}"
+                                                    Command="{Binding DataContext.ProtectLocalArtifactCommand, ElementName=GameDetailRoot}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding CanProtect}"
+                                                    Visibility="{Binding CanProtect, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <Button Content="Créer une sauvegarde"
                                                     ToolTip="Définissez d’abord un point de repère."
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.CreateLocalArtifactSnapshotCommand, ElementName=GameDetailRoot}"
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding Exists}"
-                                                    Visibility="{Binding Exists, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                    Visibility="{Binding IsBaselineVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <Button Content="Retirer de PlayStead"
                                                     Style="{DynamicResource PlayStead.Button.Secondary}"
                                                     Command="{Binding DataContext.RemoveUserDefinedArtifactCommand, ElementName=GameDetailRoot}"
