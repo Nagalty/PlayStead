@@ -192,6 +192,47 @@ public sealed class SqliteLibraryStoreTests : IDisposable
         Assert.Equal(firstObserved, installation.LastSeenUtc);
     }
 
+    [Fact]
+    public async Task Manual_game_persists_stable_id_launch_settings_and_non_destructive_removal()
+    {
+        var (store, _) = await CreateStoreAsync();
+        var manual = Assert.IsAssignableFrom<IManualGameStore>(store);
+        var root = Path.Combine(_root, "ManualGame");
+        Directory.CreateDirectory(root);
+        var executable = Path.Combine(root, "game.exe");
+        File.WriteAllText(executable, string.Empty);
+        var definition = ManualGameDefinition.Create("My Manual Game", executable, root, "--safe");
+
+        var created = await manual.CreateAsync(definition, CancellationToken.None);
+        var reloaded = await store.LoadSnapshotAsync(CancellationToken.None);
+        var persisted = Assert.Single(reloaded.Installations);
+        Assert.Equal(created.GameId, persisted.GameId);
+        Assert.Equal(created.ExternalId, persisted.ExternalId);
+        Assert.Equal(ProviderKind.Manual, persisted.Provider);
+        Assert.Equal(executable, persisted.ExecutablePath);
+        Assert.Equal(root, persisted.WorkingDirectory);
+        Assert.Equal("--safe", persisted.LaunchArguments);
+
+        var renamed = ManualGameDefinition.Create("Renamed Game", executable, root, "--other");
+        var updated = await manual.UpdateAsync(created.GameId, renamed, CancellationToken.None);
+        Assert.NotNull(updated);
+        Assert.Equal(created.ExternalId, updated!.ExternalId);
+        Assert.Equal("Renamed Game", (await store.LoadSnapshotAsync(CancellationToken.None)).Games.Single().Title);
+
+        var sameTitle = ManualGameDefinition.Create("Renamed Game", executable, root, "--second");
+        var second = await manual.CreateAsync(sameTitle, CancellationToken.None);
+        var distinctGames = (await store.LoadSnapshotAsync(CancellationToken.None)).Games;
+        Assert.Equal(2, distinctGames.Count);
+        Assert.NotEqual(created.GameId, second.GameId);
+        Assert.NotEqual(created.ExternalId, second.ExternalId);
+
+        Assert.True(await manual.RemoveAsync(created.GameId, CancellationToken.None));
+        Assert.True(File.Exists(executable));
+        var afterRemoval = (await store.LoadSnapshotAsync(CancellationToken.None)).Installations;
+        Assert.False(afterRemoval.Single(i => i.GameId == created.GameId).IsPresent);
+        Assert.True(afterRemoval.Single(i => i.GameId == second.GameId).IsPresent);
+    }
+
     private async Task<(ILibraryStore Store, string DatabasePath)> CreateStoreAsync()
     {
         Directory.CreateDirectory(_root);

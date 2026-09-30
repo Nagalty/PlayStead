@@ -83,4 +83,13 @@ public sealed class CatalogModelTests
         Assert.DoesNotContain(methods, method => method.Name.StartsWith("Delete", StringComparison.Ordinal));
         Assert.DoesNotContain(methods, method => method.Name.StartsWith("Upsert", StringComparison.Ordinal));
     }
+
+    [Theory]
+    [InlineData("007 First Light", "007 first light")]
+    [InlineData("Dune: Awakening™", "dune awakening")]
+    [InlineData("  Café  Racer  ", "cafe racer")]
+    public void Manual_title_matching_uses_conservative_normalization(string title, string expected)
+    {
+        Assert.Equal(expected, CatalogTitleNormalizer.Normalize(title));
+    }
 }

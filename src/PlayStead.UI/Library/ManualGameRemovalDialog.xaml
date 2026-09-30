@@ -1,0 +1,36 @@
+<Window x:Class="PlayStead.UI.Library.ManualGameRemovalDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Retirer le jeu"
+        Width="460"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource PlayStead.Brush.Background}"
+        Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+        KeyDown="Dialog_OnKeyDown">
+    <Border Margin="16"
+            Padding="24"
+            Background="{DynamicResource PlayStead.Brush.Surface}"
+            BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource PlayStead.Radius.Medium}">
+        <StackPanel>
+            <TextBlock Text="Retirer de PlayStead" Style="{DynamicResource PlayStead.Text.SectionTitle}" />
+            <TextBlock x:Name="MessageTextBlock"
+                       Margin="0,12,0,0"
+                       TextWrapping="Wrap"
+                       Style="{DynamicResource PlayStead.Text.Body}" />
+            <TextBlock Text="Le jeu ne sera plus suivi par PlayStead. Aucun fichier du jeu ne sera supprimé."
+                       Margin="0,8,0,0"
+                       TextWrapping="Wrap"
+                       Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="Annuler" IsCancel="True" Click="CancelButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />
+                <Button Content="Retirer" IsDefault="True" Click="RemoveButton_OnClick" Margin="8,0,0,0" Style="{DynamicResource PlayStead.Button.Primary}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

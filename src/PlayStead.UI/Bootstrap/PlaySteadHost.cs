@@ -5,6 +5,7 @@ using PlayStead.UI.Launching;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PlayStead.Core.Media;
+using PlayStead.Core.Library;
 using PlayStead.Core.Identity;
 using PlayStead.Core.Notifications;
 using PlayStead.Core.Home;
@@ -104,6 +105,9 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             ILibraryStore,
             SqliteLibraryStore>();
+        builder.Services.AddSingleton<IManualGameStore>(services =>
+            (IManualGameStore)services.GetRequiredService<ILibraryStore>());
+        builder.Services.AddSingleton<ManualGameService>();
 
         builder.Services.AddSingleton<
             IGameIdentityResolver,
@@ -530,6 +534,8 @@ public static class PlaySteadHost
                     services.GetRequiredService<PlayStead.Core.Modding.ModEvidenceRefreshService>());
                 viewModel.AttachLocalProtectionSetupService(
                     services.GetRequiredService<PlayStead.Core.LocalArtifacts.ILocalProtectionSetupService>());
+                viewModel.AttachManualGameService(
+                    services.GetRequiredService<ManualGameService>());
                 return viewModel;
             });
 
@@ -566,6 +572,9 @@ public static class PlaySteadHost
             {
                 using var process = Process.Start(startInfo);
             }));
+        builder.Services.AddSingleton<ILocalProcessLauncher, LocalProcessLauncher>();
+        builder.Services.AddSingleton<IManualSessionLaunchSink>(services =>
+            services.GetRequiredService<SessionMonitor>());
         builder.Services.AddSingleton<GameLaunchService>();
 
         builder.Services.AddSingleton<

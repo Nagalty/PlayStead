@@ -180,6 +180,16 @@
                                     </Style>
                                 </Button.Style>
                             </Button>
+                            <Button Command="{Binding EditManualGameCommand}"
+                                    Content="Modifier le jeu"
+                                    Margin="{DynamicResource PlayStead.Gap.Inline.Cta}"
+                                    Style="{DynamicResource PlayStead.Button.Secondary}"
+                                    Visibility="{Binding IsManualGame, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            <Button Command="{Binding RemoveManualGameCommand}"
+                                    Content="Retirer de PlayStead"
+                                    Margin="{DynamicResource PlayStead.Gap.Inline.Cta}"
+                                    Style="{DynamicResource PlayStead.Button.Secondary}"
+                                    Visibility="{Binding IsManualGame, Converter={StaticResource BooleanToVisibilityConverter}}" />
                             <Button Style="{DynamicResource PlayStead.Button.Secondary}"
                                     Command="{Binding RemoveFromGamesDuMomentCommand}"
                                     Content="Retirer des jeux du moment"

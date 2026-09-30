@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Microsoft.VisualBasic;
+using PlayStead.Core.Persistence;
 
 namespace PlayStead.UI.Library;
 
@@ -194,6 +195,35 @@ public partial class LibraryView :
     {
         if (DataContext is LibraryViewModel viewModel)
             viewModel.SetQuickFilter(LibraryQuickFilter.Installed);
+    }
+
+    private async void AddManualGameButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not LibraryViewModel viewModel)
+            return;
+
+        var owner = Window.GetWindow(this);
+        var selection = owner is null ? null : ManualGameExecutablePicker.Select(owner);
+        if (selection is null)
+            return;
+
+        var dialog = new ManualGameDialog(selection)
+        {
+            Owner = owner
+        };
+        if (dialog.ShowDialog() != true || dialog.Definition is null)
+            return;
+
+        try
+        {
+            await viewModel.AddManualGameAsync(dialog.Definition, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            var errorDialog = new ManualGameDialog { Owner = Window.GetWindow(this) };
+            errorDialog.SetError(ex.Message);
+            errorDialog.ShowDialog();
+        }
     }
 
     private void AttentionFilterButton_OnClick(

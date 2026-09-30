@@ -10,4 +10,7 @@ public sealed record GameInstallation(
     bool IsPreferred,
     bool IsPresent,
     DateTimeOffset LastSeenUtc,
-    InstallationContentKind ContentKind = InstallationContentKind.Unknown);
+    InstallationContentKind ContentKind = InstallationContentKind.Unknown,
+    string? ExecutablePath = null,
+    string? WorkingDirectory = null,
+    string? LaunchArguments = null);

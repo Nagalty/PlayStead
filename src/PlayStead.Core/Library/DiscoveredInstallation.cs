@@ -7,7 +7,10 @@ public sealed record DiscoveredInstallation(
     string InstallPath,
     long? InstalledSizeBytes,
     DateTimeOffset ObservedAtUtc,
-    InstallationContentKind ContentKind = InstallationContentKind.Unknown)
+    InstallationContentKind ContentKind = InstallationContentKind.Unknown,
+    string? ExecutablePath = null,
+    string? WorkingDirectory = null,
+    string? LaunchArguments = null)
 {
     public static DiscoveredInstallation Create(
         ProviderKind provider,

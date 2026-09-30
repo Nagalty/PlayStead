@@ -14,6 +14,47 @@ public sealed class SessionRuntimeTests
         new(2026, 9, 13, 0, 45, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task Explicitly_launched_manual_process_creates_one_session_for_stable_game_id()
+    {
+        var source = new QueueProcessSnapshotSource([
+            [MainProcess(777, "007FirstLight.exe", T0)],
+            [MainProcess(777, "007FirstLight.exe", T0)]
+        ]);
+        var sessions = new FakeSessionStore();
+        var sut = CreateRuntime(source, new FakeProcessSignatureStore(), sessions, new MutableTimeProvider(T0));
+        sut.TrackLaunchedProcess(GameA, 777, T0);
+
+        var first = await sut.RefreshAsync(CancellationToken.None);
+        var second = await sut.RefreshAsync(CancellationToken.None);
+
+        Assert.Equal(GameA, Assert.Single(first.ActiveSessions).GameId);
+        Assert.Equal(GameA, Assert.Single(second.ActiveSessions).GameId);
+        Assert.Single(sessions.Upserts);
+    }
+
+    [Fact]
+    public async Task Explicitly_launched_manual_process_close_is_persisted_with_positive_duration()
+    {
+        var source = new QueueProcessSnapshotSource([
+            [MainProcess(778, "007FirstLight.exe", T0)],
+            []
+        ]);
+        var sessions = new FakeSessionStore();
+        var time = new MutableTimeProvider(T0);
+        var sut = CreateRuntime(source, new FakeProcessSignatureStore(), sessions, time);
+        sut.TrackLaunchedProcess(GameA, 778, T0);
+
+        await sut.RefreshAsync(CancellationToken.None);
+        time.SetUtcNow(T0.AddMinutes(3));
+        var ended = await sut.RefreshAsync(CancellationToken.None);
+
+        Assert.Empty(ended.ActiveSessions);
+        Assert.Equal(2, sessions.Upserts.Count);
+        Assert.Equal(SessionState.Ended, sessions.Upserts[^1].State);
+        Assert.Equal(TimeSpan.FromMinutes(3), sessions.Upserts[^1].ObservedEndedAtUtc - sessions.Upserts[^1].ObservedStartedAtUtc);
+    }
+
+    [Fact]
     public async Task Already_running_accepted_game_is_reconciled_on_first_refresh()
     {
         var processStarted = T0.AddMinutes(-28);

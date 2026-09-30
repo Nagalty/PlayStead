@@ -104,6 +104,23 @@ public sealed class SqliteCanonicalCatalogStore : PlayStead.Core.Persistence.ICa
         return await ReadSingleContentAsync(command, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<CatalogContent>> FindByNormalizedTitleAsync(
+        string normalizedTitle,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(normalizedTitle);
+        await using var connection = CreateReadOnlyConnection();
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = ContentSelect + " WHERE normalized_title = $normalizedTitle ORDER BY internal_content_id;";
+        command.Parameters.AddWithValue("$normalizedTitle", normalizedTitle);
+        var results = new List<CatalogContent>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            results.Add(ReadContent(reader));
+        return results;
+    }
+
     public async Task<IReadOnlyList<CatalogProviderRef>> GetProviderRefsAsync(
         CatalogContentId contentId, CancellationToken cancellationToken)
     {
@@ -165,7 +182,10 @@ public sealed class SqliteCanonicalCatalogStore : PlayStead.Core.Persistence.ICa
             return null;
         }
 
-        return new CatalogContent(
+        return ReadContent(reader);
+    }
+
+    private static CatalogContent ReadContent(SqliteDataReader reader) => new(
             new CatalogContentId(
                 Guid.Parse(reader.GetString(0))),
             PlaySteadPublicId.Parse(
@@ -189,8 +209,7 @@ public sealed class SqliteCanonicalCatalogStore : PlayStead.Core.Persistence.ICa
             reader.IsDBNull(9)
                 ? null
                 : new CatalogContentId(
-                    Guid.Parse(reader.GetString(9))));
-    }
+            Guid.Parse(reader.GetString(9))));
 
     private const string ContentSelect = """
         SELECT

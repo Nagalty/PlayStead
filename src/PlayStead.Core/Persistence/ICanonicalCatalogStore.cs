@@ -19,6 +19,14 @@ public interface ICanonicalCatalogStore
         string externalId,
         CancellationToken cancellationToken);
 
+    async Task<IReadOnlyList<CatalogContent>> FindByNormalizedTitleAsync(
+        string normalizedTitle,
+        CancellationToken cancellationToken)
+    {
+        await Task.CompletedTask;
+        return [];
+    }
+
     Task<IReadOnlyList<CatalogProviderRef>> GetProviderRefsAsync(
         CatalogContentId contentId,
         CancellationToken cancellationToken);

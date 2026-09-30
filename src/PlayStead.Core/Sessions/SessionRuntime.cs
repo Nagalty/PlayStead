@@ -2,7 +2,7 @@ using System.ComponentModel;
 
 namespace PlayStead.Core.Sessions;
 
-public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler
+public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler, ILaunchedProcessSessionTracker
 {
     private static readonly TimeSpan HeartbeatPersistenceInterval =
         TimeSpan.FromSeconds(5);
@@ -18,6 +18,7 @@ public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler
     private readonly IDiscoveredSignatureValidator? _discoveredSignatureValidator;
     private readonly IProcessCaptureObserver? _captureObserver;
     private readonly HashSet<Guid> _unresolvedRecovered = [];
+    private readonly Dictionary<Guid, ExplicitProcessIdentity> _launchedProcesses = [];
 
     private readonly Dictionary<Guid, PendingObservation>
         _pending = [];
@@ -30,6 +31,13 @@ public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler
 
     private bool _recoveryInitialized;
     private bool _startupReconciliationRequested;
+
+    public void TrackLaunchedProcess(Guid gameId, int processId, DateTimeOffset startedAtUtc)
+    {
+        if (gameId == Guid.Empty || processId <= 0)
+            return;
+        _launchedProcesses[gameId] = new ExplicitProcessIdentity(processId, startedAtUtc);
+    }
 
     public Task<SessionRuntimeSnapshot> ReconcileRunningProcessesAsync(
         CancellationToken cancellationToken)
@@ -181,6 +189,39 @@ public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler
 
         var matchedMainGames =
             new HashSet<Guid>();
+
+        foreach (var pair in _launchedProcesses.ToArray())
+        {
+            var process = processes.FirstOrDefault(candidate =>
+                candidate.ProcessId == pair.Value.ProcessId &&
+                (candidate.StartedAtUtc is null ||
+                 Math.Abs((candidate.StartedAtUtc.Value - pair.Value.StartedAtUtc).TotalSeconds) <= 2));
+            if (process is null)
+                continue;
+
+            matchedMainGames.Add(pair.Key);
+            if (_active.TryGetValue(pair.Key, out var active))
+            {
+                var heartbeat = _transitions.Heartbeat(active, nowUtc);
+                var updated = heartbeat.Session ?? active;
+                _active[pair.Key] = updated;
+                if (heartbeat.Kind == SessionTransitionKind.Heartbeat &&
+                    ShouldPersistHeartbeat(pair.Key, updated.LastSeenAtUtc))
+                {
+                    await _sessionStore.UpsertAsync(updated, cancellationToken);
+                    _lastPersistedAtUtc[pair.Key] = updated.LastSeenAtUtc;
+                }
+            }
+            else
+            {
+                var started = _transitions.Start(pair.Key, pair.Value.StartedAtUtc, nowUtc).Session
+                    ?? throw new InvalidOperationException("Session start transition did not produce a session.");
+                var current = _transitions.Heartbeat(started, nowUtc).Session ?? started;
+                _active[pair.Key] = current;
+                await _sessionStore.UpsertAsync(current, cancellationToken);
+                _lastPersistedAtUtc[pair.Key] = current.LastSeenAtUtc;
+            }
+        }
 
         foreach (var signature in usableSignatures)
         {
@@ -358,7 +399,9 @@ public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler
             var ended =
                 _transitions.End(
                     active,
-                    active.LastSeenAtUtc,
+                    _launchedProcesses.ContainsKey(gameId)
+                        ? nowUtc
+                        : active.LastSeenAtUtc,
                     reason,
                     nowUtc).Session
                 ?? throw new InvalidOperationException(
@@ -374,6 +417,7 @@ public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler
             _lastPersistedAtUtc.Remove(
                 gameId);
             _unresolvedRecovered.Remove(gameId);
+            _launchedProcesses.Remove(gameId);
         }
 
         _unresolvedRecovered.ExceptWith(matchedMainGames);
@@ -491,4 +535,6 @@ public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler
     private sealed record PendingObservation(
         DateTimeOffset FirstObservedAtUtc,
         int ConsecutiveCount);
+
+    private sealed record ExplicitProcessIdentity(int ProcessId, DateTimeOffset StartedAtUtc);
 }

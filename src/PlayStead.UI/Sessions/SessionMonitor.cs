@@ -2,10 +2,11 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PlayStead.Core.Sessions;
+using PlayStead.UI.Launching;
 
 namespace PlayStead.UI.Sessions;
 
-public sealed class SessionMonitor : BackgroundService
+public sealed class SessionMonitor : BackgroundService, IManualSessionLaunchSink
 {
     private readonly ISessionRuntime _runtime;
     private readonly SessionMonitorOptions _options;
@@ -79,6 +80,12 @@ public sealed class SessionMonitor : BackgroundService
 
     public event Action<SessionRuntimeSnapshot>?
         SnapshotUpdated;
+
+    public void TrackLaunchedProcess(Guid gameId, int processId, DateTimeOffset startedAtUtc)
+    {
+        if (_runtime is ILaunchedProcessSessionTracker tracker)
+            tracker.TrackLaunchedProcess(gameId, processId, startedAtUtc);
+    }
 
     public async Task RunAsync(
         CancellationToken cancellationToken)

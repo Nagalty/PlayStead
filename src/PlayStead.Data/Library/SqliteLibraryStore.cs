@@ -8,7 +8,7 @@ using PlayStead.Data.Database;
 
 namespace PlayStead.Data.Library;
 
-public sealed class SqliteLibraryStore : ILibraryStore
+public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
 {
     private readonly DatabaseOptions _options;
 
@@ -269,7 +269,10 @@ public sealed class SqliteLibraryStore : ILibraryStore
                 UPDATE installations
                 SET installed_size_bytes = $size,
                     is_present = 1,
-                    last_seen_utc = $lastSeenUtc
+                    last_seen_utc = $lastSeenUtc,
+                    executable_path = $executablePath,
+                    working_directory = $workingDirectory,
+                    launch_arguments = $launchArguments
                 WHERE installation_id = $installationId;
                 """;
             update.Parameters.AddWithValue(
@@ -281,6 +284,15 @@ public sealed class SqliteLibraryStore : ILibraryStore
             update.Parameters.AddWithValue(
                 "$installationId",
                 existingId);
+            update.Parameters.AddWithValue(
+                "$executablePath",
+                (object?)discovered.ExecutablePath ?? DBNull.Value);
+            update.Parameters.AddWithValue(
+                "$workingDirectory",
+                (object?)discovered.WorkingDirectory ?? DBNull.Value);
+            update.Parameters.AddWithValue(
+                "$launchArguments",
+                (object?)discovered.LaunchArguments ?? DBNull.Value);
 
             await update.ExecuteNonQueryAsync(
                 cancellationToken);
@@ -302,7 +314,10 @@ public sealed class SqliteLibraryStore : ILibraryStore
                 installed_size_bytes,
                 is_preferred,
                 is_present,
-                last_seen_utc)
+                last_seen_utc,
+                executable_path,
+                working_directory,
+                launch_arguments)
             VALUES(
                 $installationId,
                 $gameId,
@@ -312,7 +327,10 @@ public sealed class SqliteLibraryStore : ILibraryStore
                 $size,
                 0,
                 1,
-                $lastSeenUtc);
+                $lastSeenUtc,
+                $executablePath,
+                $workingDirectory,
+                $launchArguments);
             """;
         insert.Parameters.AddWithValue(
             "$installationId",
@@ -335,6 +353,15 @@ public sealed class SqliteLibraryStore : ILibraryStore
         insert.Parameters.AddWithValue(
             "$lastSeenUtc",
             FormatUtc(discovered.ObservedAtUtc));
+        insert.Parameters.AddWithValue(
+            "$executablePath",
+            (object?)discovered.ExecutablePath ?? DBNull.Value);
+        insert.Parameters.AddWithValue(
+            "$workingDirectory",
+            (object?)discovered.WorkingDirectory ?? DBNull.Value);
+        insert.Parameters.AddWithValue(
+            "$launchArguments",
+            (object?)discovered.LaunchArguments ?? DBNull.Value);
 
         await insert.ExecuteNonQueryAsync(
             cancellationToken);
@@ -421,7 +448,10 @@ public sealed class SqliteLibraryStore : ILibraryStore
                 installed_size_bytes,
                 is_preferred,
                 is_present,
-                last_seen_utc
+                last_seen_utc,
+                executable_path,
+                working_directory,
+                launch_arguments
             FROM installations
             ORDER BY game_id, installation_id;
             """;
@@ -448,10 +478,146 @@ public sealed class SqliteLibraryStore : ILibraryStore
                     reader.GetInt64(6) != 0,
                     reader.GetInt64(7) != 0,
                     ParseUtc(reader.GetString(8)),
-                    InstallationContentKind.Unknown));
+                    InstallationContentKind.Unknown,
+                    reader.IsDBNull(9) ? null : reader.GetString(9),
+                    reader.IsDBNull(10) ? null : reader.GetString(10),
+                    reader.IsDBNull(11) ? null : reader.GetString(11)));
         }
 
         return result;
+    }
+
+    public async Task<GameInstallation> CreateAsync(
+        ManualGameDefinition definition,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        var now = DateTimeOffset.UtcNow;
+        var gameId = GameId.New();
+        var externalId = $"manual:{Guid.NewGuid():D}";
+        var installationId = InstallationId.New();
+        var stamp = FormatUtc(now);
+
+        await using var connection = new SqliteConnection($"Data Source={_options.DatabasePath};Pooling=False");
+        await connection.OpenAsync(cancellationToken);
+        await EnableForeignKeysAsync(connection, cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        var game = connection.CreateCommand();
+        game.Transaction = transaction;
+        game.CommandText = """
+            INSERT INTO games(game_id,title,is_hidden,created_utc,updated_utc)
+            VALUES($gameId,$title,0,$created,$updated);
+            """;
+        game.Parameters.AddWithValue("$gameId", gameId.ToString());
+        game.Parameters.AddWithValue("$title", definition.Title);
+        game.Parameters.AddWithValue("$created", stamp);
+        game.Parameters.AddWithValue("$updated", stamp);
+        await game.ExecuteNonQueryAsync(cancellationToken);
+
+        var installation = connection.CreateCommand();
+        installation.Transaction = transaction;
+        installation.CommandText = """
+            INSERT INTO installations(
+                installation_id,game_id,provider,external_id,install_path,
+                installed_size_bytes,is_preferred,is_present,last_seen_utc,
+                executable_path,working_directory,launch_arguments)
+            VALUES($installationId,$gameId,$provider,$externalId,$installPath,
+                NULL,1,1,$lastSeen,$executablePath,$workingDirectory,$launchArguments);
+            """;
+        installation.Parameters.AddWithValue("$installationId", installationId.ToString());
+        installation.Parameters.AddWithValue("$gameId", gameId.ToString());
+        installation.Parameters.AddWithValue("$provider", (int)ProviderKind.Manual);
+        installation.Parameters.AddWithValue("$externalId", externalId);
+        installation.Parameters.AddWithValue("$installPath", definition.WorkingDirectory);
+        installation.Parameters.AddWithValue("$lastSeen", stamp);
+        installation.Parameters.AddWithValue("$executablePath", definition.ExecutablePath);
+        installation.Parameters.AddWithValue("$workingDirectory", definition.WorkingDirectory);
+        installation.Parameters.AddWithValue("$launchArguments", (object?)definition.LaunchArguments ?? DBNull.Value);
+        await installation.ExecuteNonQueryAsync(cancellationToken);
+
+        var reference = connection.CreateCommand();
+        reference.Transaction = transaction;
+        reference.CommandText = "INSERT INTO provider_game_refs(provider,external_id,game_id) VALUES($provider,$externalId,$gameId);";
+        reference.Parameters.AddWithValue("$provider", (int)ProviderKind.Manual);
+        reference.Parameters.AddWithValue("$externalId", externalId);
+        reference.Parameters.AddWithValue("$gameId", gameId.ToString());
+        await reference.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return new GameInstallation(installationId, gameId, ProviderKind.Manual, externalId,
+            definition.WorkingDirectory, null, true, true, now, InstallationContentKind.Game,
+            definition.ExecutablePath, definition.WorkingDirectory, definition.LaunchArguments);
+    }
+
+    public async Task<GameInstallation?> UpdateAsync(
+        GameId gameId,
+        ManualGameDefinition definition,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        var now = DateTimeOffset.UtcNow;
+        await using var connection = new SqliteConnection($"Data Source={_options.DatabasePath};Pooling=False");
+        await connection.OpenAsync(cancellationToken);
+        await EnableForeignKeysAsync(connection, cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = """
+            UPDATE games SET title=$title, updated_utc=$updated WHERE game_id=$gameId;
+            UPDATE installations SET install_path=$workingDirectory, executable_path=$executablePath,
+                working_directory=$workingDirectory, launch_arguments=$launchArguments,
+                is_present=1, last_seen_utc=$updated
+            WHERE game_id=$gameId AND provider=$provider;
+            """;
+        update.Parameters.AddWithValue("$title", definition.Title);
+        update.Parameters.AddWithValue("$updated", FormatUtc(now));
+        update.Parameters.AddWithValue("$gameId", gameId.ToString());
+        update.Parameters.AddWithValue("$provider", (int)ProviderKind.Manual);
+        update.Parameters.AddWithValue("$workingDirectory", definition.WorkingDirectory);
+        update.Parameters.AddWithValue("$executablePath", definition.ExecutablePath);
+        update.Parameters.AddWithValue("$launchArguments", (object?)definition.LaunchArguments ?? DBNull.Value);
+        await update.ExecuteNonQueryAsync(cancellationToken);
+
+        var select = connection.CreateCommand();
+        select.Transaction = transaction;
+        select.CommandText = """
+            SELECT installation_id, external_id, install_path, installed_size_bytes,
+                   is_preferred, is_present, last_seen_utc, executable_path,
+                   working_directory, launch_arguments
+            FROM installations
+            WHERE game_id=$gameId AND provider=$provider
+            LIMIT 1;
+            """;
+        select.Parameters.AddWithValue("$gameId", gameId.ToString());
+        select.Parameters.AddWithValue("$provider", (int)ProviderKind.Manual);
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var installation = new GameInstallation(
+            new InstallationId(Guid.Parse(reader.GetString(0))), gameId, ProviderKind.Manual,
+            reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetInt64(3),
+            reader.GetInt64(4) != 0, reader.GetInt64(5) != 0, ParseUtc(reader.GetString(6)),
+            InstallationContentKind.Game, reader.IsDBNull(7) ? null : reader.GetString(7),
+            reader.IsDBNull(8) ? null : reader.GetString(8), reader.IsDBNull(9) ? null : reader.GetString(9));
+        await transaction.CommitAsync(cancellationToken);
+        return installation;
+    }
+
+    public async Task<bool> RemoveAsync(GameId gameId, CancellationToken cancellationToken)
+    {
+        await using var connection = new SqliteConnection($"Data Source={_options.DatabasePath};Pooling=False");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "UPDATE installations SET is_present=0 WHERE game_id=$gameId AND provider=$provider;";
+        command.Parameters.AddWithValue("$gameId", gameId.ToString());
+        command.Parameters.AddWithValue("$provider", (int)ProviderKind.Manual);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
     private static string FormatUtc(

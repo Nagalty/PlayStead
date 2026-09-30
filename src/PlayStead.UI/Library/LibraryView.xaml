@@ -324,6 +324,11 @@
             <StackPanel Grid.Column="1"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
+                <Button Content="Ajouter un jeu"
+                        Click="AddManualGameButton_OnClick"
+                        Margin="0,0,8,0"
+                        Style="{DynamicResource PlayStead.Button.Secondary}"
+                        ToolTip="Ajouter un jeu installé manuellement" />
                 <Button x:Name="InstalledFilterButton"
                         Tag="Installed"
                         Content="Installés"

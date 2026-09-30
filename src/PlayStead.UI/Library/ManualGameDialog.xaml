@@ -1,0 +1,69 @@
+<Window x:Class="PlayStead.UI.Library.ManualGameDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ajouter un jeu"
+        Width="560"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Background="{DynamicResource PlayStead.Brush.Background}"
+        Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+        FontFamily="{DynamicResource PlayStead.Font.Body}"
+        KeyDown="Dialog_OnKeyDown">
+    <Border Margin="16"
+            Padding="24"
+            Background="{DynamicResource PlayStead.Brush.Surface}"
+            BorderBrush="{DynamicResource PlayStead.Brush.BorderStrong}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource PlayStead.Radius.Medium}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Ajouter un jeu"
+                       Style="{DynamicResource PlayStead.Text.SectionTitle}"
+                       Margin="0,0,0,20" />
+            <Grid Grid.Row="1" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Text="Nom" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
+                <TextBox x:Name="TitleTextBox" Grid.Column="1" />
+            </Grid>
+            <Grid Grid.Row="2" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <TextBlock Text="Exécutable" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
+                <TextBox x:Name="ExecutableTextBox" Grid.Column="1" Margin="0,0,8,0" />
+                <Button Grid.Column="2" Content="Parcourir…" Click="BrowseButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />
+            </Grid>
+            <Grid Grid.Row="3" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Text="Dossier de travail" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
+                <TextBox x:Name="WorkingDirectoryTextBox" Grid.Column="1" />
+            </Grid>
+            <Grid Grid.Row="4" Margin="0,0,0,6">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <TextBlock Text="Arguments" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
+                <TextBox x:Name="ArgumentsTextBox" Grid.Column="1" />
+            </Grid>
+            <TextBlock x:Name="ErrorTextBlock"
+                       Grid.Row="5"
+                       Foreground="{DynamicResource PlayStead.Brush.Warning}"
+                       TextWrapping="Wrap"
+                       Margin="140,0,0,12"
+                       Visibility="Collapsed" />
+            <StackPanel Grid.Row="6"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button Content="Annuler" IsCancel="True" Click="CancelButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />
+                <Button Content="Ajouter" IsDefault="True" Click="AddButton_OnClick" Margin="8,0,0,0" Style="{DynamicResource PlayStead.Button.Primary}" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

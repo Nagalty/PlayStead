@@ -41,6 +41,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly ILocalArtifactComparisonService? _localArtifactComparisonService;
     private readonly IGraphicsTechnologyDetectionService? _graphicsTechnologyDetectionService;
     private readonly IModEvidenceStore? _modEvidenceStore;
+    private Func<Task>? _editManualGame;
+    private Func<Task>? _removeManualGame;
     private readonly LocalArtifactBaselineComparisonService _artifactBaselineComparisonService = new();
     private bool _isShortlistOperationInProgress;
     public GameDetailViewModel(
@@ -154,6 +156,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         CompareLocalArtifactCommand = new AsyncRelayCommand<GameLocalArtifact>(CompareLocalArtifactAsync, artifact => artifact?.CanCompare == true && _localArtifactComparisonService is not null);
         AddToGamesDuMomentCommand = new AsyncRelayCommand(AddToGamesDuMomentAsync, () => CanChangeGamesDuMoment);
         RemoveFromGamesDuMomentCommand = new AsyncRelayCommand(RemoveFromGamesDuMomentAsync, () => CanChangeGamesDuMoment);
+        EditManualGameCommand = new AsyncRelayCommand(EditManualGameAsync, () => IsManualGame && _editManualGame is not null);
+        RemoveManualGameCommand = new AsyncRelayCommand(RemoveManualGameAsync, () => IsManualGame && _removeManualGame is not null);
     }
 
     public GameDetailViewModel(
@@ -296,10 +300,24 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     };
 
     public bool IsInGamesDuMoment { get; private set; }
+    public bool IsManualGame => Game.Provider == ProviderKind.Manual;
+    public IAsyncRelayCommand EditManualGameCommand { get; }
+    public IAsyncRelayCommand RemoveManualGameCommand { get; }
+
+    public void AttachManualGameActions(Func<Task> edit, Func<Task> remove)
+    {
+        _editManualGame = edit ?? throw new ArgumentNullException(nameof(edit));
+        _removeManualGame = remove ?? throw new ArgumentNullException(nameof(remove));
+        EditManualGameCommand.NotifyCanExecuteChanged();
+        RemoveManualGameCommand.NotifyCanExecuteChanged();
+    }
     public bool CanChangeGamesDuMoment => _gamesDuMomentService is not null && !_isShortlistOperationInProgress;
     public string GamesDuMomentActionLabel => IsInGamesDuMoment ? "Retirer des jeux du moment" : "Ajouter aux jeux du moment";
     public IAsyncRelayCommand AddToGamesDuMomentCommand { get; }
     public IAsyncRelayCommand RemoveFromGamesDuMomentCommand { get; }
+
+    private Task EditManualGameAsync() => _editManualGame?.Invoke() ?? Task.CompletedTask;
+    private Task RemoveManualGameAsync() => _removeManualGame?.Invoke() ?? Task.CompletedTask;
 
     public sealed record BuildHistoryEntryViewModel(
         string? PreviousBuildId,

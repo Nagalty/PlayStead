@@ -19,6 +19,7 @@ using PlayStead.Core.ProviderActivity;
 using PlayStead.Core.Collections;
 using PlayStead.Core.Modding;
 using PlayStead.Core.LocalArtifacts;
+using PlayStead.Core.Catalog;
 
 namespace PlayStead.UI.Library;
 
@@ -36,6 +37,7 @@ public sealed class LibraryViewModel :
     private readonly ISessionStore? _sessionStore;
     private IEffectiveActivityService? _effectiveActivityService;
     private IGameCollectionStore? _collectionStore;
+    private ManualGameService? _manualGameService;
     private readonly object _verifySteamGate = new();
     private readonly Dispatcher? _uiDispatcher =
         Application.Current?.Dispatcher
@@ -248,6 +250,98 @@ public sealed class LibraryViewModel :
 
     public void AttachEffectiveActivityService(IEffectiveActivityService service) =>
         _effectiveActivityService = service;
+
+    public void AttachManualGameService(ManualGameService service) =>
+        _manualGameService = service ?? throw new ArgumentNullException(nameof(service));
+
+    public async Task<GameInstallation> AddManualGameAsync(
+        ManualGameDefinition definition,
+        CancellationToken cancellationToken)
+    {
+        var service = _manualGameService
+            ?? throw new InvalidOperationException("Manual game support is unavailable.");
+        var installation = await service.CreateAsync(definition, cancellationToken);
+        installation = await EnrichManualGameAsync(installation, definition, cancellationToken);
+        await RefreshAsync(cancellationToken);
+        return installation;
+    }
+
+    private async Task<GameInstallation> EnrichManualGameAsync(
+        GameInstallation installation,
+        ManualGameDefinition definition,
+        CancellationToken cancellationToken)
+    {
+        if (CanonicalCatalogStore is null)
+            return installation;
+
+        IReadOnlyList<CatalogContent> matches;
+        try
+        {
+            matches = await CanonicalCatalogStore.FindByNormalizedTitleAsync(
+                CatalogTitleNormalizer.Normalize(definition.Title),
+                cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return installation;
+        }
+
+        if (matches.Count != 1)
+            return installation;
+
+        var match = matches[0];
+        if (!string.Equals(match.CanonicalTitle, definition.Title, StringComparison.Ordinal) &&
+            _manualGameService is not null)
+        {
+            var canonicalDefinition = definition with { Title = match.CanonicalTitle };
+            installation = await _manualGameService.UpdateAsync(
+                installation.GameId,
+                canonicalDefinition,
+                cancellationToken) ?? installation;
+        }
+
+        if (ProviderGameMetadataStore is not null)
+        {
+            await ProviderGameMetadataStore.UpsertAsync(
+                ProviderGameMetadata.Create(
+                    installation.GameId,
+                    ProviderKind.Manual,
+                    installation.ExternalId,
+                    DateTimeOffset.UtcNow,
+                    developers: match.Developer is null ? null : [match.Developer],
+                    publishers: match.Publisher is null ? null : [match.Publisher],
+                    releaseDate: match.ReleaseDate,
+                    availability: ProviderGameMetadataAvailability.Partial),
+                cancellationToken);
+        }
+
+        return installation;
+    }
+
+    public async Task<GameInstallation?> EditManualGameAsync(
+        GameId gameId,
+        ManualGameDefinition definition,
+        CancellationToken cancellationToken)
+    {
+        var service = _manualGameService
+            ?? throw new InvalidOperationException("Manual game support is unavailable.");
+        var installation = await service.UpdateAsync(gameId, definition, cancellationToken);
+        if (installation is not null)
+            await RefreshAsync(cancellationToken);
+        return installation;
+    }
+
+    public async Task<bool> RemoveManualGameAsync(
+        GameId gameId,
+        CancellationToken cancellationToken)
+    {
+        var service = _manualGameService
+            ?? throw new InvalidOperationException("Manual game support is unavailable.");
+        var removed = await service.RemoveAsync(gameId, cancellationToken);
+        if (removed)
+            await RefreshAsync(cancellationToken);
+        return removed;
+    }
 
     public void AttachLocalProtectionSetupService(ILocalProtectionSetupService service)
     {
@@ -904,6 +998,10 @@ public sealed class LibraryViewModel :
 
     public IReadOnlyList<GameInstallation> GetLaunchInstallations(GameId gameId) =>
         _installations.Where(installation => installation.GameId == gameId).ToArray();
+
+    public GameInstallation? GetManualInstallation(GameId gameId) =>
+        _installations.FirstOrDefault(installation =>
+            installation.GameId == gameId && installation.Provider == ProviderKind.Manual && installation.IsPresent);
 
     public Task EnsureCoverAsync(
         LibraryItemViewModel item,

@@ -4,7 +4,7 @@ namespace PlayStead.Data.Database;
 
 public sealed class DatabaseInitializer
 {
-    private const int TargetVersion = 23;
+    private const int TargetVersion = 24;
 
     private static readonly IReadOnlyDictionary<int, string> MigrationFiles =
         new Dictionary<int, string>
@@ -31,7 +31,8 @@ public sealed class DatabaseInitializer
             [20] = "020_local_artifact_snapshots.sql",
             [21] = "021_local_artifact_snapshot_reason.sql",
             [22] = "022_mod_evidence.sql",
-            [23] = "023_user_defined_local_artifacts.sql"
+            [23] = "023_user_defined_local_artifacts.sql",
+            [24] = "024_manual_game_launch.sql"
         };
 
     private readonly DatabaseOptions _options;
@@ -162,11 +163,17 @@ public sealed class DatabaseInitializer
 
         var migration = connection.CreateCommand();
         migration.Transaction = (SqliteTransaction)transaction;
-        migration.CommandText =
-            ReadEmbeddedMigration(migrationFile);
-
-        await using (var result = await migration.ExecuteReaderAsync(cancellationToken))
+        var canApply = true;
+        if (version == 24)
         {
+            migration.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='installations';";
+            canApply = Convert.ToInt32(await migration.ExecuteScalarAsync(cancellationToken)) == 1;
+        }
+
+        if (canApply)
+        {
+            migration.CommandText = ReadEmbeddedMigration(migrationFile);
+            await using var result = await migration.ExecuteReaderAsync(cancellationToken);
             while (await result.NextResultAsync(cancellationToken))
             {
             }

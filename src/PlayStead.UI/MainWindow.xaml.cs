@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using PlayStead.Core.Library;
+using PlayStead.Core.Persistence;
 using PlayStead.Core.GameBuildHistory;
 using PlayStead.Core.Media;
 using PlayStead.Core.Sessions;
@@ -920,6 +921,13 @@ public partial class MainWindow : Window
                         _localArtifactComparisonService,
                         _graphicsTechnologyDetectionService);
 
+                if (game.Provider == ProviderKind.Manual)
+                {
+                    gameDetailViewModel.AttachManualGameActions(
+                        () => EditManualGameAsync(libraryViewModel, game),
+                        () => RemoveManualGameAsync(libraryViewModel, game));
+                }
+
                 MainContent.Content =
                     new GameDetailView(
                         gameDetailViewModel);
@@ -1099,5 +1107,45 @@ public partial class MainWindow : Window
         RescanRequested?.Invoke(
             this,
             EventArgs.Empty);
+    }
+
+    private async Task EditManualGameAsync(
+        LibraryViewModel library,
+        LibraryItemViewModel game)
+    {
+        var installation = library.GetManualInstallation(game.GameId);
+        if (installation is null || string.IsNullOrWhiteSpace(installation.ExecutablePath))
+            return;
+
+        var definition = new ManualGameDefinition(
+            game.Title,
+            installation.ExecutablePath,
+            installation.WorkingDirectory ?? installation.InstallPath,
+            installation.LaunchArguments);
+        var dialog = new ManualGameDialog(initialDefinition: definition)
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() != true || dialog.Definition is null)
+            return;
+
+        await library.EditManualGameAsync(game.GameId, dialog.Definition, CancellationToken.None);
+    }
+
+    private async Task RemoveManualGameAsync(
+        LibraryViewModel library,
+        LibraryItemViewModel game)
+    {
+        var dialog = new ManualGameRemovalDialog(game.Title)
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        if (await library.RemoveManualGameAsync(game.GameId, CancellationToken.None))
+        {
+            _navigationService.Navigate(new NavigationRequest(AppRoute.Library));
+        }
     }
 }
