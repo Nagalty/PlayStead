@@ -1819,7 +1819,7 @@ public sealed class LibraryViewModel :
         var selectedCapabilities = _capabilityFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var selectedGenres = _genreFilterOptions.Where(option => option.IsSelected).Select(option => option.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         _providerFilterOptions = Items.Select(item => item.Provider).Distinct().OrderBy(value => value)
-            .Select(value => CreateFilterOption(value.ToString(), value.ToString(), selectedProviders.Contains(value.ToString()))).ToArray();
+            .Select(value => CreateFilterOption(value.ToString(), ProviderLabel(value), selectedProviders.Contains(value.ToString()))).ToArray();
         _driveFilterOptions = _installations.Select(value => Path.GetPathRoot(value.InstallPath)?.TrimEnd('\\'))
             .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .Select(value => CreateFilterOption(value!, value!, selectedDrives.Contains(value!))).ToArray();
@@ -1998,7 +1998,7 @@ public sealed class LibraryViewModel :
                 "Steam",
 
             ProviderKind.Epic =>
-                "Epic",
+                "Epic Games",
 
             ProviderKind.Gog =>
                 "GOG",

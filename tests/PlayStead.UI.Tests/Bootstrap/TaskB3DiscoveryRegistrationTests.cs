@@ -5,11 +5,26 @@ using PlayStead.Data.Sessions;
 using PlayStead.Platform.Paths;
 using PlayStead.UI.Bootstrap;
 using PlayStead.UI.Sessions;
+using PlayStead.Providers.Epic;
+using PlayStead.Core.Scanning;
+using PlayStead.Core.Library;
 
 namespace PlayStead.UI.Tests.Bootstrap;
 
 public sealed class TaskB3DiscoveryRegistrationTests
 {
+    [Fact]
+    public void Host_registers_epic_alongside_steam_as_local_library_source()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "PlayStead.Tests", Guid.NewGuid().ToString("N"));
+        using var host = PlaySteadHost.Build(UserDataLayout.FromRoot(root));
+
+        var sources = host.Services.GetServices<ILocalLibrarySource>().ToArray();
+
+        Assert.Contains(sources, x => x.Provider == ProviderKind.Steam);
+        Assert.Contains(sources, x => x.Provider == ProviderKind.Epic && x is EpicLocalLibrarySource);
+    }
+
     [Fact]
     public void Host_resolves_one_signature_authority_and_one_inventory_observer_validator_graph()
     {

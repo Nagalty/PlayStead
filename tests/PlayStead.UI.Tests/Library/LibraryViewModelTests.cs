@@ -146,6 +146,34 @@ public sealed class LibraryViewModelTests
         Assert.Null(sut.Items[1].InstalledSizeBytes);
     }
 
+    [Fact]
+    public async Task RefreshAsync_exposes_epic_games_provider_label()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var gameId = GameId.New();
+        var snapshot = new LibrarySnapshot(
+            Games: [new LogicalGame(gameId, "Epic title", false, now, now)],
+            Installations:
+            [
+                new GameInstallation(
+                    InstallationId.New(),
+                    gameId,
+                    ProviderKind.Epic,
+                    "catalog-id",
+                    @"C:\Games\EpicTitle",
+                    1,
+                    IsPreferred: true,
+                    IsPresent: true,
+                    LastSeenUtc: now)
+            ]);
+
+        var sut = new LibraryViewModel(new StubLibraryStore(snapshot));
+
+        await sut.RefreshAsync(CancellationToken.None);
+
+        Assert.Equal("Epic Games", Assert.Single(sut.Items).ProviderLabel);
+    }
+
     private sealed class StubLibraryStore(
         LibrarySnapshot snapshot) : ILibraryStore
     {

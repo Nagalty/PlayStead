@@ -35,6 +35,7 @@ using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Evidence;
 using PlayStead.Providers.Steam.Media;
 using PlayStead.Providers.Steam.Remote;
+using PlayStead.Providers.Epic;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
 using PlayStead.UI.Library;
@@ -292,6 +293,14 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             ILocalLibrarySource,
             SteamLocalLibrarySource>();
+        builder.Services.AddSingleton<ILocalLibrarySource>(_ =>
+            new EpicLocalLibrarySource(
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "Epic",
+                    "EpicGamesLauncher",
+                    "Data",
+                    "Manifests")));
         builder.Services.AddSingleton<
             IProviderActivityMetadataStore,
             SqliteProviderActivityMetadataStore>();

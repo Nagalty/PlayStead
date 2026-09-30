@@ -66,6 +66,21 @@ public sealed class LocalScanCoordinatorTests
             () => sut.ScanAllAsync(cancellation.Token));
     }
 
+    [Fact]
+    public async Task ScanAll_runs_steam_and_epic_sources_together()
+    {
+        var observed = DateTimeOffset.UtcNow;
+        var steam = new StubSource(ProviderKind.Steam,
+            SourceScanResult.Success(ProviderKind.Steam, observed, []));
+        var epic = new StubSource(ProviderKind.Epic,
+            SourceScanResult.Success(ProviderKind.Epic, observed, []));
+
+        var results = await new LocalScanCoordinator([steam, epic])
+            .ScanAllAsync(CancellationToken.None);
+
+        Assert.Equal([ProviderKind.Steam, ProviderKind.Epic], results.Select(x => x.Provider));
+    }
+
     private sealed class StubSource(
         ProviderKind provider,
         SourceScanResult result) : ILocalLibrarySource

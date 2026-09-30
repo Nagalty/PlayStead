@@ -132,6 +132,7 @@ public sealed class LibraryFilterAndSortTests
         library.ProviderFilterOptions.Single(option => option.Key == "Epic").IsSelected = true;
         library.DriveFilterOptions.Single(option => option.Key == "D:").IsSelected = true;
 
+        Assert.Equal("Epic Games", library.ProviderFilterOptions.Single(option => option.Key == "Epic").Label);
         Assert.Equal(2, library.ActiveAdvancedFilterCategoryCount);
         Assert.Equal(["Epic D", "Steam D"], library.VisibleItems.Select(item => item.Title));
         library.ResetAdvancedFilters();
