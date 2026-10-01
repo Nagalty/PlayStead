@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -22,11 +23,13 @@ var catalogVersion = parsed.CatalogVersion ?? long.Parse(generatedAt.ToString("y
 var document = new CanonicalCatalogDocument(1, catalogVersion, generatedAt, entries);
 var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
 var payload = JsonSerializer.SerializeToUtf8Bytes(document, jsonOptions);
-var manifest = new CanonicalCatalogManifest(1, catalogVersion, generatedAt, "catalog-payload.json", Convert.ToHexString(SHA256.HashData(payload)), entries.Count, payload.LongLength);
-ValidateArtifact(document, manifest, payload);
+var compressedPayload = CompressDeterministically(payload);
+var manifest = new CanonicalCatalogManifest(2, catalogVersion, generatedAt, "catalog-payload.json.gz", Convert.ToHexString(SHA256.HashData(compressedPayload)), entries.Count, compressedPayload.LongLength, "gzip", payload.LongLength);
+ValidateArtifact(document, manifest, payload, compressedPayload);
 
 Directory.CreateDirectory(parsed.OutputPath);
 await WriteAtomicallyAsync(Path.Combine(parsed.OutputPath, "catalog-payload.json"), payload);
+await WriteAtomicallyAsync(Path.Combine(parsed.OutputPath, "catalog-payload.json.gz"), compressedPayload);
 await WriteAtomicallyAsync(Path.Combine(parsed.OutputPath, "catalog-manifest.json"), JsonSerializer.SerializeToUtf8Bytes(manifest, jsonOptions));
 if (parsed.DryRun) Console.Error.WriteLine("Dry-run: validated artifacts generated locally; nothing published.");
 return 0;
@@ -47,9 +50,17 @@ static List<CanonicalCatalogEntry> BuildEntries(IEnumerable<IgdbRecord> source)
 static CatalogProviderKind MapProvider(string? source) => source?.Trim().ToLowerInvariant() switch { "steam" => CatalogProviderKind.Steam, "epic" or "epic games store" => CatalogProviderKind.Epic, "gog" or "gog.com" => CatalogProviderKind.Gog, _ => CatalogProviderKind.Igdb };
 static Guid StableGuid(string value) => new(SHA256.HashData(Encoding.UTF8.GetBytes(value))[..16]);
 
-static void ValidateArtifact(CanonicalCatalogDocument document, CanonicalCatalogManifest manifest, byte[] payload)
+static byte[] CompressDeterministically(byte[] payload)
 {
-    if (manifest.SchemaVersion != 1 || manifest.EntryCount != document.Entries.Count || manifest.PayloadSizeBytes != payload.LongLength || !manifest.PayloadSha256.Equals(Convert.ToHexString(SHA256.HashData(payload)), StringComparison.OrdinalIgnoreCase) || document.Entries.Any(x => string.IsNullOrWhiteSpace(x.CanonicalTitle) || string.IsNullOrWhiteSpace(x.NormalizedTitle))) throw new InvalidDataException("Generated catalog artifact failed validation.");
+    using var output = new MemoryStream();
+    using (var gzip = new GZipStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
+        gzip.Write(payload);
+    return output.ToArray();
+}
+
+static void ValidateArtifact(CanonicalCatalogDocument document, CanonicalCatalogManifest manifest, byte[] payload, byte[] compressedPayload)
+{
+    if (manifest.SchemaVersion != 2 || manifest.PayloadEncoding != "gzip" || manifest.EntryCount != document.Entries.Count || manifest.PayloadSizeBytes != compressedPayload.LongLength || manifest.PayloadUncompressedSizeBytes != payload.LongLength || !manifest.PayloadSha256.Equals(Convert.ToHexString(SHA256.HashData(compressedPayload)), StringComparison.OrdinalIgnoreCase) || document.Entries.Any(x => string.IsNullOrWhiteSpace(x.CanonicalTitle) || string.IsNullOrWhiteSpace(x.NormalizedTitle))) throw new InvalidDataException("Generated catalog artifact failed validation.");
     var secrets = new[] { Environment.GetEnvironmentVariable("IGDB_CLIENT_ID"), Environment.GetEnvironmentVariable("IGDB_CLIENT_SECRET") }.Where(x => !string.IsNullOrWhiteSpace(x));
     var text = Encoding.UTF8.GetString(payload);
     if (secrets.Any(secret => text.Contains(secret!, StringComparison.Ordinal))) throw new InvalidDataException("Generated artifact contains a configured secret.");

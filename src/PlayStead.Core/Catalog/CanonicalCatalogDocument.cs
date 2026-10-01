@@ -34,4 +34,6 @@ public sealed record CanonicalCatalogManifest(
     string PayloadUrl,
     string PayloadSha256,
     int EntryCount,
-    long PayloadSizeBytes = 0);
+    long PayloadSizeBytes = 0,
+    string? PayloadEncoding = null,
+    long PayloadUncompressedSizeBytes = 0);

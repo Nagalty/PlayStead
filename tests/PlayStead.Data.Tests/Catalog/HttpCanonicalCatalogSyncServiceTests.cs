@@ -1,4 +1,5 @@
 using System.Net;
+using System.IO.Compression;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -47,6 +48,22 @@ public sealed class HttpCanonicalCatalogSyncServiceTests : IDisposable
         Assert.Equal(8, (await new SqliteCanonicalCatalogStore(options).GetMetadataAsync(CancellationToken.None)).CatalogVersion);
     }
 
+    [Fact]
+    public async Task V2_gzip_manifest_is_decompressed_verified_and_imported()
+    {
+        Directory.CreateDirectory(_root);
+        var options = new CatalogDatabaseOptions(Path.Combine(_root, "catalog.db"), Path.Combine(_root, "Backups"));
+        await new CatalogDatabaseInitializer(options).InitializeAsync(CancellationToken.None);
+        var json = Payload(9);
+        var compressed = Gzip(json);
+        var manifest = new CanonicalCatalogManifest(2, 9, DateTimeOffset.UtcNow, "catalog-payload.json.gz", Convert.ToHexString(SHA256.HashData(compressed)), 1, compressed.LongLength, "gzip", json.LongLength);
+        using var client = Client(manifest, compressed);
+        var service = CreateService(options, client, 0);
+
+        Assert.True(await service.SyncAsync(CancellationToken.None));
+        Assert.Equal(9, (await new SqliteCanonicalCatalogStore(options).GetMetadataAsync(CancellationToken.None)).CatalogVersion);
+    }
+
     private HttpCanonicalCatalogSyncService CreateService(CatalogDatabaseOptions options, HttpClient client, long localVersion)
     {
         var cache = Path.Combine(_root, "cache");
@@ -58,7 +75,14 @@ public sealed class HttpCanonicalCatalogSyncServiceTests : IDisposable
         new(new StaticHandler(manifest, payload)) { BaseAddress = new Uri("https://catalog.invalid/") };
 
     private static byte[] Payload(long version) => JsonSerializer.SerializeToUtf8Bytes(new CanonicalCatalogDocument(1, version, DateTimeOffset.UtcNow,
-        [new CanonicalCatalogEntry(new CatalogContentId(Guid.NewGuid()), PlaySteadPublicId.Parse($"PlayStead-{version:000000}"), "Game", "GAME", null, "Dev", "Pub", ["RPG"], [], CatalogProvenance.Igdb, DateTimeOffset.UtcNow)]));
+                [new CanonicalCatalogEntry(new CatalogContentId(Guid.NewGuid()), PlaySteadPublicId.Parse($"PlayStead-{version:000000}"), "Game", "GAME", null, "Dev", "Pub", ["RPG"], [], CatalogProvenance.Igdb, DateTimeOffset.UtcNow)]));
+
+    private static byte[] Gzip(byte[] payload)
+    {
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.SmallestSize, true)) gzip.Write(payload);
+        return output.ToArray();
+    }
 
     private static CanonicalCatalogManifest Manifest(byte[] payload, long version) =>
         new(1, version, DateTimeOffset.UtcNow, "catalog-payload.json", Convert.ToHexString(SHA256.HashData(payload)), 1);
