@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -71,6 +72,9 @@ internal sealed record Arguments(string? InputPath, string OutputPath, bool DryR
 
 public static class IgdbClient
 {
+    private static readonly TimeSpan MinimumRequestInterval = TimeSpan.FromMilliseconds(250);
+    private const int Max429Retries = 3;
+
     public static async Task<IgdbRecord[]> FetchAsync(HttpClient? httpClient = null)
     {
         var clientId = Environment.GetEnvironmentVariable("IGDB_CLIENT_ID"); var secret = Environment.GetEnvironmentVariable("IGDB_CLIENT_SECRET");
@@ -92,11 +96,47 @@ public static class IgdbClient
         var token = (await JsonSerializer.DeserializeAsync<Token>(await tokenResponse.Content.ReadAsStreamAsync()))?.AccessToken ?? throw new InvalidDataException("IGDB token response missing access_token.");
         client.DefaultRequestHeaders.Add("Client-ID", clientId); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var records = new List<IgdbRecord>();
+        DateTimeOffset? lastRequest = null;
         for (var offset = 0; ; offset += 500)
         {
-            using var body = new StringContent("fields id,name,first_release_date; limit 500; offset " + offset + ";", Encoding.UTF8, "text/plain"); using var response = await client.PostAsync("https://api.igdb.com/v4/games", body); response.EnsureSuccessStatusCode(); using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync()); var page = document.RootElement.EnumerateArray().Select(ParseGame).ToArray(); records.AddRange(page); if (page.Length < 500) break;
+            const string fields = "fields id,name,first_release_date,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,genres.name,external_games.external_game_source.name,external_games.uid;";
+            var query = $"{fields} limit 500; offset {offset};";
+            using var response = await PostIgdbPageAsync(client, query, lastRequest);
+            lastRequest = DateTimeOffset.UtcNow;
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+            var page = document.RootElement.EnumerateArray().Select(ParseGame).ToArray();
+            Console.Error.WriteLine($"IGDB_PAGE offset={offset} count={page.Length}");
+            records.AddRange(page);
+            if (page.Length < 500) break;
         }
         return records.ToArray();
+    }
+
+    private static async Task<HttpResponseMessage> PostIgdbPageAsync(HttpClient client, string query, DateTimeOffset? lastRequest)
+    {
+        var lastSent = lastRequest;
+        for (var attempt = 0; ; attempt++)
+        {
+            if (lastSent is { } previous)
+            {
+                var wait = MinimumRequestInterval - (DateTimeOffset.UtcNow - previous);
+                if (wait > TimeSpan.Zero) await Task.Delay(wait);
+            }
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.igdb.com/v4/games") { Content = new StringContent(query, Encoding.UTF8, "text/plain") };
+            var response = await client.SendAsync(request);
+            lastSent = DateTimeOffset.UtcNow;
+            if (response.StatusCode != HttpStatusCode.TooManyRequests || attempt >= Max429Retries) return response;
+            TimeSpan? retryAfter = response.Headers.RetryAfter?.Delta;
+            if (retryAfter is null && response.Headers.RetryAfter?.Date is { } retryDate)
+                retryAfter = retryDate - DateTimeOffset.UtcNow;
+            retryAfter ??= TimeSpan.FromMilliseconds(500 * (attempt + 1));
+            response.Dispose();
+            var retryDelay = retryAfter.Value;
+            if (retryDelay < TimeSpan.Zero) retryDelay = TimeSpan.Zero;
+            if (retryDelay > TimeSpan.FromSeconds(10)) retryDelay = TimeSpan.FromSeconds(10);
+            var intervalRemaining = MinimumRequestInterval - (DateTimeOffset.UtcNow - lastSent.Value);
+            await Task.Delay(retryDelay > intervalRemaining ? retryDelay : intervalRemaining);
+        }
     }
     internal static string SanitizeError(string detail, string clientId, string secret)
     {
@@ -104,6 +144,14 @@ public static class IgdbClient
             .Replace(clientId, "[redacted]", StringComparison.Ordinal);
         return Regex.Replace(sanitized, @"(?i)(access[_-]?token\s*[:=]\s*[""']?)[^\s,;""'}]+", "$1[redacted]");
     }
-    private static IgdbRecord ParseGame(JsonElement game) => new(game.GetProperty("id").GetInt64().ToString(), game.GetProperty("name").GetString() ?? string.Empty, null, null, [], [], game.TryGetProperty("first_release_date", out var date) ? date.GetInt64() : null);
+    private static IgdbRecord ParseGame(JsonElement game)
+    {
+        var companies = game.TryGetProperty("involved_companies", out var companyArray) && companyArray.ValueKind == JsonValueKind.Array ? companyArray.EnumerateArray().ToArray() : [];
+        var developers = companies.Where(x => x.TryGetProperty("developer", out var d) && d.GetBoolean()).Select(x => x.GetProperty("company").GetProperty("name").GetString()).OfType<string>();
+        var publishers = companies.Where(x => x.TryGetProperty("publisher", out var p) && p.GetBoolean()).Select(x => x.GetProperty("company").GetProperty("name").GetString()).OfType<string>();
+        var genres = game.TryGetProperty("genres", out var genreArray) && genreArray.ValueKind == JsonValueKind.Array ? genreArray.EnumerateArray().Select(x => x.GetProperty("name").GetString()).OfType<string>().ToArray() : [];
+        var external = game.TryGetProperty("external_games", out var externalArray) && externalArray.ValueKind == JsonValueKind.Array ? externalArray.EnumerateArray().Select(x => new IgdbExternal(x.TryGetProperty("external_game_source", out var source) && source.ValueKind == JsonValueKind.Object && source.TryGetProperty("name", out var name) ? name.GetString() : null, x.TryGetProperty("uid", out var uid) ? uid.GetString() : null)).ToArray() : [];
+        return new(game.GetProperty("id").GetInt64().ToString(), game.GetProperty("name").GetString() ?? string.Empty, developers.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).FirstOrDefault(), publishers.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).FirstOrDefault(), genres.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray(), external, game.TryGetProperty("first_release_date", out var date) ? date.GetInt64() : null);
+    }
     private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);
 }
