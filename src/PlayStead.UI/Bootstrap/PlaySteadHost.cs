@@ -64,6 +64,12 @@ namespace PlayStead.UI.Bootstrap;
 
 public static class PlaySteadHost
 {
+    public const string DefaultCanonicalCatalogManifestUrl = "https://nagalty.github.io/PlayStead/catalog/catalog-manifest.json";
+    public static Uri ResolveCanonicalCatalogManifestUri(string? configuredUrl)
+    {
+        var value = string.IsNullOrWhiteSpace(configuredUrl) ? DefaultCanonicalCatalogManifestUrl : configuredUrl;
+        return new Uri(value, UriKind.Absolute);
+    }
     public static IHost Build(
         UserDataLayout layout)
     {
@@ -104,7 +110,7 @@ public static class PlaySteadHost
             services => services.GetRequiredService<SqliteCanonicalCatalogStore>());
         builder.Services.AddSingleton<CanonicalCatalogBatchImporter>();
         var catalogManifest = Environment.GetEnvironmentVariable("PLAYSTEAD_CANONICAL_CATALOG_MANIFEST_URL");
-        if (Uri.TryCreate(catalogManifest, UriKind.Absolute, out var catalogManifestUri))
+        var catalogManifestUri = ResolveCanonicalCatalogManifestUri(catalogManifest);
         {
             builder.Services.AddSingleton(new CanonicalCatalogSyncOptions(
                 catalogManifestUri,

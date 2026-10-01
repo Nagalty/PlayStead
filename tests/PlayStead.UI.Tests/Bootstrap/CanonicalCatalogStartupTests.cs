@@ -10,6 +10,21 @@ namespace PlayStead.UI.Tests.Bootstrap;
 public sealed class CanonicalCatalogStartupTests
 {
     [Fact]
+    public void Public_catalog_url_is_default_and_environment_override_wins()
+    {
+        var previous = Environment.GetEnvironmentVariable("PLAYSTEAD_CANONICAL_CATALOG_MANIFEST_URL");
+        try
+        {
+            Environment.SetEnvironmentVariable("PLAYSTEAD_CANONICAL_CATALOG_MANIFEST_URL", null);
+            Assert.Equal(PlaySteadHost.DefaultCanonicalCatalogManifestUrl, PlaySteadHost.ResolveCanonicalCatalogManifestUri(null).ToString());
+
+            Environment.SetEnvironmentVariable("PLAYSTEAD_CANONICAL_CATALOG_MANIFEST_URL", "https://catalog.test/custom/manifest.json");
+            Assert.Equal("https://catalog.test/custom/manifest.json", PlaySteadHost.ResolveCanonicalCatalogManifestUri(Environment.GetEnvironmentVariable("PLAYSTEAD_CANONICAL_CATALOG_MANIFEST_URL")).ToString());
+        }
+        finally { Environment.SetEnvironmentVariable("PLAYSTEAD_CANONICAL_CATALOG_MANIFEST_URL", previous); }
+    }
+
+    [Fact]
     public async Task Production_host_initializes_catalog_without_network_dependency()
     {
         var root = Path.Combine(Path.GetTempPath(), "PlayStead.Tests", Guid.NewGuid().ToString("N"));
