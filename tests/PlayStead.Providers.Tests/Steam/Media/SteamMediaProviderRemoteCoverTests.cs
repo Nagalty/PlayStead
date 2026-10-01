@@ -39,8 +39,31 @@ public sealed class SteamMediaProviderRemoteCoverTests : IDisposable
         Assert.Equal("steam-remote", payload.Source);
         Assert.Equal(1, handler.RequestCount);
         Assert.Equal(
-            "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900_2x.jpg",
+            "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_capsule_2x.jpg",
             handler.LastRequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_uses_official_capsule_for_manual_bridge_AppId_3768760()
+    {
+        Directory.CreateDirectory(_root);
+
+        var handler = new RecordingHandler();
+        using var httpClient = new HttpClient(handler);
+        var provider = new SteamMediaProvider(
+            new WindowsSteamRootLocator([_root]),
+            new SteamLocalMediaLocator(),
+            new HttpSteamMediaTransport(httpClient));
+
+        var payload = await provider.ResolveAsync(
+            new GameMediaIdentity(ProviderKind.Steam, "3768760", "007 First Light"),
+            GameMediaAssetType.Cover,
+            CancellationToken.None);
+
+        Assert.NotNull(payload);
+        Assert.Equal(
+            "https://cdn.cloudflare.steamstatic.com/steam/apps/3768760/library_capsule_2x.jpg",
+            payload.SourceUri?.AbsoluteUri);
     }
 
     [Fact]
@@ -62,7 +85,7 @@ public sealed class SteamMediaProviderRemoteCoverTests : IDisposable
         Assert.NotNull(payload);
         Assert.Equal(GameMediaAssetType.Cover, payload.AssetType);
         Assert.Equal(2, handler.RequestCount);
-        Assert.EndsWith("library_600x900.jpg", handler.LastRequestUri!.AbsoluteUri, StringComparison.Ordinal);
+        Assert.EndsWith("library_capsule.jpg", handler.LastRequestUri!.AbsoluteUri, StringComparison.Ordinal);
     }
 
     public void Dispose()

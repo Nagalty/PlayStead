@@ -32,6 +32,7 @@ public sealed class GameMediaResolver : IGameMediaResolver
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        TraceDetail(identity, assetType, $"Request=YES");
 
         var cachedPath = _cache.TryGetPath(
             identity,
@@ -40,10 +41,12 @@ public sealed class GameMediaResolver : IGameMediaResolver
         if (cachedPath is not null)
         {
             Report(MediaResolutionEventKind.CacheHit, identity, assetType);
+            TraceDetail(identity, assetType, "Uri=CachePath Resolved=YES Source=LocalCache");
             return cachedPath;
         }
 
         Report(MediaResolutionEventKind.CacheMiss, identity, assetType);
+        var failureReason = "NoProviderPayload";
 
         foreach (var provider in _providers)
         {
@@ -69,15 +72,19 @@ public sealed class GameMediaResolver : IGameMediaResolver
 
                 try
                 {
-                    return await _cache.StoreAsync(
+                    var cachedResult = await _cache.StoreAsync(
                         identity,
                         payload,
                         cancellationToken)
-                    .ConfigureAwait(false);
+                        .ConfigureAwait(false);
+                    TraceDetail(identity, assetType,
+                        $"Uri={payload.SourceUri?.AbsoluteUri ?? "Payload"} Resolved=YES Source={payload.Source}");
+                    return cachedResult;
                 }
                 catch (InvalidDataException)
                 {
                     Report(MediaResolutionEventKind.InvalidImage, identity, assetType);
+                    failureReason = "InvalidImage";
                 }
             }
             catch (Exception ex) when (
@@ -89,14 +96,37 @@ public sealed class GameMediaResolver : IGameMediaResolver
                 if (ex is InvalidDataException)
                 {
                     Report(MediaResolutionEventKind.InvalidImage, identity, assetType);
+                    failureReason = "InvalidImage";
                 }
+
+                failureReason = ex.GetType().Name;
 
                 continue;
             }
         }
 
         Report(MediaResolutionEventKind.FallbackUsed, identity, assetType);
+        TraceDetail(identity, assetType, $"Uri=None Resolved=NO Source=None Reason={failureReason}");
         return null;
+    }
+
+    private static void TraceDetail(
+        GameMediaIdentity identity,
+        GameMediaAssetType assetType,
+        string details)
+    {
+        if (assetType is not (GameMediaAssetType.Cover or GameMediaAssetType.Hero))
+        {
+            return;
+        }
+
+        var label = assetType == GameMediaAssetType.Cover ? "Cover" : "Hero";
+        var normalizedDetails = details
+            .Replace("Uri=", $"{label}Uri=", StringComparison.Ordinal)
+            .Replace("Resolved=", $"{label}Resolved=", StringComparison.Ordinal)
+            .Replace("Source=", $"{label}Source=", StringComparison.Ordinal);
+        System.Diagnostics.Trace.WriteLine(
+            $"[MEDIA-DETAIL] Game=\"{identity.CanonicalTitle}\" Identity={identity.Provider}:{identity.ProviderGameId} Asset={assetType} {normalizedDetails}");
     }
 
     private void Report(

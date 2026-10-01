@@ -21,6 +21,12 @@ public static class SteamMediaUriFactory
             GameMediaAssetType.Cover =>
             [
                 new Uri(
+                    $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_capsule_2x.jpg",
+                    UriKind.Absolute),
+                new Uri(
+                    $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_capsule.jpg",
+                    UriKind.Absolute),
+                new Uri(
                     $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900_2x.jpg",
                     UriKind.Absolute),
                 new Uri(

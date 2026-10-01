@@ -21,10 +21,12 @@ public sealed class SteamMediaUriFactoryTests
     }
 
     [Fact]
-    public void CreateCandidates_Cover_prefers_legacy_high_resolution_then_standard()
+    public void CreateCandidates_Cover_includes_official_capsule_variants_before_legacy_fallbacks()
     {
         Assert.Collection(
             SteamMediaUriFactory.CreateCandidates("1874880", GameMediaAssetType.Cover),
+            uri => Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_capsule_2x.jpg", uri.AbsoluteUri),
+            uri => Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_capsule.jpg", uri.AbsoluteUri),
             uri => Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900_2x.jpg", uri.AbsoluteUri),
             uri => Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900.jpg", uri.AbsoluteUri));
     }

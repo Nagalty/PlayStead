@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
@@ -877,18 +878,19 @@ public partial class MainWindow : Window
                     break;
                 }
 
+                var activity = CreateActivityModel(libraryViewModel, gameId);
+                var detailHeroPath = CreateHeroPath(libraryViewModel, game);
+                TraceDetailMedia(game, detailHeroPath);
                 // A detail route can be opened without a prior card-load event.
                 // Request the same centralized Manual -> media bridge cover path so
                 // the cover can arrive while the detail view is already displayed.
-                _ = libraryViewModel.EnsureCoverAsync(game, CancellationToken.None);
-
-                var activity = CreateActivityModel(libraryViewModel, gameId);
+                _ = EnsureDetailCoverAsync(libraryViewModel, game, detailHeroPath);
                 var gameDetailViewModel = _sessionMonitor is null
                     ? new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
                         activity,
-                        CreateHeroPath(libraryViewModel, game),
+                        detailHeroPath,
                         libraryViewModel.CanonicalCatalogStore,
                         libraryViewModel.GamesDuMomentService,
                         libraryViewModel.ProviderGameMetadataStore,
@@ -907,7 +909,7 @@ public partial class MainWindow : Window
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
                         activity,
-                        CreateHeroPath(libraryViewModel, game),
+                        detailHeroPath,
                         _sessionMonitor,
                         () => activity?.LoadSessionSummaryAsync(CancellationToken.None)
                             ?? Task.CompletedTask,
@@ -993,6 +995,38 @@ public partial class MainWindow : Window
         {
             return null;
         }
+    }
+
+    private async Task EnsureDetailCoverAsync(
+        LibraryViewModel libraryViewModel,
+        LibraryItemViewModel game,
+        string? heroPath)
+    {
+        try
+        {
+            await libraryViewModel.EnsureCoverAsync(game, CancellationToken.None);
+            TraceDetailMedia(game, heroPath);
+        }
+        catch (Exception exception)
+        {
+            Trace.WriteLine(
+                $"[MEDIA-DETAIL] Game=\"{game.Title}\" CoverResolved=NO CoverSource=Error Error={exception.GetType().Name}");
+        }
+    }
+
+    private static void TraceDetailMedia(
+        LibraryItemViewModel game,
+        string? heroPath)
+    {
+        var identity = game.ProviderGameId is null
+            ? $"{game.Provider}:Unavailable"
+            : $"{game.Provider}:{game.ProviderGameId}";
+        Trace.WriteLine(
+            $"[MEDIA-DETAIL] Game=\"{game.Title}\" Identity={identity} " +
+            $"CoverUri={(game.HasCover ? "CachePath" : "None")} " +
+            $"HeroUri={(string.IsNullOrWhiteSpace(heroPath) ? "None" : "CachePath")} " +
+            $"CoverResolved={(game.HasCover ? "YES" : "NO")} " +
+            $"CoverSource={(game.HasCover ? "Cache" : "None")}");
     }
 
     private async void SettingsView_OnFirstLoaded(
