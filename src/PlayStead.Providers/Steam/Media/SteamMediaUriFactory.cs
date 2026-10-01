@@ -26,15 +26,27 @@ public static class SteamMediaUriFactory
         if (assetType == GameMediaAssetType.Cover)
         {
             var candidates = new List<Uri>();
+            if (mediaAssets?.CoverAssets is { Count: > 0 } coverAssets)
+            {
+                foreach (var asset in coverAssets)
+                {
+                    if (IsSafeHash(asset.Hash) &&
+                        IsSafeFileName(asset.FileName))
+                    {
+                        AddModernCandidates(candidates, appId, asset.Hash, asset.FileName);
+                    }
+                }
+            }
+
             var libraryHash = mediaAssets?.Library600x900Hash;
-            if (IsSafeHash(libraryHash))
+            if (candidates.Count == 0 && IsSafeHash(libraryHash))
             {
                 AddModernCandidates(candidates, appId, libraryHash!,
                     "library_600x900_2x.jpg", "library_600x900.jpg");
             }
 
             var capsuleHash = mediaAssets?.LibraryCapsuleHash;
-            if (IsSafeHash(capsuleHash))
+            if (candidates.Count == 0 && IsSafeHash(capsuleHash))
             {
                 AddModernCandidates(candidates, appId, capsuleHash!,
                     "library_capsule_2x.jpg", "library_capsule.jpg");
@@ -104,4 +116,9 @@ public static class SteamMediaUriFactory
 
     private static bool IsSafeHash(string? value) =>
         value is { Length: 40 } && value.All(Uri.IsHexDigit);
+
+    private static bool IsSafeFileName(string value) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        value.IndexOfAny(['/', '\\']) < 0 &&
+        value.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase);
 }

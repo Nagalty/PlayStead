@@ -1,0 +1,20 @@
+"3768760"
+{
+    "common"
+    {
+        "library_assets_full"
+        {
+            "library_capsule"
+            {
+                "image"
+                {
+                    "english" "1159a696d257cbeb3f4479be3466cfba2ae938a0/library_600x900.jpg"
+                }
+                "image2x"
+                {
+                    "english" "1159a696d257cbeb3f4479be3466cfba2ae938a0/library_600x900_2x.jpg"
+                }
+            }
+        }
+    }
+}

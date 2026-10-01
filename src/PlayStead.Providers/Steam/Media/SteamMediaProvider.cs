@@ -1,5 +1,6 @@
 using PlayStead.Core.Library;
 using PlayStead.Core.Media;
+using PlayStead.Providers.Steam.Remote;
 
 namespace PlayStead.Providers.Steam.Media;
 
@@ -10,6 +11,7 @@ public sealed class SteamMediaProvider : IGameMediaProvider
     private readonly ISteamMediaTransport _transport;
     private readonly ISteamStoreAppDetailsClient? _storeClient;
     private readonly SteamAppInfoReader _appInfoReader;
+    private readonly ISteamRemoteMediaMetadataSource? _remoteMetadataSource;
     private readonly IMediaDiagnostics _diagnostics;
 
     public SteamMediaProvider(
@@ -18,7 +20,8 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         ISteamMediaTransport transport,
         IMediaDiagnostics? diagnostics = null,
         ISteamStoreAppDetailsClient? storeClient = null,
-        SteamAppInfoReader? appInfoReader = null)
+        SteamAppInfoReader? appInfoReader = null,
+        ISteamRemoteMediaMetadataSource? remoteMetadataSource = null)
     {
         ArgumentNullException.ThrowIfNull(rootLocator);
         ArgumentNullException.ThrowIfNull(localLocator);
@@ -29,6 +32,7 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         _transport = transport;
         _storeClient = storeClient;
         _appInfoReader = appInfoReader ?? new SteamAppInfoReader();
+        _remoteMetadataSource = remoteMetadataSource;
         _diagnostics = diagnostics ?? NoOpMediaDiagnostics.Instance;
     }
 
@@ -56,9 +60,31 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         }
 
         var steamRoot = _rootLocator.TryLocate();
-        var mediaAssets = steamRoot is null
+        SteamMediaAssetMetadata? mediaAssets = steamRoot is null
             ? null
             : ReadMediaAssets(steamRoot, identity.ProviderGameId);
+
+        if (assetType == GameMediaAssetType.Cover &&
+            !HasCoverMetadata(mediaAssets) &&
+            _remoteMetadataSource is not null)
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[STEAM-MEDIA-META] AppId={identity.ProviderGameId} Source=LocalAppInfo Result=Missing");
+            try
+            {
+                mediaAssets = await _remoteMetadataSource.GetAsync(
+                    identity.ProviderGameId,
+                    cancellationToken).ConfigureAwait(false) ?? mediaAssets;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // Remote media metadata is opportunistic; preserve legacy fallback.
+            }
+        }
 
         if (steamRoot is not null)
         {
@@ -129,6 +155,11 @@ public sealed class SteamMediaProvider : IGameMediaProvider
 
         return payload;
     }
+
+    private static bool HasCoverMetadata(SteamMediaAssetMetadata? metadata) =>
+        metadata is not null &&
+        (metadata.CoverAssets is { Count: > 0 } ||
+         !string.IsNullOrWhiteSpace(metadata.LibraryAssetHash));
 
     private SteamMediaAssetMetadata? ReadMediaAssets(
         string steamRoot,

@@ -4,6 +4,7 @@ using PlayStead.Core.Library;
 using PlayStead.Core.Media;
 using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Media;
+using PlayStead.Providers.Steam.Remote;
 
 namespace PlayStead.Providers.Tests.Steam.Media;
 
@@ -96,6 +97,35 @@ public sealed class SteamMediaProviderRemoteCoverTests : IDisposable
     }
 
     [Fact]
+    public async Task ResolveAsync_requests_remote_metadata_when_local_appinfo_is_missing()
+    {
+        Directory.CreateDirectory(_root);
+        const string hash = "1159a696d257cbeb3f4479be3466cfba2ae938a0";
+        var handler = new RecordingHandler();
+        var metadataSource = new RecordingMetadataSource(
+            new SteamMediaAssetMetadata(
+                hash,
+                hash,
+                [new SteamMediaAssetReference(hash, "library_600x900.jpg")]));
+        using var httpClient = new HttpClient(handler);
+        var provider = new SteamMediaProvider(
+            new WindowsSteamRootLocator([_root]),
+            new SteamLocalMediaLocator(),
+            new HttpSteamMediaTransport(httpClient),
+            remoteMetadataSource: metadataSource);
+
+        var payload = await provider.ResolveAsync(
+            new GameMediaIdentity(ProviderKind.Steam, "3768760", "007 First Light"),
+            GameMediaAssetType.Cover,
+            CancellationToken.None);
+
+        Assert.NotNull(payload);
+        Assert.Equal(1, metadataSource.CallCount);
+        Assert.Contains(hash, payload.SourceUri!.AbsoluteUri, StringComparison.Ordinal);
+        Assert.EndsWith("/library_600x900.jpg", payload.SourceUri.AbsoluteUri, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ResolveAsync_tries_next_cover_candidate_after_recoverable_404()
     {
         Directory.CreateDirectory(_root);
@@ -175,6 +205,20 @@ public sealed class SteamMediaProviderRemoteCoverTests : IDisposable
             };
             response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
             return Task.FromResult(response);
+        }
+    }
+
+    private sealed class RecordingMetadataSource(SteamMediaAssetMetadata metadata)
+        : ISteamRemoteMediaMetadataSource
+    {
+        public int CallCount { get; private set; }
+
+        public Task<SteamMediaAssetMetadata?> GetAsync(
+            string appId,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            return Task.FromResult<SteamMediaAssetMetadata?>(metadata);
         }
     }
 

@@ -5,6 +5,30 @@ namespace PlayStead.Providers.Steam.Remote;
 public sealed class SteamCmdAppInfoParser :
     ISteamCmdAppInfoParser
 {
+    public SteamMediaAssetMetadata? ParseMediaAssets(
+        string appId,
+        string rawOutput)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(appId);
+        ArgumentNullException.ThrowIfNull(rawOutput);
+
+        try
+        {
+            if (!TryExtractAppObject(rawOutput, appId, out var appObjectText))
+                return null;
+
+            var root = new VdfObjectParser(appObjectText).ParseRootObject(appId);
+            if (!root.TryGetObject("common", out var common))
+                return null;
+
+            return ReadMediaAssets(common);
+        }
+        catch (VdfParseException)
+        {
+            return null;
+        }
+    }
+
     public SteamRemoteEvidenceResult Parse(
         string appId,
         string branchName,
@@ -110,6 +134,116 @@ public sealed class SteamCmdAppInfoParser :
             SteamRemoteEvidenceStatus.RefreshFailed,
             Evidence: null,
             SteamRemoteFailureKind.MalformedOutput);
+
+    private static SteamMediaAssetMetadata? ReadMediaAssets(VdfObject common)
+    {
+        var candidates = new List<(SteamMediaAssetReference Asset, int Score)>();
+        string? capsuleHash = null;
+        string? libraryHash = null;
+
+        if (common.TryGetObject("library_assets", out var assets))
+        {
+            capsuleHash = ReadHash(assets, "library_capsule");
+            libraryHash = ReadHash(assets, "library_600x900") ??
+                ReadHash(assets, "library_600x900_2x");
+        }
+
+        if (common.TryGetObject("library_assets_full", out var full))
+        {
+            CollectReferences(full, "library_capsule", candidates);
+            CollectReferences(full, "library_600x900", candidates);
+        }
+
+        var references = candidates
+            .OrderByDescending(candidate => candidate.Score)
+            .Select(candidate => candidate.Asset)
+            .Distinct()
+            .ToList();
+
+        if (references.Count > 0)
+        {
+            capsuleHash ??= references
+                .FirstOrDefault(reference => reference.FileName.Contains("capsule", StringComparison.OrdinalIgnoreCase))
+                ?.Hash;
+            libraryHash ??= references
+                .FirstOrDefault(reference => reference.FileName.Contains("600x900", StringComparison.OrdinalIgnoreCase))
+                ?.Hash;
+        }
+
+        if (string.IsNullOrWhiteSpace(capsuleHash) &&
+            string.IsNullOrWhiteSpace(libraryHash) &&
+            references.Count == 0)
+        {
+            return null;
+        }
+
+        return new SteamMediaAssetMetadata(
+            capsuleHash,
+            libraryHash,
+            references
+                .Distinct()
+                .OrderByDescending(reference => reference.FileName.Contains("2x", StringComparison.OrdinalIgnoreCase))
+                .ToArray());
+    }
+
+    private static string? ReadHash(VdfObject assets, string key)
+    {
+        if (!assets.TryGetString(key, out var value) || string.IsNullOrWhiteSpace(value))
+            return null;
+
+        return IsHash(value) ? value : null;
+    }
+
+    private static void CollectReferences(
+        VdfObject full,
+        string section,
+        ICollection<(SteamMediaAssetReference Asset, int Score)> candidates)
+    {
+        if (!full.TryGetObject(section, out var node))
+            return;
+
+        foreach (var (value, score) in EnumerateStrings(node))
+        {
+            var separator = value.IndexOf('/');
+            if (separator <= 0 || separator == value.Length - 1)
+                continue;
+
+            var hash = value[..separator];
+            var fileName = value[(separator + 1)..];
+            if (IsHash(hash) &&
+                fileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase))
+            {
+                candidates.Add((new SteamMediaAssetReference(hash, fileName), score));
+            }
+        }
+    }
+
+    private static IEnumerable<(string Value, int Score)> EnumerateStrings(
+        VdfObject node,
+        int score = 0)
+    {
+        foreach (var pair in node.Strings)
+            yield return (pair.Value, score + LanguageScore(pair.Key));
+
+        foreach (var pair in node.Objects)
+        {
+            foreach (var value in EnumerateStrings(
+                pair.Value,
+                score + LanguageScore(pair.Key) + VariantScore(pair.Key)))
+                yield return value;
+        }
+    }
+
+    private static int LanguageScore(string key) =>
+        key.Equals("english", StringComparison.OrdinalIgnoreCase) ? 100 :
+        key.Equals("default", StringComparison.OrdinalIgnoreCase) ? 90 : 0;
+
+    private static int VariantScore(string key) =>
+        key.Contains("2x", StringComparison.OrdinalIgnoreCase) ? 20 :
+        key.Contains("image", StringComparison.OrdinalIgnoreCase) ? 10 : 0;
+
+    private static bool IsHash(string value) =>
+        value.Length == 40 && value.All(Uri.IsHexDigit);
 
     private static bool IsNumeric(
         string value)

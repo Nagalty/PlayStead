@@ -1,5 +1,6 @@
 using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Media;
+using PlayStead.Providers.Steam.Remote;
 using PlayStead.Core.Media;
 
 namespace PlayStead.Providers.Tests.Steam.Media;
@@ -24,11 +25,13 @@ public sealed class SteamMediaProviderDependencyTests
                 typeof(ISteamMediaTransport),
                 typeof(IMediaDiagnostics),
                 typeof(ISteamStoreAppDetailsClient),
-                typeof(SteamAppInfoReader)
+                typeof(SteamAppInfoReader),
+                typeof(ISteamRemoteMediaMetadataSource)
             ],
             parameterTypes);
         Assert.True(constructor.GetParameters()[3].IsOptional);
         Assert.True(constructor.GetParameters()[4].IsOptional);
         Assert.True(constructor.GetParameters()[5].IsOptional);
+        Assert.True(constructor.GetParameters()[6].IsOptional);
     }
 }

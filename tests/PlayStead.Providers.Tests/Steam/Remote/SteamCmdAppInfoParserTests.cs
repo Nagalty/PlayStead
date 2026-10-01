@@ -139,6 +139,25 @@ public sealed class SteamCmdAppInfoParserTests
             result.FailureKind);
     }
 
+    [Fact]
+    public void Parses_modern_library_asset_hash_and_filenames()
+    {
+        var metadata = _sut.ParseMediaAssets(
+            "3768760",
+            FixtureText("appinfo_media_007.txt"));
+
+        Assert.NotNull(metadata);
+        Assert.Equal("1159a696d257cbeb3f4479be3466cfba2ae938a0", metadata!.LibraryAssetHash);
+        Assert.Equal(2, metadata.CoverAssets?.Count);
+        Assert.Equal("library_600x900_2x.jpg", metadata.CoverAssets![0].FileName);
+        Assert.Contains(
+            metadata.CoverAssets!,
+            asset => asset.FileName == "library_600x900.jpg");
+        Assert.Contains(
+            metadata.CoverAssets!,
+            asset => asset.FileName == "library_600x900_2x.jpg");
+    }
+
     private static string FixtureText(string name) =>
         File.ReadAllText(
             Path.Combine(

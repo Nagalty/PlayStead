@@ -1,8 +1,13 @@
 namespace PlayStead.Providers.Steam;
 
+public sealed record SteamMediaAssetReference(
+    string Hash,
+    string FileName);
+
 public sealed record SteamMediaAssetMetadata(
     string? LibraryCapsuleHash,
-    string? Library600x900Hash)
+    string? Library600x900Hash,
+    IReadOnlyList<SteamMediaAssetReference>? CoverAssets = null)
 {
     public string? LibraryAssetHash =>
         Library600x900Hash ?? LibraryCapsuleHash;

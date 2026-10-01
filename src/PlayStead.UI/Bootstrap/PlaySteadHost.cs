@@ -307,7 +307,8 @@ public static class PlaySteadHost
                 services.GetRequiredService<WindowsSteamRootLocator>(),
                 services.GetRequiredService<SteamLocalMediaLocator>(),
                 services.GetRequiredService<ISteamMediaTransport>(),
-                storeClient: services.GetRequiredService<ISteamStoreAppDetailsClient>()));
+                storeClient: services.GetRequiredService<ISteamStoreAppDetailsClient>(),
+                remoteMetadataSource: services.GetRequiredService<ISteamRemoteMediaMetadataSource>()));
 
         builder.Services.AddSingleton<GameMediaResolver>();
         builder.Services.AddSingleton<IGameMediaResolver>(services =>
@@ -432,8 +433,15 @@ public static class PlaySteadHost
             SteamCmdRunner>();
 
         builder.Services.AddSingleton<
-            ISteamCmdAppInfoParser,
             SteamCmdAppInfoParser>();
+
+        builder.Services.AddSingleton<
+            ISteamCmdAppInfoParser>(services =>
+                services.GetRequiredService<SteamCmdAppInfoParser>());
+
+        builder.Services.AddSingleton<
+            ISteamRemoteMediaMetadataSource,
+            SteamCmdRemoteMediaMetadataSource>();
 
         builder.Services.AddSingleton<
             ISteamRemoteEvidenceProvider,
