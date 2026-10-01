@@ -13,4 +13,7 @@
     <ProjectReference Include="..\..\tools\PlayStead.CatalogBuilder\PlayStead.CatalogBuilder.csproj" />
   </ItemGroup>
   <ItemGroup><Using Include="Xunit" /></ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\CatalogValidation\file-uri-cases.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

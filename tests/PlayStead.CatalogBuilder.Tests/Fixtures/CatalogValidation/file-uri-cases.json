@@ -1,0 +1,14 @@
+{
+  "titleFalsePositive": {
+    "canonicalTitle": "File://maniac",
+    "normalizedTitle": "file maniac",
+    "providerReferences": []
+  },
+  "providerReferenceRejected": {
+    "canonicalTitle": "Safe title",
+    "normalizedTitle": "safe title",
+    "providerReferences": [
+      { "provider": "Steam", "externalId": "file://C:/local/path" }
+    ]
+  }
+}
