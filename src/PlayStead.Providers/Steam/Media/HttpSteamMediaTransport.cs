@@ -57,11 +57,13 @@ public sealed class HttpSteamMediaTransport : ISteamMediaTransport
 
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
+                    ReportCandidate(appId, assetType, candidate, "404");
                     continue;
                 }
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    ReportCandidate(appId, assetType, candidate, $"HTTP{(int)response.StatusCode}");
                     return null;
                 }
 
@@ -78,9 +80,11 @@ public sealed class HttpSteamMediaTransport : ISteamMediaTransport
 
                 if (content is null)
                 {
+                    ReportCandidate(appId, assetType, candidate, "InvalidSize");
                     continue;
                 }
 
+                ReportCandidate(appId, assetType, candidate, "Success");
                 return new GameMediaPayload(
                     assetType,
                     "steam-remote",
@@ -93,11 +97,23 @@ public sealed class HttpSteamMediaTransport : ISteamMediaTransport
                 when (timeoutCts.IsCancellationRequested &&
                       !cancellationToken.IsCancellationRequested)
             {
+                ReportCandidate(appId, assetType, candidate, "Timeout");
                 continue;
             }
         }
 
         return null;
+    }
+
+    private static void ReportCandidate(
+        string appId,
+        GameMediaAssetType assetType,
+        Uri candidate,
+        string result)
+    {
+        var name = Path.GetFileName(candidate.AbsolutePath);
+        System.Diagnostics.Trace.WriteLine(
+            $"[STEAM-MEDIA] AppId={appId} Asset={assetType} Source=Remote Candidate={name} Result={result}");
     }
 
     private static async Task<byte[]?> ReadBoundedAsync(

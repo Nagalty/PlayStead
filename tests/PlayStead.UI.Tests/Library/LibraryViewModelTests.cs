@@ -174,6 +174,34 @@ public sealed class LibraryViewModelTests
         Assert.Equal("Epic Games", Assert.Single(sut.Items).ProviderLabel);
     }
 
+    [Fact]
+    public async Task RefreshAsync_localizes_manual_provider_label()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var gameId = GameId.New();
+        var snapshot = new LibrarySnapshot(
+            Games: [new LogicalGame(gameId, "Manual title", false, now, now)],
+            Installations:
+            [
+                new GameInstallation(
+                    InstallationId.New(),
+                    gameId,
+                    ProviderKind.Manual,
+                    "manual:game",
+                    @"C:\Games\ManualTitle",
+                    null,
+                    IsPreferred: true,
+                    IsPresent: true,
+                    LastSeenUtc: now)
+            ]);
+
+        var sut = new LibraryViewModel(new StubLibraryStore(snapshot));
+
+        await sut.RefreshAsync(CancellationToken.None);
+
+        Assert.Equal("Manuel", Assert.Single(sut.Items).ProviderLabel);
+    }
+
     private sealed class StubLibraryStore(
         LibrarySnapshot snapshot) : ILibraryStore
     {

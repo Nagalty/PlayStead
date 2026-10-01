@@ -44,10 +44,14 @@ public sealed class SteamMediaProviderTransportDelegationTests : IDisposable
         Assert.Equal(1, transport.CallCount);
         Assert.Equal("1874880", transport.LastAppId);
         Assert.Equal(GameMediaAssetType.Cover, transport.LastAssetType);
-        Assert.Single(transport.LastCandidates!);
-        Assert.Equal(
-            "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900.jpg",
-            transport.LastCandidates![0].AbsoluteUri);
+        Assert.Collection(
+            transport.LastCandidates!,
+            first => Assert.Equal(
+                "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900_2x.jpg",
+                first.AbsoluteUri),
+            second => Assert.Equal(
+                "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900.jpg",
+                second.AbsoluteUri));
         Assert.Same(expectedPayload, payload);
     }
 

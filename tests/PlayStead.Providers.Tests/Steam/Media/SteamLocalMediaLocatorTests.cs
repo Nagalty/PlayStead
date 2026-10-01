@@ -49,6 +49,9 @@ public sealed class SteamLocalMediaLocatorTests : IDisposable
     }
 
     [Theory]
+    [InlineData(GameMediaAssetType.Cover, "library_capsule_2x.jpg")]
+    [InlineData(GameMediaAssetType.Cover, "library_capsule.jpg")]
+    [InlineData(GameMediaAssetType.Cover, "library_600x900_2x.jpg")]
     [InlineData(GameMediaAssetType.Cover, "library_600x900.jpg")]
     [InlineData(GameMediaAssetType.Header, "library_header.jpg")]
     [InlineData(GameMediaAssetType.Hero, "library_hero.jpg")]
@@ -66,6 +69,27 @@ public sealed class SteamLocalMediaLocatorTests : IDisposable
         Assert.Equal(
             expected,
             locator.TryLocate(_root, "2116120", assetType));
+    }
+
+    [Fact]
+    public void TryLocate_cover_prefers_modern_2x_then_modern_then_legacy_2x_then_legacy()
+    {
+        var modern2x = CreateNestedAsset("1874880", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "library_capsule_2x.jpg");
+        var modern = CreateNestedAsset("1874880", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "library_capsule.jpg");
+        var legacy2x = CreateNestedAsset("1874880", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "library_600x900_2x.jpg");
+        var legacy = CreateNestedAsset("1874880", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "library_600x900.jpg");
+        var locator = new SteamLocalMediaLocator();
+
+        Assert.Equal(modern2x, locator.TryLocate(_root, "1874880", GameMediaAssetType.Cover));
+
+        File.Delete(modern2x);
+        Assert.Equal(modern, locator.TryLocate(_root, "1874880", GameMediaAssetType.Cover));
+
+        File.Delete(modern);
+        Assert.Equal(legacy2x, locator.TryLocate(_root, "1874880", GameMediaAssetType.Cover));
+
+        File.Delete(legacy2x);
+        Assert.Equal(legacy, locator.TryLocate(_root, "1874880", GameMediaAssetType.Cover));
     }
 
     [Fact]

@@ -39,8 +39,30 @@ public sealed class SteamMediaProviderRemoteCoverTests : IDisposable
         Assert.Equal("steam-remote", payload.Source);
         Assert.Equal(1, handler.RequestCount);
         Assert.Equal(
-            "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900.jpg",
+            "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900_2x.jpg",
             handler.LastRequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_tries_next_cover_candidate_after_recoverable_404()
+    {
+        Directory.CreateDirectory(_root);
+        var handler = new FallbackHandler();
+        using var httpClient = new HttpClient(handler);
+        var provider = new SteamMediaProvider(
+            new WindowsSteamRootLocator([_root]),
+            new SteamLocalMediaLocator(),
+            new HttpSteamMediaTransport(httpClient));
+
+        var payload = await provider.ResolveAsync(
+            new GameMediaIdentity(ProviderKind.Steam, "1874880", "Arma Reforger"),
+            GameMediaAssetType.Cover,
+            CancellationToken.None);
+
+        Assert.NotNull(payload);
+        Assert.Equal(GameMediaAssetType.Cover, payload.AssetType);
+        Assert.Equal(2, handler.RequestCount);
+        Assert.EndsWith("library_600x900.jpg", handler.LastRequestUri!.AbsoluteUri, StringComparison.Ordinal);
     }
 
     public void Dispose()
@@ -77,6 +99,29 @@ public sealed class SteamMediaProviderRemoteCoverTests : IDisposable
                 new System.Net.Http.Headers.MediaTypeHeaderValue(
                     "image/jpeg");
 
+            return Task.FromResult(response);
+        }
+    }
+
+    private sealed class FallbackHandler : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+        public Uri? LastRequestUri { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            LastRequestUri = request.RequestUri;
+            if (RequestCount == 1)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            }
+
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent([0xFF, 0xD8, 0xFF, 0xD9])
+            };
+            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
             return Task.FromResult(response);
         }
     }

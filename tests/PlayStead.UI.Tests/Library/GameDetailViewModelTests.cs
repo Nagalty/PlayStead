@@ -7,6 +7,24 @@ namespace PlayStead.UI.Tests.Library;
 public sealed class GameDetailViewModelTests
 {
     [Fact]
+    public void Localizes_manual_provider_label_for_game_detail()
+    {
+        var item = new LibraryItemViewModel(
+            GameId.New(),
+            "Manual Game",
+            ProviderKind.Manual,
+            "Manuel",
+            @"D:\Games\ManualGame",
+            null,
+            SteamUpdateState.Unknown,
+            IsSessionActive: false);
+
+        var viewModel = new GameDetailViewModel(item);
+
+        Assert.Equal("Manuel", viewModel.ProviderLabel);
+    }
+
+    [Fact]
     public void Exposes_real_library_metadata_without_invented_fields()
     {
         var item =

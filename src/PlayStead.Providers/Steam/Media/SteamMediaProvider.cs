@@ -69,6 +69,8 @@ public sealed class SteamMediaProvider : IGameMediaProvider
                     .ConfigureAwait(false);
 
                 Report(MediaResolutionEventKind.LocalProviderHit, identity, assetType);
+                System.Diagnostics.Trace.WriteLine(
+                    $"[STEAM-MEDIA] AppId={identity.ProviderGameId} Asset={assetType} Source=Local Candidate={Path.GetFileName(localCoverPath)} Result=Success");
 
                 return new GameMediaPayload(
                     assetType,

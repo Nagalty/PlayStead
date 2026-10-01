@@ -2112,7 +2112,7 @@ public sealed class LibraryViewModel :
                 "GOG",
 
             ProviderKind.Manual =>
-                "Manual",
+                "Manuel",
 
             _ =>
                 provider.ToString()

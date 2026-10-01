@@ -7,9 +7,6 @@ public sealed class SteamMediaUriFactoryTests
 {
     [Theory]
     [InlineData(
-        GameMediaAssetType.Cover,
-        "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900.jpg")]
-    [InlineData(
         GameMediaAssetType.Hero,
         "https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_hero.jpg")]
     [InlineData(
@@ -19,14 +16,17 @@ public sealed class SteamMediaUriFactoryTests
         GameMediaAssetType type,
         string expected)
     {
-        var uri = Assert.Single(
-            SteamMediaUriFactory.CreateCandidates(
-                "1874880",
-                type));
+        var candidates = SteamMediaUriFactory.CreateCandidates("1874880", type);
+        Assert.Contains(expected, candidates.Select(uri => uri.AbsoluteUri));
+    }
 
-        Assert.Equal(
-            expected,
-            uri.AbsoluteUri);
+    [Fact]
+    public void CreateCandidates_Cover_prefers_legacy_high_resolution_then_standard()
+    {
+        Assert.Collection(
+            SteamMediaUriFactory.CreateCandidates("1874880", GameMediaAssetType.Cover),
+            uri => Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900_2x.jpg", uri.AbsoluteUri),
+            uri => Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900.jpg", uri.AbsoluteUri));
     }
 
     [Fact]

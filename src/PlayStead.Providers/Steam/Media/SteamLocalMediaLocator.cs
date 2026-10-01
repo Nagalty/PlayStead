@@ -19,7 +19,13 @@ public sealed class SteamLocalMediaLocator
 
         string[] filenames = assetType switch
         {
-            GameMediaAssetType.Cover => ["library_600x900.jpg"],
+            GameMediaAssetType.Cover =>
+            [
+                "library_capsule_2x.jpg",
+                "library_capsule.jpg",
+                "library_600x900_2x.jpg",
+                "library_600x900.jpg"
+            ],
             GameMediaAssetType.Header =>
             [
                 "library_header.jpg",
