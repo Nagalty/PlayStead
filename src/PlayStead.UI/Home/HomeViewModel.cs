@@ -387,26 +387,11 @@ public sealed class HomeViewModel :
     public string? SuggestionGameIdentity => HasSuggestionWeekendIdentity ? Suggestion?.Title : null;
     public string? SuggestionDescription => Suggestion?.Metadata?.ShortDescription;
     public bool HasSuggestionDescription => !string.IsNullOrWhiteSpace(SuggestionDescription);
-    public string? SuggestionCapabilityText
-    {
-        get
-        {
-            var metadata = Suggestion?.Metadata;
-            if (metadata is null) return "Coop en ligne";
-            if (metadata.OnlineCoop is true && metadata.OnlineCoopMaxPlayers is int onlineMax)
-                return $"Coop en ligne · jusqu’à {onlineMax} joueurs";
-            var capability = HasSuggestionWeekendIdentity
-                ? metadata.OnlineCoop is true ? "Coop en ligne"
-                : metadata.LocalCoop is true ? "Coop locale"
-                : metadata.MultiPlayer is true ? "Multijoueur"
-                : metadata.SinglePlayer is true ? "Solo" : null
-                : metadata.SinglePlayer is true ? "Solo"
-                : metadata.MultiPlayer is true ? "Multijoueur"
-                : metadata.OnlineCoop is true ? "Coop en ligne"
-                : metadata.LocalCoop is true ? "Coop locale" : null;
-            return capability ?? "Coop en ligne";
-        }
-    }
+    private HomeSuggestionCapabilityProjection SuggestionCapabilityProjection =>
+        HomeSuggestionCapabilityProjection.Create(Suggestion?.Metadata);
+    public HomeSuggestionCapabilityKind SuggestionCapabilityKind => SuggestionCapabilityProjection.Kind;
+    public bool HasSuggestionCapability => SuggestionCapabilityKind != HomeSuggestionCapabilityKind.None;
+    public string? SuggestionCapabilityText => SuggestionCapabilityProjection.Text;
     public bool HasSuggestionUpdate => Suggestion?.UpdateState?.Status is
         ProviderInstallUpdateStatus.UpdateAvailable or
         ProviderInstallUpdateStatus.Downloading or
@@ -936,7 +921,8 @@ public sealed class HomeViewModel :
             nameof(Suggestion), nameof(HasSuggestion), nameof(SuggestionTitle),
             nameof(SuggestionEditorialTitle), nameof(SuggestionEditorialLine), nameof(SuggestionSupportingText), nameof(HasSuggestionWeekdayContext), nameof(HasSuggestionWeekendIdentity),
             nameof(SuggestionGameIdentity), nameof(SuggestionDescription), nameof(HasSuggestionDescription),
-            nameof(SuggestionCapabilityText), nameof(HasSuggestionUpdate), nameof(SuggestionUpdateStatusText), nameof(SuggestionMediaPath), nameof(HasSuggestionMedia),
+            nameof(SuggestionCapabilityKind), nameof(HasSuggestionCapability), nameof(SuggestionCapabilityText),
+            nameof(HasSuggestionUpdate), nameof(SuggestionUpdateStatusText), nameof(SuggestionMediaPath), nameof(HasSuggestionMedia),
             nameof(SuggestionBuildChangeCount), nameof(HasSuggestionBuildChanges), nameof(SuggestionBuildChangeText),
             nameof(CanLaunchSuggestion),
             nameof(WeeklySummary), nameof(HasWeeklyActivity), nameof(WeeklyPlayTimeLabel), nameof(WeeklyPlayTimeTitle), nameof(WeeklySessionsTitle), nameof(GamesChangedSinceLastPlayCount), nameof(GamesChangedSinceLastPlayLabel), nameof(GamesChangedSinceLastPlaySubtitle),
