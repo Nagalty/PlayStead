@@ -69,7 +69,7 @@ public sealed class ManualMetadataReconciliationService : IManualMetadataReconci
 
             try
             {
-                var normalized = CatalogTitleNormalizer.Normalize(game.Title);
+                var normalized = CanonicalCatalogTitleNormalizer.Normalize(game.Title);
                 var matches = await _catalogStore.FindByNormalizedTitleAsync(normalized, cancellationToken).ConfigureAwait(false);
                 if (matches.Count != 1)
                 {
@@ -79,13 +79,8 @@ public sealed class ManualMetadataReconciliationService : IManualMetadataReconci
 
                 var content = matches[0];
                 var refs = await _catalogStore.GetProviderRefsAsync(content.Id, cancellationToken).ConfigureAwait(false);
-                var deterministicRefs = refs
-                    .Where(x => x.Confidence == CatalogConfidence.Deterministic)
-                    .Where(x => x.Provider is CatalogProviderKind.Steam or CatalogProviderKind.Epic or CatalogProviderKind.Gog)
-                    .ToArray();
-                var mediaSource = deterministicRefs.Length == 1
-                    ? ToMediaSource(deterministicRefs[0])
-                    : null;
+                var mediaSource = ManualMetadataMediaSourceSelector.Select(refs);
+                Trace.WriteLine($"[STARTUP] ManualMetadataReconciliation Title=\"{game.Title}\" Normalized=\"{normalized}\" Matches={matches.Count} MediaSource={(mediaSource is null ? "None" : $"{mediaSource.Provider}:{mediaSource.ExternalId}")}");
 
                 var existing = await _linkStore.GetAsync(installation.GameId, cancellationToken).ConfigureAwait(false);
                 var link = new ManualMetadataLink(
@@ -128,14 +123,4 @@ public sealed class ManualMetadataReconciliationService : IManualMetadataReconci
         return new(matched, updated, skipped);
     }
 
-    private static MediaSourceIdentity ToMediaSource(CatalogProviderRef providerRef) =>
-        new(
-            providerRef.Provider switch
-            {
-                CatalogProviderKind.Steam => ProviderKind.Steam,
-                CatalogProviderKind.Epic => ProviderKind.Epic,
-                CatalogProviderKind.Gog => ProviderKind.Gog,
-                _ => throw new InvalidOperationException("Unsupported media provider.")
-            },
-            providerRef.ExternalId);
 }

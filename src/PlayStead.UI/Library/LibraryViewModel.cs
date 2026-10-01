@@ -281,7 +281,7 @@ public sealed class LibraryViewModel :
         try
         {
             matches = await CanonicalCatalogStore.FindByNormalizedTitleAsync(
-                CatalogTitleNormalizer.Normalize(definition.Title),
+                CanonicalCatalogTitleNormalizer.Normalize(definition.Title),
                 cancellationToken);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
@@ -294,25 +294,10 @@ public sealed class LibraryViewModel :
 
         var match = matches[0];
         var refs = await CanonicalCatalogStore.GetProviderRefsAsync(match.Id, cancellationToken);
-        var mediaRefs = refs
-            .Where(x => x.Confidence == CatalogConfidence.Deterministic)
-            .Where(x => x.Provider is CatalogProviderKind.Steam or CatalogProviderKind.Epic or CatalogProviderKind.Gog)
-            .ToArray();
-        var mediaRef = mediaRefs.Length == 1 ? mediaRefs[0] : null;
+        var mediaSource = ManualMetadataMediaSourceSelector.Select(refs);
 
         if (_manualMetadataLinkStore is not null)
         {
-            var mediaSource = mediaRef is null
-                ? null
-                : new MediaSourceIdentity(
-                    mediaRef.Provider switch
-                    {
-                        CatalogProviderKind.Steam => ProviderKind.Steam,
-                        CatalogProviderKind.Epic => ProviderKind.Epic,
-                        CatalogProviderKind.Gog => ProviderKind.Gog,
-                        _ => throw new InvalidOperationException()
-                    },
-                    mediaRef.ExternalId);
             await _manualMetadataLinkStore.UpsertAsync(
                 new ManualMetadataLink(
                     installation.GameId,
@@ -385,19 +370,7 @@ public sealed class LibraryViewModel :
         if (content is null)
             return false;
         var refs = await CanonicalCatalogStore.GetProviderRefsAsync(content.Id, cancellationToken);
-        var providerRefs = refs
-            .Where(x => x.Confidence == CatalogConfidence.Deterministic)
-            .Where(x => x.Provider is CatalogProviderKind.Steam or CatalogProviderKind.Epic or CatalogProviderKind.Gog)
-            .ToArray();
-        var providerRef = providerRefs.Length == 1 ? providerRefs[0] : null;
-        var source = providerRef is null ? null : new MediaSourceIdentity(
-            providerRef.Provider switch
-            {
-                CatalogProviderKind.Steam => ProviderKind.Steam,
-                CatalogProviderKind.Epic => ProviderKind.Epic,
-                CatalogProviderKind.Gog => ProviderKind.Gog,
-                _ => throw new InvalidOperationException()
-            }, providerRef.ExternalId);
+        var source = ManualMetadataMediaSourceSelector.Select(refs);
         await _manualMetadataLinkStore.UpsertAsync(new ManualMetadataLink(gameId, content.Id, source, DateTimeOffset.UtcNow), cancellationToken);
         return true;
     }

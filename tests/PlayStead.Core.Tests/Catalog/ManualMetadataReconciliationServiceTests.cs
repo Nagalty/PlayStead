@@ -24,9 +24,11 @@ public sealed class ManualMetadataReconciliationServiceTests
             CatalogContentId.New(), PlaySteadPublicId.Parse("PlayStead-123456"), CatalogContentKind.Game,
             "007 First Light", "007 first light", null, "Developer", "Publisher",
             CatalogContentStatus.Active, null);
-        var catalog = new FakeCatalogStore(content, new CatalogProviderRef(
+        var catalog = new FakeCatalogStore(content, [new CatalogProviderRef(
             content.Id, CatalogProviderKind.Steam, "3768760", null,
-            CatalogProvenance.AdminConfirmed, CatalogConfidence.Deterministic, DateTimeOffset.UtcNow));
+            CatalogProvenance.AdminConfirmed, CatalogConfidence.Deterministic, DateTimeOffset.UtcNow),
+            new CatalogProviderRef(content.Id, CatalogProviderKind.Epic, "c04cf17392964f2594620101490bdb21", null,
+                CatalogProvenance.AdminConfirmed, CatalogConfidence.Deterministic, DateTimeOffset.UtcNow)]);
         var links = new FakeLinkStore();
         var metadata = new FakeMetadataStore();
         var service = new ManualMetadataReconciliationService(
@@ -45,6 +47,8 @@ public sealed class ManualMetadataReconciliationServiceTests
         Assert.Equal(0, second.Updated);
         Assert.Equal(content.Id, link!.CanonicalCatalogId);
         Assert.Equal(new MediaSourceIdentity(ProviderKind.Steam, "3768760"), link.MediaSource);
+        Assert.Equal("007 FIRST LIGHT", catalog.LastNormalizedTitle);
+        Assert.Contains(catalog.ProviderRefs, x => x.Provider == CatalogProviderKind.Epic);
         Assert.Equal(ProviderKind.Manual, installation.Provider);
         Assert.Equal("manual:007", installation.ExternalId);
         Assert.Equal(@"H:\007 First Light", installation.InstallPath);
@@ -60,14 +64,16 @@ public sealed class ManualMetadataReconciliationServiceTests
             Task.FromResult(new LibrarySnapshot([game], [installation]));
     }
 
-    private sealed class FakeCatalogStore(CatalogContent content, CatalogProviderRef providerRef) : ICanonicalCatalogStore
+    private sealed class FakeCatalogStore(CatalogContent content, IReadOnlyList<CatalogProviderRef> providerRefs) : ICanonicalCatalogStore
     {
+        public string? LastNormalizedTitle { get; private set; }
+        public IReadOnlyList<CatalogProviderRef> ProviderRefs => providerRefs;
         public Task<CatalogMetadata> GetMetadataAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<CatalogContent?> GetByIdAsync(CatalogContentId contentId, CancellationToken cancellationToken) => Task.FromResult<CatalogContent?>(contentId == content.Id ? content : null);
         public Task<CatalogContent?> GetByPublicIdAsync(PlaySteadPublicId publicId, CancellationToken cancellationToken) => Task.FromResult<CatalogContent?>(null);
         public Task<CatalogContent?> FindByProviderRefAsync(CatalogProviderKind provider, string externalId, CancellationToken cancellationToken) => Task.FromResult<CatalogContent?>(null);
-        public Task<IReadOnlyList<CatalogContent>> FindByNormalizedTitleAsync(string normalizedTitle, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CatalogContent>>([content]);
-        public Task<IReadOnlyList<CatalogProviderRef>> GetProviderRefsAsync(CatalogContentId contentId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CatalogProviderRef>>([providerRef]);
+        public Task<IReadOnlyList<CatalogContent>> FindByNormalizedTitleAsync(string normalizedTitle, CancellationToken cancellationToken) { LastNormalizedTitle = normalizedTitle; return Task.FromResult<IReadOnlyList<CatalogContent>>([content]); }
+        public Task<IReadOnlyList<CatalogProviderRef>> GetProviderRefsAsync(CatalogContentId contentId, CancellationToken cancellationToken) => Task.FromResult(providerRefs);
         public Task<IReadOnlyList<CatalogAlias>> GetAliasesAsync(CatalogContentId contentId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CatalogAlias>>([]);
         public Task<IReadOnlyList<CatalogContentRelation>> GetRelationsFromAsync(CatalogContentId sourceContentId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CatalogContentRelation>>([]);
     }
