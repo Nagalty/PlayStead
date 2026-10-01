@@ -49,6 +49,45 @@ jobs:
           actual_payload_count = len(payload_document.get("entries", []))
           secret_found = "IGDB_CLIENT_SECRET" in payload_text
           file_uri_found = "file://" in payload_text.lower()
+          def redact(value):
+              value = str(value)
+              for secret_name in ("IGDB_CLIENT_ID", "IGDB_CLIENT_SECRET"):
+                  secret = os.environ.get(secret_name)
+                  if secret:
+                      value = value.replace(secret, "[redacted]")
+              return value[:240] + ("..." if len(value) > 240 else "")
+          def find_file_uri(value, path=""):
+              if isinstance(value, str):
+                  return (path, value) if "file://" in value.lower() else None
+              if isinstance(value, dict):
+                  for key, child in value.items():
+                      found = find_file_uri(child, f"{path}.{key}" if path else key)
+                      if found:
+                          return found
+              if isinstance(value, list):
+                  for index, child in enumerate(value):
+                      found = find_file_uri(child, f"{path}[{index}]")
+                      if found:
+                          return found
+              return None
+          if file_uri_found:
+              match = None
+              for index, entry in enumerate(payload_document.get("entries", [])):
+                  match = find_file_uri(entry)
+                  if match:
+                      title = entry.get("canonicalTitle", "") if isinstance(entry, dict) else ""
+                      print(f"CATALOG_FILE_URI_MATCH_INDEX={index}")
+                      print(f"CATALOG_FILE_URI_MATCH_TITLE={redact(title)}")
+                      print(f"CATALOG_FILE_URI_MATCH_FIELD={match[0]}")
+                      print(f"CATALOG_FILE_URI_MATCH_VALUE={redact(match[1])}")
+                      break
+              if match is None:
+                  match = find_file_uri(payload_document)
+                  if match:
+                      print("CATALOG_FILE_URI_MATCH_INDEX=ROOT")
+                      print("CATALOG_FILE_URI_MATCH_TITLE=")
+                      print(f"CATALOG_FILE_URI_MATCH_FIELD={match[0]}")
+                      print(f"CATALOG_FILE_URI_MATCH_VALUE={redact(match[1])}")
           print(f"CATALOG_SCHEMA_VERSION={actual_schema}")
           print(f"CATALOG_HASH_MATCH={actual_hash == digest}")
           print(f"CATALOG_SIZE_MATCH={actual_size == len(payload_bytes)}")
