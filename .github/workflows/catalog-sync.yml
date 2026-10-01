@@ -38,13 +38,33 @@ jobs:
           root = pathlib.Path(os.environ["RUNNER_TEMP"]) / "catalog"
           manifest = json.loads((root / "catalog-manifest.json").read_text())
           payload = root / "catalog-payload.json"
-          digest = hashlib.sha256(payload.read_bytes()).hexdigest().upper()
-          assert manifest["schemaVersion"] == 1
-          assert manifest["payloadSha256"].upper() == digest
-          assert manifest["payloadSizeBytes"] == payload.stat().st_size
-          assert manifest["entryCount"] == len(json.loads(payload.read_text())["entries"])
-          assert "IGDB_CLIENT_SECRET" not in payload.read_text()
-          assert "file://" not in payload.read_text().lower()
+          payload_bytes = payload.read_bytes()
+          payload_text = payload_bytes.decode("utf-8")
+          digest = hashlib.sha256(payload_bytes).hexdigest().upper()
+          payload_document = json.loads(payload_text)
+          actual_schema = manifest.get("schemaVersion")
+          actual_hash = manifest.get("payloadSha256", "").upper()
+          actual_size = manifest.get("payloadSizeBytes")
+          actual_manifest_count = manifest.get("entryCount")
+          actual_payload_count = len(payload_document.get("entries", []))
+          secret_found = "IGDB_CLIENT_SECRET" in payload_text
+          file_uri_found = "file://" in payload_text.lower()
+          print(f"CATALOG_SCHEMA_VERSION={actual_schema}")
+          print(f"CATALOG_HASH_MATCH={actual_hash == digest}")
+          print(f"CATALOG_SIZE_MATCH={actual_size == len(payload_bytes)}")
+          print(f"CATALOG_ENTRY_COUNT_MANIFEST={actual_manifest_count}")
+          print(f"CATALOG_ENTRY_COUNT_PAYLOAD={actual_payload_count}")
+          print(f"CATALOG_SECRET_SCAN={'FAIL' if secret_found else 'PASS'}")
+          print(f"CATALOG_FILE_URI_SCAN={'FAIL' if file_uri_found else 'PASS'}")
+          def require(label, expected, actual):
+              if expected != actual:
+                  raise AssertionError(f"{label}: expected={expected!r} actual={actual!r}")
+          require("schemaVersion", 1, actual_schema)
+          require("payloadSha256", digest, actual_hash)
+          require("payloadSizeBytes", len(payload_bytes), actual_size)
+          require("entryCount", actual_manifest_count, actual_payload_count)
+          require("secret scan", False, secret_found)
+          require("file URI scan", False, file_uri_found)
           PY
       - name: Upload validated catalog artifact
         uses: actions/upload-artifact@v4
