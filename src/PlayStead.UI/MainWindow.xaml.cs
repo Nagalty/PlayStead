@@ -975,10 +975,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var identity = new GameMediaIdentity(
-                installation.Provider,
-                installation.ExternalId,
-                game.Title);
+            var identity = GameMediaIdentityFactory.Create(game.GameId, installation, game.Title);
 
             return _gameMediaResolver.TryGetCachedPath(
                        identity,

@@ -44,10 +44,7 @@ public static class HomeEditorialProjector
             GameMediaIdentity? mediaIdentity = null;
             try
             {
-                mediaIdentity = new GameMediaIdentity(
-                    installation.Provider,
-                    installation.ExternalId,
-                    game.Title);
+                mediaIdentity = GameMediaIdentityFactory.Create(game.Id, installation, game.Title);
             }
             catch (ArgumentException)
             {

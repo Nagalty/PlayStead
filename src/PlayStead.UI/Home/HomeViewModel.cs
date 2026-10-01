@@ -1344,7 +1344,7 @@ public sealed class HomeViewModel :
 
         try
         {
-            return new GameMediaIdentity(installation.Provider, installation.ExternalId, game.Title);
+            return GameMediaIdentityFactory.Create(game.Id, installation, game.Title);
         }
         catch (ArgumentException)
         {

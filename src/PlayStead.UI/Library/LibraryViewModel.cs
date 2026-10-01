@@ -1153,11 +1153,7 @@ public sealed class LibraryViewModel :
             return;
         }
 
-        var identity =
-            new GameMediaIdentity(
-                installation.Provider,
-                installation.ExternalId,
-                item.Title);
+        var identity = GameMediaIdentityFactory.Create(item.GameId, installation, item.Title);
 
         await _mediaGate.WaitAsync(
             cancellationToken);
@@ -1301,11 +1297,7 @@ public sealed class LibraryViewModel :
             return;
         }
 
-        var identity =
-            new GameMediaIdentity(
-                installation.Provider,
-                installation.ExternalId,
-                item.Title);
+        var identity = GameMediaIdentityFactory.Create(item.GameId, installation, item.Title);
 
         await _mediaGate.WaitAsync(
             cancellationToken);
@@ -1662,11 +1654,7 @@ public sealed class LibraryViewModel :
             return;
         }
 
-        var identity =
-            new GameMediaIdentity(
-                installation.Provider,
-                installation.ExternalId,
-                item.Title);
+        var identity = GameMediaIdentityFactory.Create(item.GameId, installation, item.Title);
 
         item.SetCoverPath(
             _gameMediaResolver.TryGetCachedPath(
@@ -1683,11 +1671,7 @@ public sealed class LibraryViewModel :
             return;
         }
 
-        var identity =
-            new GameMediaIdentity(
-                installation.Provider,
-                installation.ExternalId,
-                item.Title);
+        var identity = GameMediaIdentityFactory.Create(item.GameId, installation, item.Title);
 
         item.SetLogoPath(
             _gameMediaResolver.TryGetCachedPath(

@@ -30,6 +30,25 @@ public sealed class ManualMediaIdentityBridgeTests
     }
 
     [Fact]
+    public async Task Manual_identity_uses_logical_game_id_when_installation_external_id_differs()
+    {
+        var game = GameId.New();
+        var installationExternalId = "manual:" + Guid.NewGuid().ToString("D");
+        var links = new LinkStore(new ManualMetadataLink(game, CatalogContentId.New(), new(ProviderKind.Steam, "3768760"), DateTimeOffset.UtcNow));
+        var inner = new RecordingResolver();
+        var bridge = new ManualMediaIdentityBridge(inner, links);
+        var installation = new GameInstallation(InstallationId.New(), game, ProviderKind.Manual, installationExternalId, @"H:\007 First Light", null, true, true, DateTimeOffset.UtcNow);
+
+        var identity = GameMediaIdentityFactory.Create(game, installation, "007 First Light");
+        await bridge.ResolveAndCacheAsync(identity, GameMediaAssetType.Cover, CancellationToken.None);
+
+        Assert.Equal($"manual:{game.Value:D}", identity.ProviderGameId);
+        Assert.NotEqual(installationExternalId, identity.ProviderGameId);
+        Assert.Equal(ProviderKind.Steam, inner.LastIdentity?.Provider);
+        Assert.Equal("3768760", inner.LastIdentity?.ProviderGameId);
+    }
+
+    [Fact]
     public async Task Manual_identity_resolves_through_persisted_steam_identity_without_changing_provider()
     {
         var game = GameId.New();

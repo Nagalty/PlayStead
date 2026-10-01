@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 
@@ -35,6 +36,9 @@ public sealed class ManualMediaIdentityBridge : IGameMediaResolver
         if (identity.Provider != ProviderKind.Manual)
             return identity;
         var link = _links.TryGetCached(ParseGameId(identity.ProviderGameId));
+        Trace.WriteLine(link?.MediaSource is null
+            ? $"[MEDIA-BRIDGE] Manual GameId={identity.ProviderGameId[7..]} Link=Missing"
+            : $"[MEDIA-BRIDGE] Manual GameId={identity.ProviderGameId[7..]} Link=Found Source={link.MediaSource.Provider}:{link.MediaSource.ExternalId}");
         return link?.MediaSource is null
             ? null
             : new GameMediaIdentity(link.MediaSource.Provider, link.MediaSource.ExternalId, identity.CanonicalTitle);
@@ -45,6 +49,9 @@ public sealed class ManualMediaIdentityBridge : IGameMediaResolver
         if (identity.Provider != ProviderKind.Manual)
             return identity;
         var link = await _links.GetAsync(ParseGameId(identity.ProviderGameId), cancellationToken).ConfigureAwait(false);
+        Trace.WriteLine(link?.MediaSource is null
+            ? $"[MEDIA-BRIDGE] Manual GameId={identity.ProviderGameId[7..]} Link=Missing"
+            : $"[MEDIA-BRIDGE] Manual GameId={identity.ProviderGameId[7..]} Link=Found Source={link.MediaSource.Provider}:{link.MediaSource.ExternalId}");
         return link?.MediaSource is null
             ? null
             : new GameMediaIdentity(link.MediaSource.Provider, link.MediaSource.ExternalId, identity.CanonicalTitle);

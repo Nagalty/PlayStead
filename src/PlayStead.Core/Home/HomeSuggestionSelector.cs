@@ -92,7 +92,7 @@ public sealed class HomeSuggestionSelector
             {
                 var game = games[installation.GameId];
                 GameMediaIdentity? media = null;
-                try { media = new GameMediaIdentity(installation.Provider, installation.ExternalId, game.Title); }
+                try { media = GameMediaIdentityFactory.Create(installation.GameId, installation, game.Title); }
                 catch (ArgumentException) { }
                 var gameMetadata = metadataByGame.TryGetValue(installation.GameId, out var values)
                     ? values.FirstOrDefault(value => value.Provider == installation.Provider && value.ProviderGameId == installation.ExternalId) ?? values.FirstOrDefault()

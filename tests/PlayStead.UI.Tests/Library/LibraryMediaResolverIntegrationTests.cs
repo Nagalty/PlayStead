@@ -137,6 +137,8 @@ public sealed class LibraryMediaResolverIntegrationTests
         Assert.Equal(1, resolver.ResolveAndCacheCalls);
         Assert.Equal(resolver.ResolvedPath, item.CoverPath);
         Assert.True(item.HasCover);
+        Assert.Equal(ProviderKind.Manual, resolver.LastResolvedIdentity?.Provider);
+        Assert.Equal($"manual:{item.GameId.Value:D}", resolver.LastResolvedIdentity?.ProviderGameId);
     }
 
     [Fact]
