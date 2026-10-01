@@ -350,6 +350,12 @@ public static class PlaySteadHost
             services.GetRequiredService<SteamLocalProviderActivitySource>());
         builder.Services.AddSingleton<ProviderActivityReconciliationService>();
         builder.Services.AddSingleton<IProviderGameMetadataStore, SqliteProviderGameMetadataStore>();
+        builder.Services.AddSingleton<IManualMetadataReconciliationService>(services =>
+            new ManualMetadataReconciliationService(
+                services.GetRequiredService<ILibraryStore>(),
+                services.GetRequiredService<ICanonicalCatalogStore>(),
+                services.GetRequiredService<IManualMetadataLinkStore>(),
+                services.GetRequiredService<IProviderGameMetadataStore>()));
         builder.Services.AddSingleton<PlayStead.Core.Modding.IModEvidenceStore, PlayStead.Data.Modding.SqliteModEvidenceStore>();
         builder.Services.AddSingleton<PlayStead.Core.Modding.IModEvidenceDetector, PlayStead.Providers.Steam.SteamWorkshopModEvidenceDetector>();
         builder.Services.AddSingleton<PlayStead.Core.Modding.IModEvidenceDetector, PlayStead.Providers.Steam.SteamGameSpecificModEvidenceDetector>();

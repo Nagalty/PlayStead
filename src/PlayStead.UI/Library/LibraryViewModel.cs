@@ -321,16 +321,6 @@ public sealed class LibraryViewModel :
                     DateTimeOffset.UtcNow),
                 cancellationToken);
         }
-        if (!string.Equals(match.CanonicalTitle, definition.Title, StringComparison.Ordinal) &&
-            _manualGameService is not null)
-        {
-            var canonicalDefinition = definition with { Title = match.CanonicalTitle };
-            installation = await _manualGameService.UpdateAsync(
-                installation.GameId,
-                canonicalDefinition,
-                cancellationToken) ?? installation;
-        }
-
         if (ProviderGameMetadataStore is not null)
         {
             await ProviderGameMetadataStore.UpsertAsync(

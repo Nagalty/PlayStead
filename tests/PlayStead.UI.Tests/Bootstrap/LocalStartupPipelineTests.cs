@@ -43,6 +43,25 @@ public sealed class LocalStartupPipelineTests : IDisposable
     }
 
     [Fact]
+    public async Task Initialize_runs_manual_reconciliation_after_canonical_sync_and_continues_when_it_reports_no_matches()
+    {
+        Directory.CreateDirectory(_root);
+        var options = new DatabaseOptions(Path.Combine(_root, "playstead.db"), Path.Combine(_root, "Backups"));
+        var order = new List<string>();
+        var sync = new RecordingCatalogSyncService(false, () => order.Add("sync"));
+        var reconciliation = new RecordingManualReconciliationService(() => order.Add("reconcile"));
+        var sut = new LocalStartupPipeline(
+            new DatabaseInitializer(options), new DatabaseHealthChecker(options),
+            new SqliteLibraryStore(options), new LocalScanCoordinator([]), sync, reconciliation);
+
+        var state = await sut.InitializeAsync(CancellationToken.None);
+
+        Assert.True(state.Health.IsHealthy);
+        Assert.Equal(["sync", "reconcile"], order);
+        Assert.Equal(1, reconciliation.CallCount);
+    }
+
+    [Fact]
     public async Task Initialize_then_refresh_exposes_cached_snapshot_before_applying_local_scan()
     {
         Directory.CreateDirectory(_root);
@@ -104,14 +123,27 @@ public sealed class LocalStartupPipelineTests : IDisposable
             Task.FromResult(result);
     }
 
-    private sealed class RecordingCatalogSyncService(bool result) : ICanonicalCatalogSyncService
+    private sealed class RecordingCatalogSyncService(bool result, Action? onCall = null) : ICanonicalCatalogSyncService
     {
         public int CallCount { get; private set; }
         public Task<bool> SyncAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             CallCount++;
+            onCall?.Invoke();
             return Task.FromResult(result);
+        }
+    }
+
+    private sealed class RecordingManualReconciliationService(Action? onCall = null) : IManualMetadataReconciliationService
+    {
+        public int CallCount { get; private set; }
+        public Task<ManualMetadataReconciliationResult> ReconcileAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CallCount++;
+            onCall?.Invoke();
+            return Task.FromResult(new ManualMetadataReconciliationResult(0, 0, 0));
         }
     }
 

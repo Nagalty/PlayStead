@@ -29,6 +29,7 @@ public sealed class LocalStartupPipeline
     private readonly SteamLocalCatalogBootstrapper?
         _steamLocalCatalogBootstrapper;
     private ICanonicalCatalogSyncService? _canonicalCatalogSyncService;
+    private IManualMetadataReconciliationService? _manualMetadataReconciliationService;
     private readonly StartupProgressState? _startupProgress;
     private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
     private readonly object _refreshRequestGate = new();
@@ -101,6 +102,19 @@ public sealed class LocalStartupPipeline
         DatabaseHealthChecker databaseHealthChecker,
         ILibraryStore libraryStore,
         LocalScanCoordinator scanCoordinator,
+        ICanonicalCatalogSyncService canonicalCatalogSyncService,
+        IManualMetadataReconciliationService manualMetadataReconciliationService)
+        : this(databaseInitializer, databaseHealthChecker, libraryStore, scanCoordinator, canonicalCatalogSyncService)
+    {
+        _manualMetadataReconciliationService = manualMetadataReconciliationService
+            ?? throw new ArgumentNullException(nameof(manualMetadataReconciliationService));
+    }
+
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
         ISteamReferenceRuntime steamReferenceRuntime,
         DiscoveryInventoryManager discoveryInventory,
         CatalogDatabaseInitializer catalogDatabaseInitializer,
@@ -108,7 +122,8 @@ public sealed class LocalStartupPipeline
         NotificationRetentionStartup notificationRetentionStartup,
         SteamLocalCatalogBootstrapper steamLocalCatalogBootstrapper,
         StartupProgressState startupProgress,
-        ICanonicalCatalogSyncService canonicalCatalogSyncService)
+        ICanonicalCatalogSyncService canonicalCatalogSyncService,
+        IManualMetadataReconciliationService manualMetadataReconciliationService)
         : this(databaseInitializer, databaseHealthChecker, libraryStore, scanCoordinator,
             steamReferenceRuntime, discoveryInventory, catalogDatabaseInitializer,
             identityResolutionCoordinator, notificationRetentionStartup,
@@ -116,6 +131,8 @@ public sealed class LocalStartupPipeline
     {
         _canonicalCatalogSyncService = canonicalCatalogSyncService
             ?? throw new ArgumentNullException(nameof(canonicalCatalogSyncService));
+        _manualMetadataReconciliationService = manualMetadataReconciliationService
+            ?? throw new ArgumentNullException(nameof(manualMetadataReconciliationService));
     }
 
     public LocalStartupPipeline(
@@ -242,6 +259,13 @@ public sealed class LocalStartupPipeline
         if (_canonicalCatalogSyncService is not null)
         {
             await StartupForensicTrace.MeasureAsync("CanonicalCatalogSync", () => _canonicalCatalogSyncService.SyncAsync(cancellationToken));
+        }
+
+        if (_manualMetadataReconciliationService is not null)
+        {
+            await StartupForensicTrace.MeasureAsync(
+                "ManualMetadataReconciliation",
+                () => _manualMetadataReconciliationService.ReconcileAsync(cancellationToken));
         }
 
         if (_notificationRetentionStartup is not null)
