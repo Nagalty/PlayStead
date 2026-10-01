@@ -7,6 +7,8 @@ public static class GameMediaIdentityFactory
     public static GameMediaIdentity Create(GameId gameId, GameInstallation installation, string title)
     {
         ArgumentNullException.ThrowIfNull(installation);
+        if (string.IsNullOrWhiteSpace(installation.ExternalId))
+            throw new ArgumentException("Installation must have an external identity.", nameof(installation));
         var providerGameId = installation.Provider == ProviderKind.Manual
             ? $"manual:{gameId.Value:D}"
             : installation.ExternalId;

@@ -2,6 +2,7 @@ using PlayStead.Core.Catalog;
 using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Steam;
+using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.UI.Library;
 using System.ComponentModel;
 using System.Runtime.ExceptionServices;
@@ -41,6 +42,37 @@ public sealed class GameDetailMetadataProjectionTests
         Assert.Null(vm.DeveloperDisplay);
         Assert.Null(vm.PublisherDisplay);
         Assert.Null(vm.ReleaseDateDisplay);
+    }
+
+    [Fact]
+    public async Task Genres_are_localized_in_the_ui_without_mutating_provider_metadata()
+    {
+        var gameId = GameId.New();
+        var sourceGenres = new[] { "Adventure", "Shooter", "Uncatalogued Genre" };
+        var metadata = ProviderGameMetadata.Create(
+            gameId,
+            ProviderKind.Manual,
+            $"manual:{gameId.Value:D}",
+            DateTimeOffset.UtcNow,
+            genres: sourceGenres);
+        var item = new LibraryItemViewModel(
+            gameId,
+            "007 First Light",
+            ProviderKind.Manual,
+            "Manuel",
+            @"H:\\007 First Light",
+            null);
+        var vm = new GameDetailViewModel(
+            item,
+            null,
+            null,
+            null,
+            providerGameMetadataStore: new FakeProviderMetadataStore(metadata));
+
+        await vm.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(["Aventure", "Tir", "Uncatalogued Genre"], vm.Genres);
+        Assert.Equal(sourceGenres, metadata.Genres);
     }
 
     [Fact]
@@ -137,5 +169,16 @@ public sealed class GameDetailMetadataProjectionTests
         public Task<IReadOnlyList<CatalogProviderRef>> GetProviderRefsAsync(CatalogContentId id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<CatalogAlias>> GetAliasesAsync(CatalogContentId id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<CatalogContentRelation>> GetRelationsFromAsync(CatalogContentId id, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeProviderMetadataStore(ProviderGameMetadata metadata) : IProviderGameMetadataStore
+    {
+        public Task<IReadOnlyList<ProviderGameMetadata>> GetAllAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ProviderGameMetadata>>([metadata]);
+
+        public Task<ProviderGameMetadata?> GetAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) =>
+            Task.FromResult<ProviderGameMetadata?>(metadata.GameId == gameId && metadata.Provider == provider ? metadata : null);
+
+        public Task UpsertAsync(ProviderGameMetadata metadata, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

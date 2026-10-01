@@ -1342,6 +1342,11 @@ public sealed class HomeViewModel :
             return null;
         }
 
+        if (!installation.IsPresent || string.IsNullOrWhiteSpace(installation.InstallPath))
+        {
+            return null;
+        }
+
         try
         {
             return GameMediaIdentityFactory.Create(game.Id, installation, game.Title);

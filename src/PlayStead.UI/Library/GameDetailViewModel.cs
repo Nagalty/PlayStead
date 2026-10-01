@@ -704,7 +704,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(ReleaseDateDisplay));
             OnPropertyChanged(nameof(HasReleaseDate));
         }
-        Genres = metadata.Genres ?? [];
+        // Keep provider/catalogue values untouched; only the UI projection is localized.
+        Genres = GenreDisplayLocalizer.LocalizeMany(metadata.Genres ?? []);
         GameModes = BuildGameModes(metadata);
         OnPropertyChanged(nameof(Genres));
         OnPropertyChanged(nameof(GameModes));

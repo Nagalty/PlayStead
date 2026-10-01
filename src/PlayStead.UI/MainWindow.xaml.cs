@@ -877,6 +877,11 @@ public partial class MainWindow : Window
                     break;
                 }
 
+                // A detail route can be opened without a prior card-load event.
+                // Request the same centralized Manual -> media bridge cover path so
+                // the cover can arrive while the detail view is already displayed.
+                _ = libraryViewModel.EnsureCoverAsync(game, CancellationToken.None);
+
                 var activity = CreateActivityModel(libraryViewModel, gameId);
                 var gameDetailViewModel = _sessionMonitor is null
                     ? new GameDetailViewModel(

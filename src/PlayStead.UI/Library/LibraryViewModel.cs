@@ -1946,7 +1946,7 @@ public sealed class LibraryViewModel :
             .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
         _genreFilterOptions = genres
-            .Select(value => CreateFilterOption(value, value, selectedGenres.Contains(value)))
+            .Select(value => CreateFilterOption(value, GenreDisplayLocalizer.Localize(value), selectedGenres.Contains(value)))
             .ToArray();
         OnPropertyChanged(nameof(ProviderFilterOptions));
         OnPropertyChanged(nameof(DriveFilterOptions));

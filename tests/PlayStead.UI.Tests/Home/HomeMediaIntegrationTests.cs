@@ -134,8 +134,8 @@ public sealed class HomeMediaIntegrationTests
             Session(f.B, 4, 5),
             Session(thirdGame, 3, 4)
         ];
-        f.Media.CachedPaths[("game-a", GameMediaAssetType.Hero)] = "game-a-hero.jpg";
-        f.Media.CachedPaths[("game-b", GameMediaAssetType.Header)] = "game-b-header.jpg";
+        f.Media.CachedPaths[($"manual:{f.A.Value:D}", GameMediaAssetType.Hero)] = "game-a-hero.jpg";
+        f.Media.CachedPaths[($"manual:{f.B.Value:D}", GameMediaAssetType.Header)] = "game-b-header.jpg";
 
         await f.Library.RefreshAsync(CancellationToken.None);
         await f.Sessions.RefreshAsync(CancellationToken.None);
@@ -386,7 +386,7 @@ public sealed class HomeMediaIntegrationTests
         f.Shortlist.Entries = [new(f.B, 0, Now)];
         f.Store.Games = [new(f.A, "Outriders", false, Now, Now), new(f.B, "Game B", false, Now, Now)];
         f.Store.Recent = [Session(f.A, -61 * 24 * 60, -60 * 24 * 60)];
-        f.Media.CachedPaths[("game-a", GameMediaAssetType.Hero)] = "dormant-hero.jpg";
+        f.Media.CachedPaths[($"manual:{f.A.Value:D}", GameMediaAssetType.Hero)] = "dormant-hero.jpg";
         var navigation = new NavigationService();
         var home = f.CreateWithLaunchService(
             new GameLaunchService(new RecordingLauncher()),
@@ -607,7 +607,7 @@ public sealed class HomeMediaIntegrationTests
             Value<string>(home, "ActiveSessionSupportingText"));
         var request = Assert.Single(f.Media.Requests);
         Assert.Equal(ProviderKind.Manual, request.Identity.Provider);
-        Assert.Equal("game-a", request.Identity.ProviderGameId);
+        Assert.Equal($"manual:{f.A.Value:D}", request.Identity.ProviderGameId);
         Assert.Equal("Game A", request.Identity.CanonicalTitle);
         Assert.Equal(GameMediaAssetType.Hero, request.Type);
     }
@@ -621,8 +621,8 @@ public sealed class HomeMediaIntegrationTests
         var home = f.Create();
         await Refresh(home);
         Assert.Equal(f.B.Value, Value<Guid?>(home, "ActiveSessionGameId"));
-        Assert.Contains(f.Media.Requests, request => request.Identity.ProviderGameId == "game-b");
-        Assert.Contains(f.Media.Requests, request => request.Identity.ProviderGameId == "game-a");
+        Assert.Contains(f.Media.Requests, request => request.Identity.ProviderGameId == $"manual:{f.B.Value:D}");
+        Assert.Contains(f.Media.Requests, request => request.Identity.ProviderGameId == $"manual:{f.A.Value:D}");
     }
 
     [Fact]
@@ -718,7 +718,7 @@ public sealed class HomeMediaIntegrationTests
         f.Store.Active = [Session(f.A, 1)];
         var a = new TaskCompletionSource<string?>();
         var b = new TaskCompletionSource<string?>();
-        f.Media.Resolve = identity => identity.ProviderGameId == "game-a" ? a.Task : b.Task;
+        f.Media.Resolve = identity => identity.ProviderGameId == $"manual:{f.A.Value:D}" ? a.Task : b.Task;
         var home = f.Create();
         var changed = new List<string?>();
         home.PropertyChanged += (_, eventArgs) => changed.Add(eventArgs.PropertyName);
