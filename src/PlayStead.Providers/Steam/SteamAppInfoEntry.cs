@@ -1,5 +1,13 @@
 namespace PlayStead.Providers.Steam;
 
+public sealed record SteamMediaAssetMetadata(
+    string? LibraryCapsuleHash,
+    string? Library600x900Hash)
+{
+    public string? LibraryAssetHash =>
+        Library600x900Hash ?? LibraryCapsuleHash;
+}
+
 public sealed record SteamAppInfoEntry(
     uint AppId,
     string? Developer,
@@ -14,4 +22,5 @@ public sealed record SteamAppInfoEntry(
     string? PublicBuildId = null,
     IReadOnlyDictionary<string, string>? PublicDepotManifests = null,
     string? Type = null,
-    IReadOnlyList<SteamLaunchConfiguration>? LaunchConfigurations = null);
+    IReadOnlyList<SteamLaunchConfiguration>? LaunchConfigurations = null,
+    SteamMediaAssetMetadata? MediaAssets = null);

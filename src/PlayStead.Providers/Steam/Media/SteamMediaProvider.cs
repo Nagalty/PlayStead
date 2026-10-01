@@ -9,6 +9,7 @@ public sealed class SteamMediaProvider : IGameMediaProvider
     private readonly SteamLocalMediaLocator _localLocator;
     private readonly ISteamMediaTransport _transport;
     private readonly ISteamStoreAppDetailsClient? _storeClient;
+    private readonly SteamAppInfoReader _appInfoReader;
     private readonly IMediaDiagnostics _diagnostics;
 
     public SteamMediaProvider(
@@ -16,7 +17,8 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         SteamLocalMediaLocator localLocator,
         ISteamMediaTransport transport,
         IMediaDiagnostics? diagnostics = null,
-        ISteamStoreAppDetailsClient? storeClient = null)
+        ISteamStoreAppDetailsClient? storeClient = null,
+        SteamAppInfoReader? appInfoReader = null)
     {
         ArgumentNullException.ThrowIfNull(rootLocator);
         ArgumentNullException.ThrowIfNull(localLocator);
@@ -26,6 +28,7 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         _localLocator = localLocator;
         _transport = transport;
         _storeClient = storeClient;
+        _appInfoReader = appInfoReader ?? new SteamAppInfoReader();
         _diagnostics = diagnostics ?? NoOpMediaDiagnostics.Instance;
     }
 
@@ -53,13 +56,17 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         }
 
         var steamRoot = _rootLocator.TryLocate();
+        var mediaAssets = steamRoot is null
+            ? null
+            : ReadMediaAssets(steamRoot, identity.ProviderGameId);
 
         if (steamRoot is not null)
         {
             var localCoverPath = _localLocator.TryLocate(
                 steamRoot,
                 identity.ProviderGameId,
-                assetType);
+                assetType,
+                mediaAssets?.LibraryAssetHash);
 
             if (localCoverPath is not null)
             {
@@ -88,6 +95,7 @@ public sealed class SteamMediaProvider : IGameMediaProvider
 
         var remoteCandidates = SteamMediaUriFactory.CreateCandidates(
             identity.ProviderGameId,
+            mediaAssets,
             assetType);
         if (assetType == GameMediaAssetType.Header && _storeClient is not null)
         {
@@ -120,6 +128,30 @@ public sealed class SteamMediaProvider : IGameMediaProvider
             assetType);
 
         return payload;
+    }
+
+    private SteamMediaAssetMetadata? ReadMediaAssets(
+        string steamRoot,
+        string appId)
+    {
+        if (!uint.TryParse(appId, out var parsedAppId))
+        {
+            return null;
+        }
+
+        try
+        {
+            return _appInfoReader.Find(
+                Path.Combine(steamRoot, "appcache", "appinfo.vdf"),
+                parsedAppId)?.MediaAssets;
+        }
+        catch (Exception ex) when (
+            ex is IOException
+            or UnauthorizedAccessException
+            or InvalidDataException)
+        {
+            return null;
+        }
     }
 
     private void Report(

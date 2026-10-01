@@ -104,6 +104,7 @@ public sealed class SteamAppInfoReader
         var categories = FindCollection(root, "categories");
         var type = FindCommonValue(root, "type");
         var launchConfigurations = FindLaunchConfigurations(root);
+        var mediaAssets = FindMediaAssets(root);
         var releaseDate = FindValue(root, "date");
         var releaseReported = FindNode(root, "release_date") is not null;
         var isFreeText = FindValue(root, "is_free");
@@ -127,7 +128,8 @@ public sealed class SteamAppInfoReader
             FindPathValue(root, "branches", "public", "buildid"),
             FindPublicDepotManifests(root),
             type,
-            launchConfigurations);
+            launchConfigurations,
+            mediaAssets);
     }
 
     private static string? Read(KVObject root, string key) =>
@@ -188,6 +190,27 @@ public sealed class SteamAppInfoReader
         }
 
         return result;
+    }
+
+    private static SteamMediaAssetMetadata? FindMediaAssets(KVObject root)
+    {
+        var common = root.TryGetValue("common", out var rawCommon) &&
+            rawCommon.ValueType == KVValueType.Collection
+            ? rawCommon
+            : null;
+        if (common is null ||
+            !common.TryGetValue("library_assets", out var rawAssets) ||
+            rawAssets.ValueType != KVValueType.Collection)
+        {
+            return null;
+        }
+
+        var capsuleHash = Read(rawAssets, "library_capsule");
+        var libraryHash = Read(rawAssets, "library_600x900")
+            ?? Read(rawAssets, "library_600x900_2x");
+        return string.IsNullOrWhiteSpace(capsuleHash) && string.IsNullOrWhiteSpace(libraryHash)
+            ? null
+            : new SteamMediaAssetMetadata(capsuleHash, libraryHash);
     }
 
     private static string? FindPathValue(KVObject root, params string[] path)

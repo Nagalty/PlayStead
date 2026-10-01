@@ -93,6 +93,23 @@ public sealed class SteamLocalMediaLocatorTests : IDisposable
     }
 
     [Fact]
+    public void TryLocate_prefers_the_appinfo_hash_directory_when_supplied()
+    {
+        var older = CreateNestedAsset("3768760", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "library_600x900_2x.jpg");
+        var preferred = CreateNestedAsset("3768760", "86d898447e0e475e3f8a9cc1ef660a80032472d7", "library_600x900_2x.jpg");
+        var locator = new SteamLocalMediaLocator();
+
+        Assert.Equal(
+            preferred,
+            locator.TryLocate(
+                _root,
+                "3768760",
+                GameMediaAssetType.Cover,
+                "86d898447e0e475e3f8a9cc1ef660a80032472d7"));
+        Assert.NotEqual(older, preferred);
+    }
+
+    [Fact]
     public void TryLocate_preserves_direct_then_flat_legacy_then_sorted_hash_priority()
     {
         var direct = CreateLocalAsset("1874880", "library_hero.jpg");

@@ -1,4 +1,5 @@
 using PlayStead.Core.Media;
+using PlayStead.Providers.Steam;
 
 namespace PlayStead.Providers.Steam.Media;
 
@@ -6,6 +7,12 @@ public static class SteamMediaUriFactory
 {
     public static IReadOnlyList<Uri> CreateCandidates(
         string appId,
+        GameMediaAssetType assetType)
+        => CreateCandidates(appId, mediaAssets: null, assetType);
+
+    public static IReadOnlyList<Uri> CreateCandidates(
+        string appId,
+        SteamMediaAssetMetadata? mediaAssets,
         GameMediaAssetType assetType)
     {
         if (!long.TryParse(appId, out var parsedAppId) ||
@@ -16,23 +23,29 @@ public static class SteamMediaUriFactory
                 nameof(appId));
         }
 
+        if (assetType == GameMediaAssetType.Cover)
+        {
+            var candidates = new List<Uri>();
+            var libraryHash = mediaAssets?.Library600x900Hash;
+            if (IsSafeHash(libraryHash))
+            {
+                AddModernCandidates(candidates, appId, libraryHash!,
+                    "library_600x900_2x.jpg", "library_600x900.jpg");
+            }
+
+            var capsuleHash = mediaAssets?.LibraryCapsuleHash;
+            if (IsSafeHash(capsuleHash))
+            {
+                AddModernCandidates(candidates, appId, capsuleHash!,
+                    "library_capsule_2x.jpg", "library_capsule.jpg");
+            }
+
+            candidates.AddRange(CreateLegacyCandidates(appId));
+            return candidates;
+        }
+
         return assetType switch
         {
-            GameMediaAssetType.Cover =>
-            [
-                new Uri(
-                    $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_capsule_2x.jpg",
-                    UriKind.Absolute),
-                new Uri(
-                    $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_capsule.jpg",
-                    UriKind.Absolute),
-                new Uri(
-                    $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900_2x.jpg",
-                    UriKind.Absolute),
-                new Uri(
-                    $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900.jpg",
-                    UriKind.Absolute)
-            ],
             GameMediaAssetType.Header =>
             [
                 new Uri(
@@ -58,4 +71,37 @@ public static class SteamMediaUriFactory
                 $"Steam media asset type '{assetType}' is not supported in this task.")
         };
     }
+
+    private static IReadOnlyList<Uri> CreateLegacyCandidates(string appId) =>
+    [
+        new Uri(
+            $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_capsule_2x.jpg",
+            UriKind.Absolute),
+        new Uri(
+            $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_capsule.jpg",
+            UriKind.Absolute),
+        new Uri(
+            $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900_2x.jpg",
+            UriKind.Absolute),
+        new Uri(
+            $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900.jpg",
+            UriKind.Absolute)
+    ];
+
+    private static void AddModernCandidates(
+        ICollection<Uri> candidates,
+        string appId,
+        string hash,
+        params string[] fileNames)
+    {
+        foreach (var fileName in fileNames)
+        {
+            candidates.Add(new Uri(
+                $"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{appId}/{hash}/{fileName}",
+                UriKind.Absolute));
+        }
+    }
+
+    private static bool IsSafeHash(string? value) =>
+        value is { Length: 40 } && value.All(Uri.IsHexDigit);
 }

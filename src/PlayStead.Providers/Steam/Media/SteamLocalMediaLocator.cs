@@ -8,6 +8,13 @@ public sealed class SteamLocalMediaLocator
         string steamRoot,
         string appId,
         GameMediaAssetType assetType)
+        => TryLocate(steamRoot, appId, assetType, preferredHash: null);
+
+    public string? TryLocate(
+        string steamRoot,
+        string appId,
+        GameMediaAssetType assetType,
+        string? preferredHash)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(steamRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(appId);
@@ -44,6 +51,20 @@ public sealed class SteamLocalMediaLocator
         var appDirectory = Path.Combine(
             libraryCacheRoot,
             appId);
+
+        if (IsSafeHash(preferredHash))
+        {
+            foreach (var filename in filenames)
+            {
+                var candidate = TryGetRegularFile(
+                    libraryCacheRoot,
+                    Path.Combine(appDirectory, preferredHash!, filename));
+                if (candidate is not null)
+                {
+                    return candidate;
+                }
+            }
+        }
 
         foreach (var filename in filenames)
         {
@@ -129,6 +150,9 @@ public sealed class SteamLocalMediaLocator
         return name.Length == 40 &&
                name.All(Uri.IsHexDigit);
     }
+
+    private static bool IsSafeHash(string? value) =>
+        value is { Length: 40 } && value.All(Uri.IsHexDigit);
 
     private static bool IsSafeDirectory(
         string root,

@@ -1,4 +1,5 @@
 using PlayStead.Core.Media;
+using PlayStead.Providers.Steam;
 using PlayStead.Providers.Steam.Media;
 
 namespace PlayStead.Providers.Tests.Steam.Media;
@@ -29,6 +30,26 @@ public sealed class SteamMediaUriFactoryTests
             uri => Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_capsule.jpg", uri.AbsoluteUri),
             uri => Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900_2x.jpg", uri.AbsoluteUri),
             uri => Assert.Equal("https://cdn.cloudflare.steamstatic.com/steam/apps/1874880/library_600x900.jpg", uri.AbsoluteUri));
+    }
+
+    [Fact]
+    public void CreateCandidates_Cover_uses_official_hash_for_modern_store_item_assets()
+    {
+        const string hash = "86d898447e0e475e3f8a9cc1ef660a80032472d7";
+        var candidates = SteamMediaUriFactory.CreateCandidates(
+            "3768760",
+            new SteamMediaAssetMetadata(hash, hash),
+            GameMediaAssetType.Cover);
+
+        Assert.Equal(
+            "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/3768760/86d898447e0e475e3f8a9cc1ef660a80032472d7/library_600x900_2x.jpg",
+            candidates[0].AbsoluteUri);
+        Assert.Contains(
+            candidates,
+            uri => uri.AbsoluteUri.EndsWith("/library_600x900.jpg", StringComparison.Ordinal));
+        Assert.Contains(
+            candidates,
+            uri => uri.AbsoluteUri.Contains("cdn.cloudflare.steamstatic.com/steam/apps/3768760", StringComparison.Ordinal));
     }
 
     [Fact]
