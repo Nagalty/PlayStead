@@ -15,6 +15,34 @@ public sealed class LocalStartupPipelineTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Fact]
+    public async Task Initialize_runs_canonical_sync_and_continues_when_sync_reports_offline()
+    {
+        Directory.CreateDirectory(_root);
+        var options = new DatabaseOptions(Path.Combine(_root, "playstead.db"), Path.Combine(_root, "Backups"));
+        var sync = new RecordingCatalogSyncService(false);
+        var sut = new LocalStartupPipeline(new DatabaseInitializer(options), new DatabaseHealthChecker(options), new SqliteLibraryStore(options), new LocalScanCoordinator([]), sync);
+
+        var state = await sut.InitializeAsync(CancellationToken.None);
+
+        Assert.True(state.Health.IsHealthy);
+        Assert.Equal(1, sync.CallCount);
+    }
+
+    [Fact]
+    public async Task Initialize_propagates_canonical_sync_cancellation()
+    {
+        Directory.CreateDirectory(_root);
+        var options = new DatabaseOptions(Path.Combine(_root, "playstead.db"), Path.Combine(_root, "Backups"));
+        var sync = new RecordingCatalogSyncService(false);
+        var sut = new LocalStartupPipeline(new DatabaseInitializer(options), new DatabaseHealthChecker(options), new SqliteLibraryStore(options), new LocalScanCoordinator([]), sync);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sut.InitializeAsync(cancellation.Token));
+        Assert.Equal(0, sync.CallCount);
+    }
+
+    [Fact]
     public async Task Initialize_then_refresh_exposes_cached_snapshot_before_applying_local_scan()
     {
         Directory.CreateDirectory(_root);
@@ -74,6 +102,17 @@ public sealed class LocalStartupPipelineTests : IDisposable
         public Task<SourceScanResult> ScanAsync(
             CancellationToken cancellationToken) =>
             Task.FromResult(result);
+    }
+
+    private sealed class RecordingCatalogSyncService(bool result) : ICanonicalCatalogSyncService
+    {
+        public int CallCount { get; private set; }
+        public Task<bool> SyncAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CallCount++;
+            return Task.FromResult(result);
+        }
     }
 
     public void Dispose()

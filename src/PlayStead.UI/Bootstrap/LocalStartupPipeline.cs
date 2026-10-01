@@ -28,6 +28,7 @@ public sealed class LocalStartupPipeline
         _notificationRetentionStartup;
     private readonly SteamLocalCatalogBootstrapper?
         _steamLocalCatalogBootstrapper;
+    private ICanonicalCatalogSyncService? _canonicalCatalogSyncService;
     private readonly StartupProgressState? _startupProgress;
     private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
     private readonly object _refreshRequestGate = new();
@@ -81,6 +82,40 @@ public sealed class LocalStartupPipeline
         _steamLocalCatalogBootstrapper = steamLocalCatalogBootstrapper
             ?? throw new ArgumentNullException(nameof(steamLocalCatalogBootstrapper));
         _startupProgress = startupProgress ?? throw new ArgumentNullException(nameof(startupProgress));
+    }
+
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
+        ICanonicalCatalogSyncService canonicalCatalogSyncService)
+        : this(databaseInitializer, databaseHealthChecker, libraryStore, scanCoordinator)
+    {
+        _canonicalCatalogSyncService = canonicalCatalogSyncService
+            ?? throw new ArgumentNullException(nameof(canonicalCatalogSyncService));
+    }
+
+    public LocalStartupPipeline(
+        DatabaseInitializer databaseInitializer,
+        DatabaseHealthChecker databaseHealthChecker,
+        ILibraryStore libraryStore,
+        LocalScanCoordinator scanCoordinator,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        DiscoveryInventoryManager discoveryInventory,
+        CatalogDatabaseInitializer catalogDatabaseInitializer,
+        ILocalIdentityResolutionCoordinator identityResolutionCoordinator,
+        NotificationRetentionStartup notificationRetentionStartup,
+        SteamLocalCatalogBootstrapper steamLocalCatalogBootstrapper,
+        StartupProgressState startupProgress,
+        ICanonicalCatalogSyncService canonicalCatalogSyncService)
+        : this(databaseInitializer, databaseHealthChecker, libraryStore, scanCoordinator,
+            steamReferenceRuntime, discoveryInventory, catalogDatabaseInitializer,
+            identityResolutionCoordinator, notificationRetentionStartup,
+            steamLocalCatalogBootstrapper, startupProgress)
+    {
+        _canonicalCatalogSyncService = canonicalCatalogSyncService
+            ?? throw new ArgumentNullException(nameof(canonicalCatalogSyncService));
     }
 
     public LocalStartupPipeline(
@@ -202,6 +237,11 @@ public sealed class LocalStartupPipeline
         if (_catalogDatabaseInitializer is not null)
         {
             await StartupForensicTrace.MeasureAsync("CatalogDatabase", () => _catalogDatabaseInitializer.InitializeAsync(cancellationToken));
+        }
+
+        if (_canonicalCatalogSyncService is not null)
+        {
+            await StartupForensicTrace.MeasureAsync("CanonicalCatalogSync", () => _canonicalCatalogSyncService.SyncAsync(cancellationToken));
         }
 
         if (_notificationRetentionStartup is not null)
