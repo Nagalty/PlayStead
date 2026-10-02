@@ -264,6 +264,77 @@ public sealed class GameDetailActivityTests
         detail.Deactivate();
     });
 
+    [Fact]
+    public void Cover_changes_are_relayed_only_while_detail_is_active()
+    {
+        var item = Item(Guid.NewGuid());
+        var detail = new GameDetailViewModel(item, launch: null, activity: null);
+        var changed = new List<string?>();
+        detail.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        detail.Activate();
+        item.SetCoverPath(@"C:\Cache\cover.jpg");
+
+        Assert.Contains(nameof(GameDetailViewModel.CoverPath), changed);
+        Assert.Contains(nameof(GameDetailViewModel.HasCover), changed);
+        Assert.True(detail.HasCover);
+
+        changed.Clear();
+        detail.Deactivate();
+        item.SetCoverPath(null);
+
+        Assert.Empty(changed);
+    }
+
+    [Fact]
+    public void Reactivating_detail_does_not_duplicate_cover_notifications()
+    {
+        var item = Item(Guid.NewGuid());
+        var detail = new GameDetailViewModel(item, launch: null, activity: null);
+        var coverChanges = 0;
+        detail.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(GameDetailViewModel.CoverPath))
+                coverChanges++;
+        };
+
+        detail.Activate();
+        detail.Deactivate();
+        detail.Activate();
+        item.SetCoverPath(@"C:\Cache\cover.jpg");
+
+        Assert.Equal(1, coverChanges);
+        detail.Deactivate();
+    }
+
+    [Fact]
+    public void Session_game_replacement_rebinds_cover_notifications()
+    {
+        PlaySteadWpfTestResources.Run(() =>
+        {
+            var gameId = Guid.NewGuid();
+            var oldItem = Item(gameId);
+            var monitor = new SessionMonitor(new NoopRuntime(), SessionMonitorOptions.Default, (_, _) => Task.CompletedTask);
+            var detail = new GameDetailViewModel(oldItem, null, null, null, monitor, () => Task.CompletedTask);
+            var changed = new List<string?>();
+            detail.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+            detail.Activate();
+            Publish(monitor, new SessionRuntimeSnapshot(DateTimeOffset.UtcNow,
+                [new GameSession(Guid.NewGuid(), gameId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null,
+                    SessionState.Active, null, SessionDetectionSource.ProcessMonitor, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)]));
+
+            changed.Clear();
+            oldItem.SetCoverPath(@"C:\Cache\old.jpg");
+            Assert.DoesNotContain(nameof(GameDetailViewModel.CoverPath), changed);
+
+            changed.Clear();
+            detail.Game.SetCoverPath(@"C:\Cache\new.jpg");
+            Assert.Contains(nameof(GameDetailViewModel.CoverPath), changed);
+            detail.Deactivate();
+        });
+    }
+
     private static LibraryItemViewModel Item(Guid gameId) =>
         new(
             new GameId(gameId),

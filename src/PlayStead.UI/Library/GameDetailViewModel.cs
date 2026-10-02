@@ -28,6 +28,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly SessionMonitor? _sessionMonitor;
     private readonly Func<Task>? _refreshActivityAsync;
     private bool _isActive;
+    private bool _isGamePropertySubscriptionActive;
     private readonly ICanonicalCatalogStore? _catalogStore;
     private readonly IGamesDuMomentService? _gamesDuMomentService;
     private readonly IProviderGameMetadataStore? _providerGameMetadataStore;
@@ -735,24 +736,81 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
 
     public void Activate()
     {
-        if (_isActive || _sessionMonitor is null)
+        if (_isActive)
         {
             return;
         }
 
         _isActive = true;
-        _sessionMonitor.SnapshotUpdated += SessionMonitor_OnSnapshotUpdated;
+        SubscribeToGameProperties();
+        if (_sessionMonitor is not null)
+        {
+            _sessionMonitor.SnapshotUpdated += SessionMonitor_OnSnapshotUpdated;
+        }
     }
 
     public void Deactivate()
     {
-        if (!_isActive || _sessionMonitor is null)
+        if (!_isActive && !_isGamePropertySubscriptionActive)
         {
             return;
         }
 
         _isActive = false;
-        _sessionMonitor.SnapshotUpdated -= SessionMonitor_OnSnapshotUpdated;
+        if (_sessionMonitor is not null)
+        {
+            _sessionMonitor.SnapshotUpdated -= SessionMonitor_OnSnapshotUpdated;
+        }
+        UnsubscribeFromGameProperties();
+    }
+
+    private void SubscribeToGameProperties()
+    {
+        if (_isGamePropertySubscriptionActive)
+        {
+            return;
+        }
+
+        Game.PropertyChanged += Game_OnPropertyChanged;
+        _isGamePropertySubscriptionActive = true;
+    }
+
+    private void UnsubscribeFromGameProperties()
+    {
+        if (!_isGamePropertySubscriptionActive)
+        {
+            return;
+        }
+
+        Game.PropertyChanged -= Game_OnPropertyChanged;
+        _isGamePropertySubscriptionActive = false;
+    }
+
+    private void Game_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(LibraryItemViewModel.CoverPath)
+            or nameof(LibraryItemViewModel.HasCover))
+        {
+            OnPropertyChanged(e.PropertyName);
+        }
+    }
+
+    private void ReplaceGame(LibraryItemViewModel game)
+    {
+        var previous = Game;
+        if (ReferenceEquals(previous, game))
+        {
+            return;
+        }
+
+        if (_isGamePropertySubscriptionActive)
+        {
+            previous.PropertyChanged -= Game_OnPropertyChanged;
+            game.PropertyChanged += Game_OnPropertyChanged;
+        }
+
+        Game = game;
+        OnPropertyChanged(nameof(Game));
     }
 
     private async void SessionMonitor_OnSnapshotUpdated(SessionRuntimeSnapshot snapshot)
@@ -775,8 +833,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             return;
         }
 
-        Game = Game with { IsSessionActive = isSessionActive };
-        OnPropertyChanged(nameof(Game));
+        ReplaceGame(Game with { IsSessionActive = isSessionActive });
         OnPropertyChanged(nameof(SessionStatusLabel));
 
         if (_refreshActivityAsync is not null)
