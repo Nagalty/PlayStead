@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.Globalization;
 using PlayStead.Core.Library;
 using PlayStead.Data.Database;
 using PlayStead.Platform.Paths;
@@ -10,37 +8,6 @@ namespace PlayStead.UI.Tests.Bootstrap;
 
 public sealed class ApplicationStartupCoordinatorTests
 {
-    [Fact]
-    public async Task Initial_refresh_forensic_trace_brackets_the_refresh_operation()
-    {
-        using var output = new StringWriter(CultureInfo.InvariantCulture);
-        using var listener = new TextWriterTraceListener(output);
-        var previousAutoFlush = Trace.AutoFlush;
-        Trace.Listeners.Add(listener);
-        Trace.AutoFlush = true;
-
-        try
-        {
-            var probe = new StartupProbe();
-            probe.ProgressState.Begin();
-            var sut = new ApplicationStartupCoordinator(probe.CreateOperations());
-
-            await sut.StartAsync([], CancellationToken.None);
-
-            listener.Flush();
-            var lines = output.ToString().Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
-            var begin = Array.FindIndex(lines, line => line.Contains(" Event=RefreshAndApply.Begin", StringComparison.Ordinal));
-            var end = Array.FindIndex(lines, line => line.Contains(" Event=RefreshAndApply.End", StringComparison.Ordinal));
-            Assert.True(begin >= 0, "The initial refresh BEGIN forensic marker was not emitted.");
-            Assert.True(end > begin, "The initial refresh END forensic marker must follow BEGIN.");
-        }
-        finally
-        {
-            Trace.Listeners.Remove(listener);
-            Trace.AutoFlush = previousAutoFlush;
-        }
-    }
-
     [Fact]
     public async Task Forwarded_stops_after_gate_without_touching_user_data_host_database_or_scan()
     {
@@ -188,6 +155,7 @@ public sealed class ApplicationStartupCoordinatorTests
         var sut = new ApplicationStartupCoordinator(probe.CreateOperations());
 
         var result = await sut.StartAsync([], CancellationToken.None);
+        try { await sut.BackgroundRefreshTask!; } catch (InvalidOperationException) { }
 
         Assert.Equal(ApplicationStartupCoordinator.StartResult.Started, result);
         Assert.Equal(1, probe.RefreshRunCount);
@@ -514,6 +482,37 @@ public sealed class ApplicationStartupCoordinatorTests
 
             previousIndex = index;
         }
+    }
+
+    [Fact]
+    public async Task Initial_refresh_runs_heavy_work_off_the_calling_thread_before_apply()
+    {
+        var callerThread = Environment.CurrentManagedThreadId;
+        var refreshThread = 0;
+        var applied = false;
+        var probe = new StartupProbe();
+        probe.RefreshBehavior = _ =>
+        {
+            refreshThread = Environment.CurrentManagedThreadId;
+            return Task.FromResult(probe.FreshSnapshot);
+        };
+        var operations = probe.CreateOperations() with
+        {
+            ApplySnapshotOnUiAsync = (snapshot, _) =>
+            {
+                applied = true;
+                probe.AppliedSnapshot = snapshot;
+                return Task.CompletedTask;
+            }
+        };
+
+        var sut = new ApplicationStartupCoordinator(operations);
+        await sut.StartAsync([], CancellationToken.None);
+        await sut.BackgroundRefreshTask!;
+
+        Assert.NotEqual(callerThread, refreshThread);
+        Assert.True(applied);
+        Assert.Same(probe.FreshSnapshot, probe.AppliedSnapshot);
     }
 
     private static async Task WaitForAsync(

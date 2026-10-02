@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -68,6 +69,12 @@ public sealed class LibraryViewModel :
         new();
 
     private SessionMonitor? _sessionMonitor;
+    private readonly CancellationTokenSource _sessionProjectionCancellation = new();
+    private readonly object _sessionProjectionGate = new();
+    private SessionProjectionRequest? _pendingSessionProjection;
+    private Task? _sessionProjectionTask;
+    private int _sessionProjectionGeneration;
+    private int _disposed;
 
     private IReadOnlyList<LibraryItemViewModel> _items =
         Array.Empty<LibraryItemViewModel>();
@@ -863,6 +870,18 @@ public sealed class LibraryViewModel :
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        Interlocked.Increment(ref _sessionProjectionGeneration);
+        _sessionProjectionCancellation.Cancel();
+        lock (_sessionProjectionGate)
+        {
+            _pendingSessionProjection = null;
+        }
+
         if (_attentionService is not null)
             _attentionService.Changed -= AttentionServiceOnChanged;
         if (_sessionMonitor is not null)
@@ -1774,6 +1793,11 @@ public sealed class LibraryViewModel :
     private void SessionMonitor_OnSnapshotUpdated(
         SessionRuntimeSnapshot snapshot)
     {
+        if (Volatile.Read(ref _disposed) != 0)
+        {
+            return;
+        }
+
         if (_uiDispatcher is not null)
         {
             if (_uiDispatcher.HasShutdownStarted ||
@@ -1792,22 +1816,147 @@ public sealed class LibraryViewModel :
             }
         }
 
-        var activeGameIds =
-            ActiveGameIds(
-                snapshot);
+        var itemsSnapshot = Items;
+        var generation = Interlocked.Increment(ref _sessionProjectionGeneration);
+        var cancellationToken = _sessionProjectionCancellation.Token;
+        lock (_sessionProjectionGate)
+        {
+            _pendingSessionProjection = new SessionProjectionRequest(
+                snapshot,
+                itemsSnapshot,
+                generation);
 
-        Items =
-            Items
+            if (_sessionProjectionTask is null)
+            {
+                _sessionProjectionTask = Task.Run(
+                    async () =>
+                    {
+                        await Task.Yield();
+                        ProcessSessionProjectionQueue();
+                    },
+                    cancellationToken);
+            }
+        }
+    }
+
+    private void ProcessSessionProjectionQueue()
+    {
+        var cancellationToken = _sessionProjectionCancellation.Token;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            SessionProjectionRequest? request;
+            lock (_sessionProjectionGate)
+            {
+                request = _pendingSessionProjection;
+                _pendingSessionProjection = null;
+                if (request is null)
+                {
+                    _sessionProjectionTask = null;
+                    return;
+                }
+            }
+
+            ProjectSessionSnapshot(
+                request.Snapshot,
+                request.Items,
+                request.Generation,
+                cancellationToken);
+        }
+
+        lock (_sessionProjectionGate)
+        {
+            _sessionProjectionTask = null;
+            _pendingSessionProjection = null;
+        }
+    }
+
+    private void ProjectSessionSnapshot(
+        SessionRuntimeSnapshot snapshot,
+        IReadOnlyList<LibraryItemViewModel> itemsSnapshot,
+        int generation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var activeGameIds = ActiveGameIds(snapshot);
+            var projectedItems = itemsSnapshot
                 .Select(
                     item =>
                         item with
                         {
                             IsSessionActive =
-                                activeGameIds.Contains(
-                                    item.GameId)
+                                activeGameIds.Contains(item.GameId)
                         })
                 .ToArray();
+
+            if (cancellationToken.IsCancellationRequested ||
+                generation != Volatile.Read(ref _sessionProjectionGeneration) ||
+                Volatile.Read(ref _disposed) != 0)
+            {
+                return;
+            }
+
+            if (_uiDispatcher is null)
+            {
+                ApplySessionProjection(
+                    itemsSnapshot,
+                    projectedItems,
+                    generation);
+                return;
+            }
+
+            if (_uiDispatcher.HasShutdownStarted ||
+                _uiDispatcher.HasShutdownFinished)
+            {
+                return;
+            }
+
+            _uiDispatcher.BeginInvoke(
+                () =>
+                    ApplySessionProjection(
+                        itemsSnapshot,
+                        projectedItems,
+                        generation),
+                DispatcherPriority.DataBind);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            // Disposal/cancellation is an expected end for this projection.
+        }
+        catch (Exception exception)
+        {
+            Trace.WriteLine(
+                $"[SESSION-PROJECTION] failed type={exception.GetType().Name} message={exception.Message}");
+        }
     }
+
+    private void ApplySessionProjection(
+        IReadOnlyList<LibraryItemViewModel> itemsSnapshot,
+        IReadOnlyList<LibraryItemViewModel> projectedItems,
+        int generation)
+    {
+        if (Volatile.Read(ref _disposed) != 0 ||
+            generation != Volatile.Read(ref _sessionProjectionGeneration) ||
+            !ReferenceEquals(Items, itemsSnapshot))
+        {
+            return;
+        }
+
+        if (!Items
+            .Select(item => item.IsSessionActive)
+            .SequenceEqual(projectedItems.Select(item => item.IsSessionActive)))
+        {
+            Items = projectedItems;
+        }
+    }
+
+    private sealed record SessionProjectionRequest(
+        SessionRuntimeSnapshot Snapshot,
+        IReadOnlyList<LibraryItemViewModel> Items,
+        int Generation);
 
     private void ReconcileSelectedItem()
     {

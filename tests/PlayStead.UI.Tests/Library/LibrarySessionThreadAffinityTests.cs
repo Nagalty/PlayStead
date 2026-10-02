@@ -28,16 +28,40 @@ public sealed class LibrarySessionThreadAffinityTests
         new(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Background_snapshots_reach_MainWindow_on_UI_thread_in_order_without_blocking_monitor()
+    public Task Snapshot_publication_returns_before_library_projection_is_applied() =>
+        PlaySteadWpfTestResources.RunAsync(async () =>
     {
-        PlaySteadWpfTestResources.Run(() =>
-        {
+            using var monitor = CreateMonitor(new CancellationTokenSource());
+            var library = new LibraryViewModel(new LibraryStore(), monitor);
+            await library.RefreshAsync(CancellationToken.None);
+
+            Assert.False(Assert.Single(library.Items).IsSessionActive);
+
+            var applied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            library.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(LibraryViewModel.Items))
+                    applied.TrySetResult();
+            };
+
+            PublishSnapshot(monitor, CreateSnapshot(GameId));
+
+            // The snapshot callback must not perform the projection inline on the UI thread.
+            Assert.False(Assert.Single(library.Items).IsSessionActive);
+
+            await applied.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.True(Assert.Single(library.Items).IsSessionActive);
+        });
+
+    [Fact]
+    public Task Background_snapshots_reach_MainWindow_on_UI_thread_without_blocking_monitor() =>
+        PlaySteadWpfTestResources.RunAsync(async () =>
+    {
             var dispatcher = Dispatcher.CurrentDispatcher;
-            using var cancellation = new CancellationTokenSource();
-            using var monitor = CreateMonitor(cancellation);
+            using var monitor = CreateMonitor(new CancellationTokenSource());
             var store = new LibraryStore();
             var library = new LibraryViewModel(store, monitor);
-            library.RefreshAsync(CancellationToken.None).GetAwaiter().GetResult();
+            await library.RefreshAsync(CancellationToken.None);
             library.SelectGame(Assert.Single(library.Items));
 
             var navigation = new NavigationService();
@@ -58,8 +82,8 @@ public sealed class LibrarySessionThreadAffinityTests
                 navigation.Navigate(new NavigationRequest(AppRoute.Library));
                 var view = Assert.IsType<LibraryView>(
                     Assert.IsType<ContentControl>(window.FindName("MainContent")).Content);
-                var observedStates = new List<bool>();
                 var notificationThreads = new List<bool>();
+                var activeProjectionApplied = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 library.PropertyChanged += (_, e) =>
                 {
                     // Check every notification, not only the selected-item callback.
@@ -70,22 +94,22 @@ public sealed class LibrarySessionThreadAffinityTests
                         Assert.Equal(GameId, selected.GameId);
                         Assert.Same(Assert.Single(library.Items), selected);
                         Assert.Same(selected, view.QuickPanelViewModel!.Game);
-                        observedStates.Add(selected.IsSessionActive);
+                        if (selected.IsSessionActive)
+                            activeProjectionApplied.TrySetResult();
                     }
                 };
 
-                // The UI deliberately does not pump until both background publications finish.
-                // A synchronous Dispatcher.Invoke would deadlock here and hit the timeout.
-                Task.Run(() => monitor.RunAsync(cancellation.Token))
-                    .WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
-                dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                // The monitor can publish faster than the UI applies projections; the latest
+                // snapshot wins while every applied notification remains on the UI thread.
+                await Task.Run(() => PublishSnapshot(monitor, CreateSnapshot(GameId)));
+                await activeProjectionApplied.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                await Task.Run(() => PublishSnapshot(monitor, new SessionRuntimeSnapshot(Now.AddSeconds(2), [])));
+                await Task.Delay(100);
 
                 Assert.NotEmpty(notificationThreads);
                 Assert.All(notificationThreads, onUiThread => Assert.True(onUiThread));
-                Assert.Equal(new[] { true, false }, observedStates);
                 Assert.False(Assert.Single(library.Items).IsSessionActive);
                 Assert.Equal("Test Game", library.SelectedItem!.Title);
-                Assert.Empty(monitor.LatestSnapshot!.ActiveSessions);
             }
             finally
             {
@@ -94,7 +118,6 @@ public sealed class LibrarySessionThreadAffinityTests
                 if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
             }
         });
-    }
 
     private static SessionMonitor CreateMonitor(CancellationTokenSource cancellation)
     {
@@ -109,6 +132,23 @@ public sealed class LibrarySessionThreadAffinityTests
             if (++publications == 2) cancellation.Cancel();
             return Task.CompletedTask;
         });
+    }
+
+    private static void PublishSnapshot(SessionMonitor monitor, SessionRuntimeSnapshot snapshot)
+    {
+        var handlers = (Action<SessionRuntimeSnapshot>?)typeof(SessionMonitor)
+            .GetField("SnapshotUpdated", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(monitor);
+        Assert.NotNull(handlers);
+        handlers!(snapshot);
+    }
+
+    private static SessionRuntimeSnapshot CreateSnapshot(GameId activeGameId)
+    {
+        var session = new GameSession(Guid.NewGuid(), activeGameId.Value,
+            Now, Now, null, SessionState.Active, null,
+            SessionDetectionSource.ProcessMonitor, Now, Now);
+        return new SessionRuntimeSnapshot(Now, [session]);
     }
 
     private sealed class SnapshotRuntime(Queue<SessionRuntimeSnapshot> snapshots) : ISessionRuntime

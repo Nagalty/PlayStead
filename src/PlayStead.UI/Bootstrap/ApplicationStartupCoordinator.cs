@@ -210,6 +210,9 @@ public sealed class ApplicationStartupCoordinator
         {
             if (_stopping)
                 return Task.FromCanceled(new CancellationToken(canceled: true));
+            var existing = _refreshTasks.FirstOrDefault(task => !task.IsCompleted);
+            if (existing is not null)
+                return existing;
             _refreshTasks.Add(completion.Task);
         }
         _ = CompleteRefreshAndApplyAsync(completion, cancellationToken);
@@ -220,10 +223,11 @@ public sealed class ApplicationStartupCoordinator
         TaskCompletionSource completion,
         CancellationToken cancellationToken)
     {
-        StartupForensicTrace.Write("RefreshAndApply.Begin");
         try
         {
-            var snapshot = await _operations.RefreshAsync(cancellationToken);
+            var snapshot = await Task.Run(
+                () => _operations.RefreshAsync(cancellationToken),
+                cancellationToken);
             await _operations.ApplySnapshotOnUiAsync(snapshot, cancellationToken);
             completion.TrySetResult();
         }
@@ -237,7 +241,6 @@ public sealed class ApplicationStartupCoordinator
         }
         finally
         {
-            StartupForensicTrace.Write("RefreshAndApply.End");
             lock (_lifecycleGate)
                 _refreshTasks.Remove(completion.Task);
         }

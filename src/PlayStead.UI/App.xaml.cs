@@ -293,10 +293,6 @@ public partial class App : Application
                     await RunOnUiAsync(
                         async () =>
                         {
-                            await GetRequiredService<LibraryViewModel>()
-                                .RefreshAsync(
-                                    cancellationToken);
-
                             await GetRequiredService<SessionViewModel>()
                                 .RefreshAsync(
                                     cancellationToken);

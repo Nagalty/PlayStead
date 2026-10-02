@@ -215,9 +215,20 @@ public sealed class LibrarySessionIndicatorTests
                         firstGameId),
                 "IsSessionActive"));
 
+        var projectionApplied = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(LibraryViewModel.Items))
+            {
+                projectionApplied.TrySetResult();
+            }
+        };
+
         PublishSnapshot(
             monitor,
             secondGameId);
+        await projectionApplied.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.False(
             ReadRequiredBool(
