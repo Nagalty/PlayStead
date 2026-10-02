@@ -48,7 +48,13 @@ public sealed class GameDetailMetadataProjectionTests
     public async Task Genres_are_localized_in_the_ui_without_mutating_provider_metadata()
     {
         var gameId = GameId.New();
-        var sourceGenres = new[] { "Adventure", "Shooter", "Uncatalogued Genre" };
+        var sourceGenres = new[]
+        {
+            "Strategy",
+            "Tactical",
+            "Turn-based strategy (TBS)",
+            "Uncatalogued Genre"
+        };
         var metadata = ProviderGameMetadata.Create(
             gameId,
             ProviderKind.Manual,
@@ -71,8 +77,17 @@ public sealed class GameDetailMetadataProjectionTests
 
         await vm.LoadAsync(CancellationToken.None);
 
-        Assert.Equal(["Aventure", "Tir", "Uncatalogued Genre"], vm.Genres);
+        Assert.Equal(
+            ["Stratégie", "Tactique", "Stratégie au tour par tour", "Uncatalogued Genre"],
+            vm.Genres);
         Assert.Equal(sourceGenres, metadata.Genres);
+    }
+
+    [Fact]
+    public void Genre_localizer_keeps_case_insensitivity_and_trimmed_unknown_fallback()
+    {
+        Assert.Equal("Tactique", GenreDisplayLocalizer.Localize("  tAcTiCaL "));
+        Assert.Equal("Genre inédit", GenreDisplayLocalizer.Localize("  Genre inédit "));
     }
 
     [Fact]

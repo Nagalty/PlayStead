@@ -11,6 +11,8 @@ internal static class GenreDisplayLocalizer
             ["RPG"] = "RPG",
             ["Simulation"] = "Simulation",
             ["Strategy"] = "Stratégie",
+            ["Tactical"] = "Tactique",
+            ["Turn-based strategy (TBS)"] = "Stratégie au tour par tour",
             ["Sports"] = "Sports",
             ["Racing"] = "Course",
             ["Casual"] = "Occasionnel",
