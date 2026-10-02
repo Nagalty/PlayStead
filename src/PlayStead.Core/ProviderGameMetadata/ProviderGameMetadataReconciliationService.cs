@@ -19,14 +19,14 @@ public sealed class ProviderGameMetadataReconciliationService
 
     public async Task RefreshAsync(LibrarySnapshot snapshot, CancellationToken cancellationToken)
     {
-        var previous = await _store.GetAllAsync(cancellationToken);
+        var previous = await _store.GetAllAsync(cancellationToken).ConfigureAwait(false);
         var changed = false;
         foreach (var source in _sources)
         {
             IReadOnlyList<ProviderGameMetadataPatch> patches;
             try
             {
-                patches = await source.GetAsync(snapshot, cancellationToken);
+                patches = await source.GetAsync(snapshot, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -45,7 +45,7 @@ public sealed class ProviderGameMetadataReconciliationService
                 var semanticChanged = old is null || !SemanticEquals(old, merged);
                 if (old is not null && !semanticChanged)
                     merged = merged with { RefreshedAtUtc = patch.Availability == ProviderGameMetadataAvailability.Unknown ? old.RefreshedAtUtc : DateTimeOffset.UtcNow };
-                await _store.UpsertAsync(merged, cancellationToken);
+                await _store.UpsertAsync(merged, cancellationToken).ConfigureAwait(false);
                 if (semanticChanged) changed = true;
             }
         }

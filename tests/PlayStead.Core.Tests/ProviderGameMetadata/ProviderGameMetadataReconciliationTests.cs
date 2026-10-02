@@ -55,6 +55,23 @@ public sealed class ProviderGameMetadataReconciliationTests
         Assert.Equal("Known description", store.Value!.ShortDescription);
     }
 
+    [Fact]
+    public async Task Provider_failure_isolated_and_later_source_still_reconciles()
+    {
+        var game = GameId.New();
+        var store = new Store(null);
+        var patch = Patch(game, ProviderField<IReadOnlyList<string>>.FromValue(["Action"]));
+        var sut = new ProviderGameMetadataReconciliationService(
+            store,
+            [new ThrowingSource(), new Source(patch)]);
+
+        await sut.RefreshAsync(new LibrarySnapshot([], []), CancellationToken.None);
+
+        Assert.NotNull(store.Value);
+        Assert.Equal("1", store.Value!.ProviderGameId);
+        Assert.Equal(["Action"], store.Value.Genres);
+    }
+
     private static ProviderGameMetadataPatch Patch(GameId game, ProviderField<IReadOnlyList<string>> genres) =>
         new(game, ProviderKind.Steam, "1", genres, ProviderField<IReadOnlyList<string>>.NotReported,
             ProviderField<IReadOnlyList<string>>.NotReported, ProviderField<IReadOnlyList<string>>.NotReported,
@@ -68,7 +85,17 @@ public sealed class ProviderGameMetadataReconciliationTests
         public Task<IReadOnlyList<ProviderGameMetadataPatch>> GetAsync(LibrarySnapshot _, CancellationToken __) => Task.FromResult<IReadOnlyList<ProviderGameMetadataPatch>>([patch]);
     }
 
-    private sealed class Store(Metadata value) : IProviderGameMetadataStore
+    private sealed class ThrowingSource : IProviderGameMetadataSource
+    {
+        public ProviderKind Provider => ProviderKind.Steam;
+
+        public Task<IReadOnlyList<ProviderGameMetadataPatch>> GetAsync(
+            LibrarySnapshot _,
+            CancellationToken __) =>
+            throw new InvalidOperationException("provider fixture failure");
+    }
+
+    private sealed class Store(Metadata? value) : IProviderGameMetadataStore
     {
         public Metadata? Value { get; set; } = value;
         public Task<IReadOnlyList<Metadata>> GetAllAsync(CancellationToken _) => Task.FromResult<IReadOnlyList<Metadata>>(Value is null ? [] : [Value]);

@@ -1,13 +1,16 @@
 using System.Reflection;
 using System.Globalization;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.Platform.Paths;
 using PlayStead.UI.Bootstrap;
 using PlayStead.UI.Home;
 using PlayStead.UI.Library;
 using PlayStead.UI.Navigation;
 using PlayStead.UI.Sessions;
+using PlayStead.UI.Tests.TestSupport;
 
 namespace PlayStead.UI.Tests.Home;
 
@@ -27,6 +30,33 @@ public sealed class HomeViewModelTests :
         Assert.Null(HomeViewModel.FormatBuildChangeText(0));
         Assert.Equal("1 mise à jour depuis ta dernière partie", HomeViewModel.FormatBuildChangeText(1));
         Assert.Equal("3 mises à jour depuis ta dernière partie", HomeViewModel.FormatBuildChangeText(3));
+    }
+
+    [Fact]
+    public async Task Metadata_progress_from_worker_is_marshaled_to_the_ui_dispatcher()
+    {
+        await PlaySteadWpfTestResources.RunAsync(async () =>
+        {
+            using var host = BuildHost();
+            var sut = CreateViewModel(host, host.Services.GetRequiredService<NavigationService>());
+            var callback = typeof(HomeViewModel).GetMethod(
+                "ProviderGameMetadataProgress_OnChanged",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(callback);
+
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            foreach (var progress in new[]
+            {
+                new ProviderGameMetadataProgress(true, 25, 0, 0, 0),
+                new ProviderGameMetadataProgress(true, 25, 8, 8, 0),
+                new ProviderGameMetadataProgress(false, 25, 25, 25, 0)
+            })
+            {
+                await Task.Run(() => callback!.Invoke(sut, [null, progress]));
+                dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
+                Assert.Equal($"{progress.Completed} / {progress.Total}", sut.MetadataProgressLabel);
+            }
+        });
     }
 
     [Fact]

@@ -24,7 +24,7 @@ public sealed class SteamStoreGameMetadataSource : IProviderGameMetadataSource, 
     public event EventHandler<ProviderGameMetadataProgress>? ProgressChanged;
     public async Task<IReadOnlyList<ProviderGameMetadataPatch>> GetAsync(LibrarySnapshot snapshot, CancellationToken cancellationToken)
     {
-        var persisted = (await _store.GetAllAsync(cancellationToken)).Where(x => x.Provider == ProviderKind.Steam).ToDictionary(x => (x.GameId, x.Provider), x => x);
+        var persisted = (await _store.GetAllAsync(cancellationToken).ConfigureAwait(false)).Where(x => x.Provider == ProviderKind.Steam).ToDictionary(x => (x.GameId, x.Provider), x => x);
         var eligibleIds = _eligibleSnapshot?.EligibleExternalIds;
         var installations = snapshot.Installations
             .Where(x => x.Provider == ProviderKind.Steam && x.IsPresent)
@@ -42,13 +42,13 @@ public sealed class SteamStoreGameMetadataSource : IProviderGameMetadataSource, 
         var tasks = candidateGroups.Select(async group =>
         {
             Interlocked.Increment(ref requested);
-            await gate.WaitAsync(cancellationToken);
+            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 SteamStoreAppDetails? details;
                 try
                 {
-                    details = await _client.GetAsync(group.Key, cancellationToken);
+                        details = await _client.GetAsync(group.Key, cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -77,7 +77,7 @@ public sealed class SteamStoreGameMetadataSource : IProviderGameMetadataSource, 
                 gate.Release();
             }
         }).ToArray();
-        var result = (await Task.WhenAll(tasks)).SelectMany(x => x).ToArray();
+        var result = (await Task.WhenAll(tasks).ConfigureAwait(false)).SelectMany(x => x).ToArray();
         System.Diagnostics.Trace.WriteLine($"[STARTUP-STORE] Requested={requested} Successful={successful} Failed={failed} Timeout=see-client-trace");
         PublishProgress(new ProviderGameMetadataProgress(false, candidateGroups.Length, candidateGroups.Length, successful, failed));
         return result;

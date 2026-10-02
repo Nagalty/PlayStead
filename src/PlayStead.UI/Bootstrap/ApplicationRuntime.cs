@@ -91,6 +91,19 @@ public sealed class ApplicationRuntime
         _steamLiveRefresh.SetRefresh(RefreshAsync);
     }
 
+    public ApplicationRuntime(
+        LocalStartupPipeline startupPipeline,
+        LibraryViewModel libraryViewModel,
+        IAppInvocationHandler invocationHandler,
+        ProviderActivityReconciliationService providerActivity,
+        ILibraryStore libraryStore,
+        ProviderGameMetadataReconciliationService providerGameMetadata,
+        ProviderGameMetadataOnlineReconciliationService onlineProviderGameMetadata)
+        : this(startupPipeline, libraryViewModel, invocationHandler, providerActivity, libraryStore, providerGameMetadata)
+    {
+        _onlineProviderGameMetadata = onlineProviderGameMetadata;
+    }
+
     public async Task<DatabaseHealthResult> InitializeAsync(
         CancellationToken cancellationToken)
     {
@@ -169,18 +182,24 @@ public sealed class ApplicationRuntime
             if (_onlineRefreshTask is { IsCompleted: false })
                 return;
 
-            _onlineRefreshTask = RunPostReadyEnrichmentAsync(cancellationToken);
+            System.Diagnostics.Trace.WriteLine(
+                $"[POST-READY] Caller Thread={Environment.CurrentManagedThreadId}");
+            _onlineRefreshTask = Task.Run(
+                () => RunPostReadyEnrichmentAsync(cancellationToken),
+                CancellationToken.None);
         }
     }
 
     private async Task RunPostReadyEnrichmentAsync(CancellationToken cancellationToken)
     {
+        System.Diagnostics.Trace.WriteLine(
+            $"[POST-READY] MetadataEnrichment START Thread={Environment.CurrentManagedThreadId} IsThreadPool={Thread.CurrentThread.IsThreadPoolThread}");
         try
         {
-            var snapshot = await _libraryStore!.LoadSnapshotAsync(cancellationToken);
+            var snapshot = await _libraryStore!.LoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
             await StartupForensicTrace.MeasureAsync(
                 "PostReady.ProviderGameMetadata",
-                () => _onlineProviderGameMetadata!.RefreshAsync(snapshot, cancellationToken));
+                () => _onlineProviderGameMetadata!.RefreshAsync(snapshot, cancellationToken)).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -188,6 +207,11 @@ public sealed class ApplicationRuntime
         catch (Exception exception)
         {
             System.Diagnostics.Trace.WriteLine($"[STARTUP-STORE] PostReadyFailure Type={exception.GetType().Name}");
+        }
+        finally
+        {
+            System.Diagnostics.Trace.WriteLine(
+                $"[POST-READY] MetadataEnrichment END Thread={Environment.CurrentManagedThreadId} IsThreadPool={Thread.CurrentThread.IsThreadPoolThread}");
         }
     }
 

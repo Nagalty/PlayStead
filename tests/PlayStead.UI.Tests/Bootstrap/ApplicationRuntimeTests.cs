@@ -3,6 +3,7 @@ using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
 using PlayStead.Core.ProviderActivity;
+using PlayStead.Core.ProviderGameMetadata;
 using PlayStead.Data.Database;
 using PlayStead.Data.Library;
 using PlayStead.Platform.SingleInstance;
@@ -170,6 +171,81 @@ public sealed class ApplicationRuntimeTests : IDisposable
         Assert.Equal(2, source.Calls);
     }
 
+    [Fact]
+    public async Task Post_ready_enrichment_runs_off_caller_thread_and_is_single_flight()
+    {
+        Directory.CreateDirectory(_root);
+        var options = new DatabaseOptions(
+            Path.Combine(_root, "playstead.db"),
+            Path.Combine(_root, "Backups"));
+        var initializer = new DatabaseInitializer(options);
+        await initializer.InitializeAsync(CancellationToken.None);
+        var library = new SqliteLibraryStore(options);
+        var pipeline = new LocalStartupPipeline(
+            initializer,
+            new DatabaseHealthChecker(options),
+            library,
+            new LocalScanCoordinator(Array.Empty<ILocalLibrarySource>()));
+        var source = new BlockingMetadataSource();
+        var metadataStore = new MemoryMetadataStore();
+        var online = new ProviderGameMetadataOnlineReconciliationService(metadataStore, [source]);
+        var progress = new List<ProviderGameMetadataProgress>();
+        online.ProgressChanged += (_, value) => progress.Add(value);
+        var runtime = new ApplicationRuntime(
+            pipeline,
+            new LibraryViewModel(library),
+            new RecordingInvocationHandler(),
+            new ProviderActivityReconciliationService(new MemoryActivityStore(), Array.Empty<IProviderActivityMetadataSource>()),
+            library,
+            new ProviderGameMetadataReconciliationService(metadataStore, Array.Empty<IProviderGameMetadataSource>()),
+            online);
+
+        var callerThread = Environment.CurrentManagedThreadId;
+        runtime.StartPostReadyEnrichment(CancellationToken.None);
+        runtime.StartPostReadyEnrichment(CancellationToken.None);
+
+        await source.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.NotEqual(callerThread, source.WorkerThreadId);
+        Assert.Equal(1, source.CallCount);
+        Assert.False(source.Completed.Task.IsCompleted);
+
+        source.Gate.TrySetResult(true);
+        await source.Completed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Contains(progress, value => value.Total == 25 && value.Completed == 0);
+        Assert.Contains(progress, value => value.Total == 25 && value.Completed == 8);
+        Assert.Contains(progress, value => value.Total == 25 && value.Completed == 25);
+    }
+
+    [Fact]
+    public async Task Post_ready_cancellation_stops_background_work_without_user_exception()
+    {
+        Directory.CreateDirectory(_root);
+        var options = new DatabaseOptions(Path.Combine(_root, "playstead.db"), Path.Combine(_root, "Backups"));
+        var initializer = new DatabaseInitializer(options);
+        await initializer.InitializeAsync(CancellationToken.None);
+        var library = new SqliteLibraryStore(options);
+        var pipeline = new LocalStartupPipeline(initializer, new DatabaseHealthChecker(options), library,
+            new LocalScanCoordinator(Array.Empty<ILocalLibrarySource>()));
+        var source = new BlockingMetadataSource();
+        var metadataStore = new MemoryMetadataStore();
+        var online = new ProviderGameMetadataOnlineReconciliationService(metadataStore, [source]);
+        var runtime = new ApplicationRuntime(
+            pipeline,
+            new LibraryViewModel(library),
+            new RecordingInvocationHandler(),
+            new ProviderActivityReconciliationService(new MemoryActivityStore(), Array.Empty<IProviderActivityMetadataSource>()),
+            library,
+            new ProviderGameMetadataReconciliationService(metadataStore, Array.Empty<IProviderGameMetadataSource>()),
+            online);
+        using var cancellation = new CancellationTokenSource();
+
+        runtime.StartPostReadyEnrichment(cancellation.Token);
+        await source.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        cancellation.Cancel();
+
+        await source.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    }
+
     private sealed class StubSource(
         SourceScanResult result) : ILocalLibrarySource
     {
@@ -215,6 +291,66 @@ public sealed class ApplicationRuntimeTests : IDisposable
                 new ProviderActivityMetadata(installation.GameId, ProviderKind.Steam, installation.ExternalId,
                     null, DateTimeOffset.UtcNow.AddDays(-60), DateTimeOffset.UtcNow,
                     ProviderActivityAvailability.Complete)]);
+        }
+    }
+
+    private sealed class BlockingMetadataSource : IProviderGameMetadataSource, IProviderGameMetadataProgress
+    {
+        public ProviderKind Provider => ProviderKind.Steam;
+        public TaskCompletionSource<bool> Started { get; } = NewSignal();
+        public TaskCompletionSource<bool> Gate { get; } = NewSignal();
+        public TaskCompletionSource<bool> Completed { get; } = NewSignal();
+        public TaskCompletionSource<bool> Cancelled { get; } = NewSignal();
+        public int CallCount { get; private set; }
+        public int WorkerThreadId { get; private set; }
+        public ProviderGameMetadataProgress Current { get; private set; } = new(false, 0, 0, 0, 0);
+        public event EventHandler<ProviderGameMetadataProgress>? ProgressChanged;
+
+        public async Task<IReadOnlyList<ProviderGameMetadataPatch>> GetAsync(
+            LibrarySnapshot snapshot,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            WorkerThreadId = Environment.CurrentManagedThreadId;
+            Publish(new ProviderGameMetadataProgress(true, 25, 0, 0, 0));
+            Started.TrySetResult(true);
+            try
+            {
+                await Gate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                Cancelled.TrySetResult(true);
+                throw;
+            }
+            Publish(new ProviderGameMetadataProgress(true, 25, 8, 8, 0));
+            Publish(new ProviderGameMetadataProgress(false, 25, 25, 25, 0));
+            Completed.TrySetResult(true);
+            return [];
+        }
+
+        private void Publish(ProviderGameMetadataProgress progress)
+        {
+            Current = progress;
+            ProgressChanged?.Invoke(this, progress);
+        }
+
+        private static TaskCompletionSource<bool> NewSignal() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class MemoryMetadataStore : IProviderGameMetadataStore
+    {
+        private readonly List<ProviderGameMetadata> _items = [];
+        public Task<IReadOnlyList<ProviderGameMetadata>> GetAllAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ProviderGameMetadata>>(_items.ToArray());
+        public Task<ProviderGameMetadata?> GetAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) =>
+            Task.FromResult(_items.FirstOrDefault(item => item.GameId == gameId && item.Provider == provider));
+        public Task UpsertAsync(ProviderGameMetadata metadata, CancellationToken cancellationToken)
+        {
+            _items.RemoveAll(item => item.GameId == metadata.GameId && item.Provider == metadata.Provider);
+            _items.Add(metadata);
+            return Task.CompletedTask;
         }
     }
 

@@ -18,14 +18,14 @@ public sealed class SqliteProviderGameMetadataStore : IProviderGameMetadataStore
 
     public async Task<Metadata?> GetAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken)
     {
-        var values = await ReadAsync(gameId, provider, cancellationToken);
+        var values = await ReadAsync(gameId, provider, cancellationToken).ConfigureAwait(false);
         return values.FirstOrDefault();
     }
 
     public async Task UpsertAsync(Metadata metadata, CancellationToken cancellationToken)
     {
-        await using var connection = await OpenAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         var command = connection.CreateCommand();
         command.Transaction = (SqliteTransaction)transaction;
         command.CommandText = """
@@ -71,13 +71,13 @@ public sealed class SqliteProviderGameMetadataStore : IProviderGameMetadataStore
         command.Parameters.AddWithValue("$online_multiplayer_max_players", (object?)metadata.OnlineMultiplayerMaxPlayers ?? DBNull.Value);
         command.Parameters.AddWithValue("$offline_coop_max_players", (object?)metadata.OfflineCoopMaxPlayers ?? DBNull.Value);
         command.Parameters.AddWithValue("$offline_multiplayer_max_players", (object?)metadata.OfflineMultiplayerMaxPlayers ?? DBNull.Value);
-        await command.ExecuteNonQueryAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyList<Metadata>> ReadAsync(GameId? gameId, ProviderKind? provider, CancellationToken cancellationToken)
     {
-        await using var connection = await OpenAsync(cancellationToken);
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var command = connection.CreateCommand();
         command.CommandText = "SELECT game_id, provider, provider_game_id, genres_json, categories_json, developers_json, publishers_json, release_date, is_free, single_player, multi_player, online_coop, local_coop, refreshed_utc, availability, short_description, online_coop_max_players, online_multiplayer_max_players, offline_coop_max_players, offline_multiplayer_max_players FROM provider_game_metadata";
         if (gameId is not null && provider is not null)
@@ -88,8 +88,8 @@ public sealed class SqliteProviderGameMetadataStore : IProviderGameMetadataStore
         }
         command.CommandText += " ORDER BY game_id, provider;";
         var result = new List<Metadata>();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             result.Add(Metadata.Create(
                 new GameId(Guid.Parse(reader.GetString(0))), (ProviderKind)reader.GetInt32(1), reader.GetString(2),
@@ -115,7 +115,7 @@ public sealed class SqliteProviderGameMetadataStore : IProviderGameMetadataStore
     private async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
     {
         var connection = new SqliteConnection($"Data Source={_options.DatabasePath};Pooling=False");
-        await connection.OpenAsync(cancellationToken);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         return connection;
     }
 }
