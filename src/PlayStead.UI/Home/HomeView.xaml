@@ -393,14 +393,24 @@
                                        TextWrapping="Wrap"
                                        TextTrimming="CharacterEllipsis" />
                             <StackPanel Orientation="Horizontal"
-                                        Visibility="{Binding HasSuggestion, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        Visibility="{Binding HasSuggestionCapability, Converter={StaticResource BooleanToVisibilityConverter}}"
                                         Margin="0,0,0,10">
                                 <Path Width="24"
                                       Height="18"
-                                      Data="{DynamicResource PlayStead.Icon.People}"
                                       Fill="{DynamicResource PlayStead.Brush.TextSecondary}"
                                       Stretch="Uniform"
-                                      VerticalAlignment="Center" />
+                                      VerticalAlignment="Center">
+                                    <Path.Style>
+                                        <Style TargetType="Path">
+                                            <Setter Property="Data" Value="{DynamicResource PlayStead.Icon.People}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SuggestionCapabilityKind}" Value="Solo">
+                                                    <Setter Property="Data" Value="{DynamicResource PlayStead.Icon.Person}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
                                 <TextBlock Text="{Binding SuggestionCapabilityText}"
                                            Margin="8,0,0,0"
                                            Style="{DynamicResource PlayStead.Text.BodySecondary}" />

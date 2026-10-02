@@ -46,11 +46,21 @@ public sealed class HomeViewStructureTests
             (string?)element.Attribute(xaml + "Name") == "SuggestionGameCard");
 
         var coopIcon = Assert.Single(card.Descendants(presentation + "Path"), element =>
-            ((string?)element.Attribute("Data"))?.Contains("PlayStead.Icon.People", StringComparison.Ordinal) == true);
+            element.Descendants(presentation + "DataTrigger").Any(trigger =>
+                (string?)trigger.Attribute("Binding") == "{Binding SuggestionCapabilityKind}" &&
+                (string?)trigger.Attribute("Value") == "Solo"));
         Assert.Equal("24", (string?)coopIcon.Attribute("Width"));
         Assert.Equal("18", (string?)coopIcon.Attribute("Height"));
         Assert.Equal("{DynamicResource PlayStead.Brush.TextSecondary}", (string?)coopIcon.Attribute("Fill"));
         Assert.Equal("Center", (string?)coopIcon.Attribute("VerticalAlignment"));
+        Assert.Equal("{Binding HasSuggestionCapability, Converter={StaticResource BooleanToVisibilityConverter}}",
+            (string?)coopIcon.Parent?.Attribute("Visibility"));
+        Assert.Contains(coopIcon.Descendants(presentation + "Setter"), element =>
+            (string?)element.Attribute("Property") == "Data" &&
+            (string?)element.Attribute("Value") == "{DynamicResource PlayStead.Icon.People}");
+        Assert.Contains(coopIcon.Descendants(presentation + "Setter"), element =>
+            (string?)element.Attribute("Property") == "Data" &&
+            (string?)element.Attribute("Value") == "{DynamicResource PlayStead.Icon.Person}");
         Assert.Contains(card.Descendants(presentation + "TextBlock"), element =>
             (string?)element.Attribute("Text") == "{Binding SuggestionCapabilityText}" &&
             (string?)element.Attribute("Margin") == "8,0,0,0");
