@@ -69,6 +69,7 @@ public partial class MainWindow : Window
     private readonly UserDefinedLocalArtifactService? _userDefinedArtifactService;
     private readonly ILocalArtifactComparisonService? _localArtifactComparisonService;
     private readonly IGraphicsTechnologyDetectionService? _graphicsTechnologyDetectionService;
+    private GameDetailViewModel? _activeGameDetailViewModel;
     private LibraryUiState? _libraryStateBeforeGameDetail;
 
     public MainWindow()
@@ -609,6 +610,17 @@ public partial class MainWindow : Window
                 UpdateQuickPanel();
         }
 
+        if (e.PropertyName == nameof(LibraryViewModel.ProviderMetadataByGame) &&
+            _activeGameDetailViewModel is not null &&
+            _navigationService.CurrentRoute == AppRoute.GameDetail)
+        {
+            void RefreshActiveDetail() => _ = _activeGameDetailViewModel.LoadAsync(CancellationToken.None);
+            if (Dispatcher.CheckAccess())
+                RefreshActiveDetail();
+            else
+                _ = Dispatcher.BeginInvoke(RefreshActiveDetail);
+        }
+
         if (e.PropertyName == nameof(LibraryViewModel.SelectedItem))
         {
             UpdateQuickPanel();
@@ -904,7 +916,8 @@ public partial class MainWindow : Window
                         libraryViewModel.ModEvidenceStore,
                         _userDefinedArtifactService,
                         _localArtifactComparisonService,
-                        _graphicsTechnologyDetectionService)
+                        _graphicsTechnologyDetectionService,
+                        libraryViewModel.ManualMetadataLinkStore)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -926,7 +939,10 @@ public partial class MainWindow : Window
                         libraryViewModel.ModEvidenceStore,
                         _userDefinedArtifactService,
                         _localArtifactComparisonService,
-                        _graphicsTechnologyDetectionService);
+                        _graphicsTechnologyDetectionService,
+                        libraryViewModel.ManualMetadataLinkStore);
+
+                _activeGameDetailViewModel = gameDetailViewModel;
 
                 if (game.Provider == ProviderKind.Manual)
                 {

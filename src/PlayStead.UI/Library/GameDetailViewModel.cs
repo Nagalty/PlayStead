@@ -32,6 +32,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly ICanonicalCatalogStore? _catalogStore;
     private readonly IGamesDuMomentService? _gamesDuMomentService;
     private readonly IProviderGameMetadataStore? _providerGameMetadataStore;
+    private readonly IManualMetadataLinkStore? _manualMetadataLinkStore;
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
     private readonly IGameLocalArtifactDiscoveryService? _localArtifactDiscoveryService;
     private readonly IArtifactFingerprintService? _artifactFingerprintService;
@@ -85,7 +86,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         IModEvidenceStore? modEvidenceStore = null,
         UserDefinedLocalArtifactService? userDefinedArtifactService = null,
         ILocalArtifactComparisonService? localArtifactComparisonService = null,
-        IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null)
+        IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null,
+        IManualMetadataLinkStore? manualMetadataLinkStore = null)
     {
         ArgumentNullException.ThrowIfNull(
             game);
@@ -129,6 +131,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         _catalogStore = catalogStore;
         _gamesDuMomentService = gamesDuMomentService;
         _providerGameMetadataStore = providerGameMetadataStore;
+        _manualMetadataLinkStore = manualMetadataLinkStore;
         _gameBuildHistoryService = gameBuildHistoryService;
         _localArtifactDiscoveryService = localArtifactDiscoveryService;
         _artifactFingerprintService = artifactFingerprintService;
@@ -181,8 +184,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         IModEvidenceStore? modEvidenceStore = null,
         UserDefinedLocalArtifactService? userDefinedArtifactService = null,
         ILocalArtifactComparisonService? localArtifactComparisonService = null,
-        IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null)
-        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService, localArtifactComparisonService, graphicsTechnologyDetectionService)
+        IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null,
+        IManualMetadataLinkStore? manualMetadataLinkStore = null)
+        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService, localArtifactComparisonService, graphicsTechnologyDetectionService, manualMetadataLinkStore)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -246,7 +250,17 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(GamesDuMomentActionLabel));
         }
         if (_providerGameMetadataStore is not null)
-            ApplyProviderMetadata(await _providerGameMetadataStore.GetAsync(GameId, Game.Provider, cancellationToken));
+        {
+            var baseMetadata = await _providerGameMetadataStore.GetAsync(GameId, Game.Provider, cancellationToken);
+            var enrichment = Game.Provider == ProviderKind.Manual
+                ? await _providerGameMetadataStore.GetAsync(GameId, ProviderKind.Steam, cancellationToken)
+                : null;
+            var currentMediaSource = Game.Provider == ProviderKind.Manual && _manualMetadataLinkStore is not null
+                ? (await _manualMetadataLinkStore.GetAsync(GameId, cancellationToken))?.MediaSource
+                : null;
+            if (baseMetadata is not null || enrichment is not null)
+                ApplyProviderMetadata(ProviderGameMetadataComposer.Compose(baseMetadata, enrichment, currentMediaSource));
+        }
         if (_modEvidenceStore is not null)
         {
             ModState = ModEvidenceAggregation.GetState(await _modEvidenceStore.GetByGameAsync(GameId, cancellationToken));

@@ -1,4 +1,5 @@
 using PlayStead.Core.Library;
+using PlayStead.Core.Catalog;
 using PlayStead.Core.Notifications;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.Scanning;
@@ -185,6 +186,25 @@ public sealed class LibraryFilterAndSortTests
     }
 
     [Fact]
+    public async Task Manual_library_projection_uses_current_linked_steam_metadata()
+    {
+        var game = GameId.New();
+        var metadata = new FakeProviderMetadataStore(
+            ProviderGameMetadata.Create(game, ProviderKind.Manual, "manual:game", DateTimeOffset.UtcNow, developers: ["Canonical"]),
+            ProviderGameMetadata.Create(game, ProviderKind.Steam, "2075800", DateTimeOffset.UtcNow, genres: ["Adventure"], publishers: ["Steam"]));
+        var links = new FakeManualMetadataLinkStore(new ManualMetadataLink(game, CatalogContentId.New(), new(ProviderKind.Steam, "2075800"), DateTimeOffset.UtcNow));
+
+        var library = await LoadWithMetadata(
+            [(game, "Manual Game", "Manual", @"C:\\Manual")], metadata, links);
+
+        var effective = Assert.Single(library.ProviderMetadataByGame);
+        Assert.Equal(ProviderKind.Manual, effective.Value.Provider);
+        Assert.Equal(["Adventure"], effective.Value.Genres);
+        Assert.Equal(["Canonical"], effective.Value.Developers);
+        Assert.Equal(["Steam"], effective.Value.Publishers);
+    }
+
+    [Fact]
     public async Task Capability_filters_use_or_and_unknown_capabilities_do_not_match()
     {
         var solo = GameId.New();
@@ -309,13 +329,16 @@ public sealed class LibraryFilterAndSortTests
 
     private static async Task<LibraryViewModel> LoadWithMetadata(
         (GameId Id, string Title, string Provider, string Path)[] games,
-        FakeProviderMetadataStore metadataStore)
+        FakeProviderMetadataStore metadataStore,
+        IManualMetadataLinkStore? links = null)
     {
         var now = DateTimeOffset.UtcNow;
         var snapshot = new LibrarySnapshot(
             games.Select(game => new LogicalGame(game.Id, game.Title, false, now, now)).ToArray(),
             games.Select(game => new GameInstallation(InstallationId.New(), game.Id, Enum.Parse<ProviderKind>(game.Provider), "123456", game.Path, null, true, true, now)).ToArray());
-        var library = new LibraryViewModel(new StubLibraryStore(snapshot), metadataStore);
+        var library = links is null
+            ? new LibraryViewModel(new StubLibraryStore(snapshot), metadataStore)
+            : new LibraryViewModel(new StubLibraryStore(snapshot), metadataStore, links);
         await library.RefreshAsync(CancellationToken.None);
         return library;
     }
@@ -399,5 +422,13 @@ public sealed class LibraryFilterAndSortTests
         public Task<ProviderGameMetadata?> GetAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) =>
             Task.FromResult<ProviderGameMetadata?>(values.FirstOrDefault(value => value.GameId == gameId && value.Provider == provider));
         public Task UpsertAsync(ProviderGameMetadata metadata, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class FakeManualMetadataLinkStore(ManualMetadataLink? link) : IManualMetadataLinkStore
+    {
+        public Task<ManualMetadataLink?> GetAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult(link?.ManualGameId == gameId ? link : null);
+        public Task UpsertAsync(ManualMetadataLink link, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task RemoveAsync(GameId gameId, CancellationToken cancellationToken) => Task.CompletedTask;
+        public ManualMetadataLink? TryGetCached(GameId gameId) => link?.ManualGameId == gameId ? link : null;
     }
 }

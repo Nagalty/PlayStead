@@ -218,6 +218,15 @@ public sealed class LibraryViewModel :
 
     public LibraryViewModel(
         ILibraryStore libraryStore,
+        IProviderGameMetadataStore providerGameMetadataStore,
+        IManualMetadataLinkStore manualMetadataLinkStore)
+        : this(libraryStore, providerGameMetadataStore)
+    {
+        _manualMetadataLinkStore = manualMetadataLinkStore ?? throw new ArgumentNullException(nameof(manualMetadataLinkStore));
+    }
+
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
         ISteamReferenceRuntime steamReferenceRuntime,
         SessionMonitor sessionMonitor,
         UiPreferencesStore uiPreferencesStore)
@@ -389,6 +398,7 @@ public sealed class LibraryViewModel :
     }
 
     public IProviderGameMetadataStore? ProviderGameMetadataStore { get; }
+    public IManualMetadataLinkStore? ManualMetadataLinkStore => _manualMetadataLinkStore;
 
     public IReadOnlyList<LibraryItemViewModel> Items
     {
@@ -2072,11 +2082,32 @@ public sealed class LibraryViewModel :
 
     private async Task RefreshProviderMetadataProjectionAsync(CancellationToken cancellationToken)
     {
-        _providerMetadataByGame = ProviderGameMetadataStore is null
-            ? new Dictionary<GameId, ProviderGameMetadata>()
-            : (await ProviderGameMetadataStore.GetAllAsync(cancellationToken))
-                .GroupBy(metadata => metadata.GameId)
-                .ToDictionary(group => group.Key, group => group.OrderByDescending(metadata => metadata.RefreshedAtUtc).First());
+        if (ProviderGameMetadataStore is null)
+        {
+            _providerMetadataByGame = new Dictionary<GameId, ProviderGameMetadata>();
+        }
+        else
+        {
+            var rows = await ProviderGameMetadataStore.GetAllAsync(cancellationToken);
+            var byGame = rows.GroupBy(metadata => metadata.GameId).ToDictionary(group => group.Key, group => group.ToArray());
+            var projection = new Dictionary<GameId, ProviderGameMetadata>();
+            foreach (var installationGroup in (_lastSnapshot?.Installations ?? []).Where(x => x.IsPresent).GroupBy(x => x.GameId))
+            {
+                var rowsForGame = byGame.GetValueOrDefault(installationGroup.Key) ?? [];
+                var installation = installationGroup.OrderBy(x => x.Provider).First();
+                var baseMetadata = rowsForGame.FirstOrDefault(x => x.Provider == installation.Provider)
+                    ?? rowsForGame.OrderByDescending(x => x.RefreshedAtUtc).FirstOrDefault();
+                var enrichment = installation.Provider == ProviderKind.Manual
+                    ? rowsForGame.FirstOrDefault(x => x.Provider == ProviderKind.Steam)
+                    : null;
+                var currentMediaSource = installation.Provider == ProviderKind.Manual && _manualMetadataLinkStore is not null
+                    ? (await _manualMetadataLinkStore.GetAsync(installationGroup.Key, cancellationToken))?.MediaSource
+                    : null;
+                if (baseMetadata is not null || enrichment is not null)
+                    projection[installationGroup.Key] = ProviderGameMetadataComposer.Compose(baseMetadata, enrichment, currentMediaSource);
+            }
+            _providerMetadataByGame = projection;
+        }
         OnPropertyChanged(nameof(ProviderMetadataByGame));
         RefreshAdvancedFilterOptions();
     }

@@ -84,6 +84,27 @@ public sealed class GameDetailMetadataProjectionTests
     }
 
     [Fact]
+    public async Task Manual_game_uses_current_linked_steam_metadata_without_changing_provider()
+    {
+        var gameId = GameId.New();
+        var manual = ProviderGameMetadata.Create(gameId, ProviderKind.Manual, "manual:game", DateTimeOffset.UtcNow, genres: null, developers: ["Canonical Studio"]);
+        var steam = ProviderGameMetadata.Create(gameId, ProviderKind.Steam, "2075800", DateTimeOffset.UtcNow, genres: ["Adventure"], publishers: ["Steam Publisher"], onlineCoop: true);
+        var item = new LibraryItemViewModel(gameId, "STAR WARS Zero Company", ProviderKind.Manual, "Manuel", @"C:\\Manual", null);
+        var vm = new GameDetailViewModel(
+            item, null, null, null,
+            providerGameMetadataStore: new FakeProviderMetadataStore(manual, steam),
+            manualMetadataLinkStore: new FakeManualMetadataLinkStore(new(gameId, CatalogContentId.New(), new PlayStead.Core.Media.MediaSourceIdentity(ProviderKind.Steam, "2075800"), DateTimeOffset.UtcNow)));
+
+        await vm.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(ProviderKind.Manual, vm.Game.Provider);
+        Assert.Equal(["Aventure"], vm.Genres);
+        Assert.Equal("Canonical Studio", vm.DeveloperDisplay);
+        Assert.Equal("Steam Publisher", vm.PublisherDisplay);
+        Assert.Equal(["Coop en ligne"], vm.GameModes);
+    }
+
+    [Fact]
     public void Genre_localizer_keeps_case_insensitivity_and_trimmed_unknown_fallback()
     {
         Assert.Equal("Tactique", GenreDisplayLocalizer.Localize("  tAcTiCaL "));
@@ -186,14 +207,22 @@ public sealed class GameDetailMetadataProjectionTests
         public Task<IReadOnlyList<CatalogContentRelation>> GetRelationsFromAsync(CatalogContentId id, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class FakeProviderMetadataStore(ProviderGameMetadata metadata) : IProviderGameMetadataStore
+    private sealed class FakeProviderMetadataStore(params ProviderGameMetadata[] metadata) : IProviderGameMetadataStore
     {
         public Task<IReadOnlyList<ProviderGameMetadata>> GetAllAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<ProviderGameMetadata>>([metadata]);
+            Task.FromResult<IReadOnlyList<ProviderGameMetadata>>(metadata);
 
         public Task<ProviderGameMetadata?> GetAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) =>
-            Task.FromResult<ProviderGameMetadata?>(metadata.GameId == gameId && metadata.Provider == provider ? metadata : null);
+            Task.FromResult<ProviderGameMetadata?>(metadata.FirstOrDefault(value => value.GameId == gameId && value.Provider == provider));
 
         public Task UpsertAsync(ProviderGameMetadata metadata, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class FakeManualMetadataLinkStore(ManualMetadataLink? link) : IManualMetadataLinkStore
+    {
+        public Task<ManualMetadataLink?> GetAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult(link?.ManualGameId == gameId ? link : null);
+        public Task UpsertAsync(ManualMetadataLink link, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task RemoveAsync(GameId gameId, CancellationToken cancellationToken) => Task.CompletedTask;
+        public ManualMetadataLink? TryGetCached(GameId gameId) => link?.ManualGameId == gameId ? link : null;
     }
 }
