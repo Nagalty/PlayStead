@@ -309,6 +309,10 @@ public static class PlaySteadHost
                 services.GetRequiredService<ISteamMediaTransport>(),
                 storeClient: services.GetRequiredService<ISteamStoreAppDetailsClient>(),
                 remoteMetadataSource: services.GetRequiredService<ISteamRemoteMediaMetadataSource>()));
+        builder.Services.AddSingleton<GogLocalMediaLocator>();
+        builder.Services.AddSingleton<IGameMediaProvider>(services =>
+            new GogMediaProvider(
+                services.GetRequiredService<GogLocalMediaLocator>()));
 
         builder.Services.AddSingleton<GameMediaResolver>();
         builder.Services.AddSingleton<IGameMediaResolver>(services =>

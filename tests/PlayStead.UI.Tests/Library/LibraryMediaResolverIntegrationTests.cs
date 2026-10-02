@@ -142,6 +142,22 @@ public sealed class LibraryMediaResolverIntegrationTests
     }
 
     [Fact]
+    public async Task EnsureCoverAsync_resolves_exact_Gog_product_identity()
+    {
+        var resolver = new RecordingGameMediaResolver(null)
+        {
+            ResolvedPath = @"C:\Media\gog\1495134320\cover.webp"
+        };
+        var (viewModel, item) = await CreateLoadedLibraryAsync(resolver, ProviderKind.Gog);
+
+        await viewModel.EnsureCoverAsync(item, CancellationToken.None);
+
+        Assert.Equal(resolver.ResolvedPath, item.CoverPath);
+        Assert.Equal(ProviderKind.Gog, resolver.LastResolvedIdentity?.Provider);
+        Assert.Equal("1495134320", resolver.LastResolvedIdentity?.ProviderGameId);
+    }
+
+    [Fact]
     public async Task EnsureCoverAsync_keeps_fallback_when_resolver_returns_null()
     {
         var resolver = new RecordingGameMediaResolver(null);
@@ -211,13 +227,20 @@ public sealed class LibraryMediaResolverIntegrationTests
     {
         var now = new DateTimeOffset(2026, 9, 15, 0, 30, 0, TimeSpan.Zero);
         var gameId = GameId.New();
+        var title = provider == ProviderKind.Gog
+            ? "The Witcher 3: Wild Hunt - Game of the Year Edition"
+            : "Arma Reforger";
+        var externalId = provider == ProviderKind.Gog ? "1495134320" : "1874880";
         var snapshot = new LibrarySnapshot(
-            [new LogicalGame(gameId, "Arma Reforger", false, now, now)],
+            [new LogicalGame(gameId, title, false, now, now)],
             [
                 new GameInstallation(InstallationId.New(), GameId.New(), ProviderKind.Steam,
                     "999", @"C:\Games\Other", null, true, true, now),
                 new GameInstallation(InstallationId.New(), gameId, provider,
-                    "1874880", @"G:\SteamLibrary\steamapps\common\Arma Reforger", null, true, true, now)
+                    externalId, provider == ProviderKind.Gog
+                        ? @"G:\Gog Games\The Witcher 3 Wild Hunt GOTY"
+                        : @"G:\SteamLibrary\steamapps\common\Arma Reforger",
+                    null, true, true, now)
             ]);
         var viewModel = new LibraryViewModel(
             new StubLibraryStore(snapshot),

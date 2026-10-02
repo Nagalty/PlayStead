@@ -50,9 +50,7 @@ public sealed class MediaServiceRegistrationTests :
             host.Services.GetRequiredService<
                 ILocalGameMediaResolver>();
 
-        var provider =
-            host.Services.GetRequiredService<
-                IGameMediaProvider>();
+        var providers = host.Services.GetServices<IGameMediaProvider>().ToArray();
 
         var resolver =
             host.Services.GetRequiredService<
@@ -77,8 +75,8 @@ public sealed class MediaServiceRegistrationTests :
         Assert.IsType<SteamLocalGameMediaResolver>(
             localResolver);
 
-        Assert.IsType<SteamMediaProvider>(
-            provider);
+        Assert.Contains(providers, provider => provider is SteamMediaProvider);
+        Assert.Contains(providers, provider => provider is PlayStead.Providers.Gog.GogMediaProvider);
 
         Assert.IsType<ManualMediaIdentityBridge>(
             resolver);

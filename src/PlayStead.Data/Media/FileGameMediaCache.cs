@@ -186,8 +186,18 @@ public sealed class FileGameMediaCache : IGameMediaCache
             return ".jpg";
         }
 
-        throw new InvalidDataException("Media payload is not a valid JPEG or PNG image.");
+        if (IsValidWebp(content))
+        {
+            return ".webp";
+        }
+
+        throw new InvalidDataException("Media payload is not a valid JPEG, PNG or WebP image.");
     }
+
+    private static bool IsValidWebp(ReadOnlySpan<byte> content) =>
+        content.Length > 16 &&
+        content[..4].SequenceEqual("RIFF"u8) &&
+        content[8..12].SequenceEqual("WEBP"u8);
 
     private static bool IsValidPng(ReadOnlySpan<byte> content)
     {

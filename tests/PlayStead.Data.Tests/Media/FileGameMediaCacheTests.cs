@@ -31,6 +31,34 @@ public sealed class FileGameMediaCacheTests : IDisposable
     }
 
     [Fact]
+    public async Task StoreAsync_persists_valid_WebP_without_relabeling_bytes()
+    {
+        var cache = new FileGameMediaCache(_root);
+        var webp = await File.ReadAllBytesAsync(Path.Combine(
+            AppContext.BaseDirectory,
+            "Fixtures",
+            "Gog",
+            "gog_vertical_cover.webp"));
+
+        var path = await cache.StoreAsync(
+            new GameMediaIdentity(ProviderKind.Gog, "1495134320", "The Witcher 3"),
+            new GameMediaPayload(
+                GameMediaAssetType.Cover,
+                "gog-local",
+                "1495134320",
+                webp,
+                "image/webp",
+                null),
+            CancellationToken.None);
+
+        Assert.EndsWith("gog\\1495134320\\cover.webp", path, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(webp, await File.ReadAllBytesAsync(path));
+        Assert.Equal(path, cache.TryGetPath(
+            new GameMediaIdentity(ProviderKind.Gog, "1495134320", "The Witcher 3"),
+            GameMediaAssetType.Cover));
+    }
+
+    [Fact]
     public async Task Stored_asset_is_found_by_a_new_cache_instance()
     {
         var first = new FileGameMediaCache(_root);

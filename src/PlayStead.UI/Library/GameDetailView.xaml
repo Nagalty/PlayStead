@@ -44,16 +44,18 @@
                     <Border x:Name="HeroContentRail"
                             HorizontalAlignment="Left"
                             Margin="0"
-                            Width="520"
+                            Width="600"
                             Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
-                            Opacity="0.86">
+                            Opacity="0.92">
                         <Border.OpacityMask>
                             <LinearGradientBrush StartPoint="0,0.5"
                                                  EndPoint="1,0.5">
                                 <GradientStop Offset="0"
                                               Color="#FF000000"/>
-                                <GradientStop Offset="0.72"
-                                              Color="#EE000000"/>
+                                <GradientStop Offset="0.58"
+                                              Color="#F2000000"/>
+                                <GradientStop Offset="0.86"
+                                              Color="#70000000"/>
                                 <GradientStop Offset="1"
                                               Color="#00000000"/>
                             </LinearGradientBrush>
