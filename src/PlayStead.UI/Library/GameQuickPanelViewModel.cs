@@ -25,8 +25,8 @@ public sealed class GameQuickPanelViewModel :
     private string _lastActivityLabel = "J’ai encore peu de recul sur celui-là.";
     private string _lastSessionDateLabel = "—";
     private string _lastSessionDurationLabel = "—";
-    private string _totalPlayTimeLabel = "0 min";
-    private string _sessionCountLabel = "0 session";
+    private string _totalPlayTimeLabel = "Inconnu";
+    private string _sessionCountLabel = "0 session connue";
     private string _knownSessionHistoryLabel = string.Empty;
     private IReadOnlyList<RecentActivitySessionItemViewModel> _recentActivitySessions =
         Array.Empty<RecentActivitySessionItemViewModel>();
@@ -110,10 +110,13 @@ public sealed class GameQuickPanelViewModel :
             _hasSessionHistory = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasAnyActivity));
+            OnPropertyChanged(nameof(HasNoActivity));
         }
     }
 
     public bool HasAnyActivity => HasSessionHistory || HasProviderActivity;
+
+    public bool HasNoActivity => !HasAnyActivity;
 
     public bool HasAttention => _hasAttention;
 
@@ -360,6 +363,7 @@ public sealed class GameQuickPanelViewModel :
         OnPropertyChanged(nameof(ProviderActivitySourceLabel));
         OnPropertyChanged(nameof(HasProviderActivity));
         OnPropertyChanged(nameof(HasAnyActivity));
+        OnPropertyChanged(nameof(HasNoActivity));
     }
 
     public void OpenDetails()

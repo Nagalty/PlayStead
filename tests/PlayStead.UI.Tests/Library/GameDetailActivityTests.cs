@@ -18,7 +18,7 @@ namespace PlayStead.UI.Tests.Library;
 public sealed class GameDetailActivityTests
 {
     [Fact]
-    public void Activity_module_uses_existing_projection_and_collapses_without_history()
+    public void Activity_module_stays_visible_and_exposes_no_activity_state()
     {
         var xaml =
             File.ReadAllText(
@@ -32,8 +32,18 @@ public sealed class GameDetailActivityTests
             xaml,
             StringComparison.Ordinal);
 
+        Assert.DoesNotContain(
+            "Visibility=\"{Binding Activity.HasAnyActivity",
+            xaml,
+            StringComparison.Ordinal);
+
         Assert.Contains(
-            "Activity.HasAnyActivity",
+            "Activity.HasNoActivity",
+            xaml,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "Je n’ai encore aucune session connue pour ce jeu.",
             xaml,
             StringComparison.Ordinal);
 
@@ -96,6 +106,7 @@ public sealed class GameDetailActivityTests
         Assert.True(activity.HasSessionHistory);
         Assert.Equal("1 session connue", activity.SessionCountLabel);
         Assert.Equal("Inconnu", activity.TotalPlayTimeLabel);
+        Assert.False(activity.HasNoActivity);
     }
 
     [Fact]
@@ -124,6 +135,49 @@ public sealed class GameDetailActivityTests
         Assert.False(activity.HasSessionHistory);
         Assert.Equal("0 session connue", activity.SessionCountLabel);
         Assert.Equal("Inconnu", activity.TotalPlayTimeLabel);
+        Assert.True(activity.HasNoActivity);
+    }
+
+    [Fact]
+    public void Game_activity_card_shows_empty_state_without_activity()
+    {
+        RunSta(() =>
+        {
+            var item = Item(Guid.NewGuid());
+            var activity = CreateActivity(
+                item,
+                new FakeSessionStore([]),
+                new FakeCorrectionStore([]));
+            var detail = new GameDetailViewModel(item, launch: null, activity);
+            var view = new GameDetailView(detail);
+            var window = new Window
+            {
+                Content = view,
+                Width = 1200,
+                Height = 900,
+                ShowInTaskbar = false,
+                ShowActivated = false
+            };
+
+            try
+            {
+                window.Show();
+                detail.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
+                Drain(view.Dispatcher);
+
+                var card = Assert.IsType<Border>(view.FindName("GameActivity"));
+                var message = Assert.IsType<TextBlock>(view.FindName("NoActivityMessage"));
+                Assert.Equal(Visibility.Visible, card.Visibility);
+                Assert.Equal(Visibility.Visible, message.Visibility);
+                Assert.Equal(
+                    "Je n’ai encore aucune session connue pour ce jeu.",
+                    message.Text);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
     }
 
     [Fact]

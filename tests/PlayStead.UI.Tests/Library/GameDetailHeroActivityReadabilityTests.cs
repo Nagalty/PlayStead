@@ -24,9 +24,9 @@ public sealed class GameDetailHeroActivityReadabilityTests
     }
 
     [Fact]
-    public void Activity_line_remains_conditionally_visible()
+    public void Activity_provider_details_remain_conditionally_visible()
     {
-        Assert.Contains("Visibility=\"{Binding Activity.HasAnyActivity", Hero, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"{Binding Activity.HasProviderActivity", Hero, StringComparison.Ordinal);
         Assert.Contains("BooleanToVisibilityConverter", Hero, StringComparison.Ordinal);
     }
 

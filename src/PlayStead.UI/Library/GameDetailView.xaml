@@ -221,10 +221,7 @@
                         Grid.Row="0"
                         Grid.Column="0"
                         Margin="0,0,9,0"
-                        Style="{DynamicResource PlayStead.Surface.Card}"
-                        Visibility="{Binding Activity.HasAnyActivity,
-                                             Converter={StaticResource BooleanToVisibilityConverter},
-                                             FallbackValue=Collapsed}">
+                        Style="{DynamicResource PlayStead.Surface.Card}">
                     <StackPanel>
                         <controls:SectionHeader Title="Ton jeu"/>
                         <TextBlock Margin="0,8,0,0"
@@ -250,6 +247,12 @@
                                 </StackPanel>
                             </Border>
                         </UniformGrid>
+                        <TextBlock x:Name="NoActivityMessage"
+                                   Margin="0,10,0,0"
+                                   Text="Je n’ai encore aucune session connue pour ce jeu."
+                                   Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                   Visibility="{Binding Activity.HasNoActivity,
+                                                Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         <TextBlock Margin="0,10,0,0"
                                    Text="{Binding Activity.KnownSessionHistoryLabel}"
                                    Style="{DynamicResource PlayStead.Text.BodySecondary}"
