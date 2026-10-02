@@ -108,7 +108,32 @@ public sealed class GameDetailMetadataProjectionTests
     public void Genre_localizer_keeps_case_insensitivity_and_trimmed_unknown_fallback()
     {
         Assert.Equal("Tactique", GenreDisplayLocalizer.Localize("  tAcTiCaL "));
+        Assert.Equal("Fantastique", GenreDisplayLocalizer.Localize("  fantasy "));
         Assert.Equal("Genre inédit", GenreDisplayLocalizer.Localize("  Genre inédit "));
+    }
+
+    [Theory]
+    [InlineData(new[] { "FPP", "Tir" }, new[] { "FPS" })]
+    [InlineData(new[] { "Tir", "FPP" }, new[] { "FPS" })]
+    [InlineData(new[] { "FPP", "Shooter" }, new[] { "FPS" })]
+    [InlineData(new[] { "TPP", "Tir" }, new[] { "TPS" })]
+    [InlineData(new[] { "TPP", "Shooter" }, new[] { "TPS" })]
+    [InlineData(new[] { "FPP" }, new[] { "FPP" })]
+    [InlineData(new[] { "TPP" }, new[] { "TPP" })]
+    [InlineData(new[] { "FPP", "Tir", "SF" }, new[] { "FPS", "Science-fiction" })]
+    [InlineData(new[] { "FPP", "Tir", "Horreur" }, new[] { "FPS", "Horreur" })]
+    [InlineData(new[] { "FPP", "Tir", "FPS" }, new[] { "FPS" })]
+    public void Genre_localizer_composes_gog_taxonomy_without_mutating_values(string[] source, string[] expected)
+    {
+        Assert.Equal(expected, GenreDisplayLocalizer.LocalizeMany(source));
+    }
+
+    [Fact]
+    public void Genre_localizer_composition_is_case_insensitive_trim_safe_and_order_stable()
+    {
+        Assert.Equal(
+            ["Horreur", "FPS", "Science-fiction"],
+            GenreDisplayLocalizer.LocalizeMany([" Horreur ", " FPP ", "TIR", "sf"]));
     }
 
     [Fact]
