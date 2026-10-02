@@ -381,6 +381,8 @@ public static class PlaySteadHost
         });
         builder.Services.AddSingleton<ISteamStoreAppDetailsClient, SteamStoreAppDetailsClient>();
         builder.Services.AddSingleton<SteamStoreGameMetadataSource>();
+        builder.Services.AddSingleton<IGogGamesV2Client, GogGamesV2Client>();
+        builder.Services.AddSingleton<GogGamesV2GameMetadataSource>();
         builder.Services.AddSingleton<ProviderGameMetadataReconciliationService>(services =>
             new ProviderGameMetadataReconciliationService(
                 services.GetRequiredService<IProviderGameMetadataStore>(),
@@ -388,7 +390,7 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<ProviderGameMetadataOnlineReconciliationService>(services =>
             new ProviderGameMetadataOnlineReconciliationService(
                 services.GetRequiredService<IProviderGameMetadataStore>(),
-                [services.GetRequiredService<SteamStoreGameMetadataSource>()]));
+                [services.GetRequiredService<SteamStoreGameMetadataSource>(), services.GetRequiredService<GogGamesV2GameMetadataSource>()]));
         builder.Services.AddSingleton<IProviderGameMetadataProgress>(services =>
             services.GetRequiredService<ProviderGameMetadataOnlineReconciliationService>());
         builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateStateEvaluator>();
