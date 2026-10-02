@@ -88,8 +88,8 @@
             <Border x:Name="HomeMetadataProgressStrip"
                     Margin="0,8,0,0"
                     Padding="12,8"
-                    Background="{DynamicResource PlayStead.Brush.Surface}"
-                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                    Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
+                    BorderBrush="{DynamicResource PlayStead.Brush.AccentMuted}"
                     BorderThickness="1"
                     CornerRadius="{DynamicResource PlayStead.Radius.Small}"
                     Visibility="{Binding IsMetadataProgressVisible, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -103,10 +103,13 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Mise à jour des informations de jeu…"
-                               Style="{DynamicResource PlayStead.Text.BodySecondary}" />
+                               Style="{DynamicResource PlayStead.Text.Body}"
+                               FontWeight="SemiBold" />
                     <TextBlock Grid.Column="1"
                                Text="{Binding MetadataProgressLabel, Mode=OneWay}"
-                               Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                               Style="{DynamicResource PlayStead.Text.Body}"
+                               Foreground="{DynamicResource PlayStead.Brush.Accent}"
+                               FontWeight="SemiBold"
                                Margin="12,0,0,0" />
                     <ProgressBar Grid.Row="1"
                                  Grid.ColumnSpan="2"

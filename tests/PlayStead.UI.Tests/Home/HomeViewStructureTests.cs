@@ -9,6 +9,34 @@ namespace PlayStead.UI.Tests.Home;
 public sealed class HomeViewStructureTests
 {
     [Fact]
+    public void Metadata_progress_strip_uses_compact_copper_emphasis()
+    {
+        var document = LoadHomeView();
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+        var strip = Assert.Single(document.Descendants(presentation + "Border"), element =>
+            (string?)element.Attribute(xaml + "Name") == "HomeMetadataProgressStrip");
+
+        Assert.Equal("{DynamicResource PlayStead.Brush.SurfaceRaised}", (string?)strip.Attribute("Background"));
+        Assert.Equal("{DynamicResource PlayStead.Brush.AccentMuted}", (string?)strip.Attribute("BorderBrush"));
+        Assert.Equal("1", (string?)strip.Attribute("BorderThickness"));
+
+        var message = Assert.Single(strip.Descendants(presentation + "TextBlock"), element =>
+            (string?)element.Attribute("Text") == "Mise à jour des informations de jeu…");
+        Assert.Equal("{DynamicResource PlayStead.Text.Body}", (string?)message.Attribute("Style"));
+        Assert.Equal("SemiBold", (string?)message.Attribute("FontWeight"));
+
+        var count = Assert.Single(strip.Descendants(presentation + "TextBlock"), element =>
+            ((string?)element.Attribute("Text"))?.Contains("MetadataProgressLabel", StringComparison.Ordinal) == true);
+        Assert.Equal("{DynamicResource PlayStead.Brush.Accent}", (string?)count.Attribute("Foreground"));
+        Assert.Equal("SemiBold", (string?)count.Attribute("FontWeight"));
+
+        var progress = Assert.Single(strip.Descendants(presentation + "ProgressBar"));
+        Assert.Equal("{DynamicResource PlayStead.Brush.Accent}", (string?)progress.Attribute("Foreground"));
+    }
+
+    [Fact]
     public void Suggestion_capability_uses_coop_icon_without_redundant_install_label()
     {
         var document = LoadHomeView();
