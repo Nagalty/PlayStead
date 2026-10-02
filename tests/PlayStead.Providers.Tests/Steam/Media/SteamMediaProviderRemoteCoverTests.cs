@@ -126,6 +126,38 @@ public sealed class SteamMediaProviderRemoteCoverTests : IDisposable
     }
 
     [Fact]
+    public async Task ResolveAsync_requests_remote_metadata_for_hero_when_local_appinfo_is_missing()
+    {
+        Directory.CreateDirectory(_root);
+        const string hash = "86d898447e0e475e3f8a9cc1ef660a80032472d7";
+        var handler = new RecordingHandler();
+        var metadataSource = new RecordingMetadataSource(
+            new SteamMediaAssetMetadata(
+                null,
+                null,
+                null,
+                hash,
+                [new SteamMediaAssetReference(hash, "library_hero_2x.jpg")]));
+        using var httpClient = new HttpClient(handler);
+        var provider = new SteamMediaProvider(
+            new WindowsSteamRootLocator([_root]),
+            new SteamLocalMediaLocator(),
+            new HttpSteamMediaTransport(httpClient),
+            remoteMetadataSource: metadataSource);
+
+        var payload = await provider.ResolveAsync(
+            new GameMediaIdentity(ProviderKind.Steam, "3768760", "007 First Light"),
+            GameMediaAssetType.Hero,
+            CancellationToken.None);
+
+        Assert.NotNull(payload);
+        Assert.Equal(1, metadataSource.CallCount);
+        Assert.Equal(
+            "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/3768760/86d898447e0e475e3f8a9cc1ef660a80032472d7/library_hero_2x.jpg",
+            payload.SourceUri?.AbsoluteUri);
+    }
+
+    [Fact]
     public async Task ResolveAsync_tries_next_cover_candidate_after_recoverable_404()
     {
         Directory.CreateDirectory(_root);

@@ -53,6 +53,28 @@ public sealed class SteamMediaUriFactoryTests
     }
 
     [Fact]
+    public void CreateCandidates_Hero_uses_official_hash_and_filename_before_legacy_fallback()
+    {
+        const string hash = "86d898447e0e475e3f8a9cc1ef660a80032472d7";
+        var candidates = SteamMediaUriFactory.CreateCandidates(
+            "3768760",
+            new SteamMediaAssetMetadata(
+                null,
+                null,
+                null,
+                hash,
+                [new SteamMediaAssetReference(hash, "library_hero_2x.jpg")]),
+            GameMediaAssetType.Hero);
+
+        Assert.Equal(
+            "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/3768760/86d898447e0e475e3f8a9cc1ef660a80032472d7/library_hero_2x.jpg",
+            candidates[0].AbsoluteUri);
+        Assert.Contains(
+            candidates,
+            uri => uri.AbsoluteUri == "https://cdn.cloudflare.steamstatic.com/steam/apps/3768760/library_hero.jpg");
+    }
+
+    [Fact]
     public void CreateCandidates_Header_returns_exact_candidates_in_priority_order()
     {
         var candidates = SteamMediaUriFactory.CreateCandidates(

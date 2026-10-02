@@ -138,20 +138,24 @@ public sealed class SteamCmdAppInfoParser :
     private static SteamMediaAssetMetadata? ReadMediaAssets(VdfObject common)
     {
         var candidates = new List<(SteamMediaAssetReference Asset, int Score)>();
+        var heroCandidates = new List<(SteamMediaAssetReference Asset, int Score)>();
         string? capsuleHash = null;
         string? libraryHash = null;
+        string? heroHash = null;
 
         if (common.TryGetObject("library_assets", out var assets))
         {
             capsuleHash = ReadHash(assets, "library_capsule");
             libraryHash = ReadHash(assets, "library_600x900") ??
                 ReadHash(assets, "library_600x900_2x");
+            heroHash = ReadHash(assets, "library_hero");
         }
 
         if (common.TryGetObject("library_assets_full", out var full))
         {
             CollectReferences(full, "library_capsule", candidates);
             CollectReferences(full, "library_600x900", candidates);
+            CollectReferences(full, "library_hero", heroCandidates);
         }
 
         var references = candidates
@@ -170,9 +174,16 @@ public sealed class SteamCmdAppInfoParser :
                 ?.Hash;
         }
 
+        if (heroCandidates.Count > 0)
+        {
+            heroHash ??= heroCandidates[0].Asset.Hash;
+        }
+
         if (string.IsNullOrWhiteSpace(capsuleHash) &&
             string.IsNullOrWhiteSpace(libraryHash) &&
-            references.Count == 0)
+            string.IsNullOrWhiteSpace(heroHash) &&
+            references.Count == 0 &&
+            heroCandidates.Count == 0)
         {
             return null;
         }
@@ -181,6 +192,12 @@ public sealed class SteamCmdAppInfoParser :
             capsuleHash,
             libraryHash,
             references
+                .Distinct()
+                .OrderByDescending(reference => reference.FileName.Contains("2x", StringComparison.OrdinalIgnoreCase))
+                .ToArray(),
+            heroHash,
+            heroCandidates
+                .Select(candidate => candidate.Asset)
                 .Distinct()
                 .OrderByDescending(reference => reference.FileName.Contains("2x", StringComparison.OrdinalIgnoreCase))
                 .ToArray());

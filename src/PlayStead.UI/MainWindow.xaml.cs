@@ -935,6 +935,12 @@ public partial class MainWindow : Window
                         () => RemoveManualGameAsync(libraryViewModel, game));
                 }
 
+                _ = EnsureDetailHeroAsync(
+                    libraryViewModel,
+                    game,
+                    gameDetailViewModel,
+                    detailHeroPath);
+
                 MainContent.Content =
                     new GameDetailView(
                         gameDetailViewModel);
@@ -1011,6 +1017,48 @@ public partial class MainWindow : Window
         {
             Trace.WriteLine(
                 $"[MEDIA-DETAIL] Game=\"{game.Title}\" CoverResolved=NO CoverSource=Error Error={exception.GetType().Name}");
+        }
+    }
+
+    private async Task EnsureDetailHeroAsync(
+        LibraryViewModel libraryViewModel,
+        LibraryItemViewModel game,
+        GameDetailViewModel detail,
+        string? heroPath)
+    {
+        if (!string.IsNullOrWhiteSpace(heroPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var identity = game.ProviderGameId is null
+                ? $"{game.Provider}:Unavailable"
+                : $"{game.Provider}:{game.ProviderGameId}";
+            Trace.WriteLine(
+                $"[MEDIA-DETAIL] Game=\"{game.Title}\" Identity={identity} Asset=Hero Request=YES");
+            var resolved = await libraryViewModel.EnsureHeroAsync(
+                game,
+                CancellationToken.None);
+            if (resolved is null)
+            {
+                Trace.WriteLine(
+                    $"[MEDIA-DETAIL] Game=\"{game.Title}\" Asset=Hero HeroResolved=NO");
+                return;
+            }
+
+            detail.SetHeroPath(resolved);
+            Trace.WriteLine(
+                $"[MEDIA-DETAIL] Game=\"{game.Title}\" Asset=Hero HeroResolved=YES");
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            Trace.WriteLine(
+                $"[MEDIA-DETAIL] Game=\"{game.Title}\" Asset=Hero HeroResolved=NO Error={exception.GetType().Name}");
         }
     }
 

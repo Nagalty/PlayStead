@@ -156,6 +156,11 @@ public sealed class SteamCmdAppInfoParserTests
         Assert.Contains(
             metadata.CoverAssets!,
             asset => asset.FileName == "library_600x900_2x.jpg");
+        Assert.Equal("86d898447e0e475e3f8a9cc1ef660a80032472d7", metadata.LibraryHeroHash);
+        Assert.Equal(2, metadata.HeroAssets?.Count);
+        Assert.Contains(
+            metadata.HeroAssets!,
+            asset => asset.FileName == "library_hero_2x.jpg");
     }
 
     private static string FixtureText(string name) =>

@@ -55,6 +55,12 @@ public sealed class LibraryViewModel :
     private readonly object _coverLoadsGate =
         new();
 
+    private readonly Dictionary<GameId, Task<string?>> _heroLoads =
+        new();
+
+    private readonly object _heroLoadsGate =
+        new();
+
     private readonly Dictionary<GameId, Task> _logoLoads =
         new();
 
@@ -1077,6 +1083,69 @@ public sealed class LibraryViewModel :
             completion);
 
         return completion.Task;
+    }
+
+    public async Task<string?> EnsureHeroAsync(
+        LibraryItemViewModel item,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var installation =
+            GameLaunchInstallationSelector.SelectDefault(
+                item.GameId,
+                _installations.Where(candidate =>
+                    candidate.Provider == item.Provider &&
+                    string.Equals(candidate.InstallPath, item.InstallPath, StringComparison.OrdinalIgnoreCase)));
+        if (installation is null || string.IsNullOrWhiteSpace(installation.ExternalId))
+            return null;
+
+        Task<string?> load;
+        lock (_heroLoadsGate)
+        {
+            if (!_heroLoads.TryGetValue(item.GameId, out load!))
+            {
+                var identity = GameMediaIdentityFactory.Create(item.GameId, installation, item.Title);
+                load = ResolveHeroCoreAsync(identity, cancellationToken);
+                _heroLoads[item.GameId] = load;
+                _ = load.ContinueWith(
+                    completed =>
+                    {
+                        lock (_heroLoadsGate)
+                        {
+                            if (_heroLoads.TryGetValue(item.GameId, out var current) &&
+                                ReferenceEquals(current, completed))
+                            {
+                                _heroLoads.Remove(item.GameId);
+                            }
+                        }
+                    },
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+            }
+        }
+
+        return await load.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<string?> ResolveHeroCoreAsync(
+        GameMediaIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        await _mediaGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await _gameMediaResolver.ResolveAndCacheAsync(
+                identity,
+                GameMediaAssetType.Hero,
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _mediaGate.Release();
+        }
     }
 
     private async Task CompleteCoverLoadAsync(

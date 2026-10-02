@@ -140,6 +140,7 @@ public sealed class SteamAppInfoReaderTests
 
         Assert.NotNull(result);
         Assert.Equal(hash, result!.MediaAssets?.LibraryAssetHash);
+        Assert.Equal(hash, result.MediaAssets?.LibraryHeroHash);
     }
 
     private static byte[] CreateAppInfo(
@@ -232,6 +233,7 @@ public sealed class SteamAppInfoReaderTests
         var assets = collection.Invoke(null, null)!;
         add.Invoke(assets, ["library_capsule", Activator.CreateInstance(objectType, hash)!]);
         add.Invoke(assets, ["library_600x900", Activator.CreateInstance(objectType, hash)!]);
+        add.Invoke(assets, ["library_hero", Activator.CreateInstance(objectType, hash)!]);
         add.Invoke(common, ["library_assets", assets]);
         add.Invoke(root, ["common", common]);
 

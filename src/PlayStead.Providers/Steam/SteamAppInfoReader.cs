@@ -208,9 +208,12 @@ public sealed class SteamAppInfoReader
         var capsuleHash = Read(rawAssets, "library_capsule");
         var libraryHash = Read(rawAssets, "library_600x900")
             ?? Read(rawAssets, "library_600x900_2x");
-        return string.IsNullOrWhiteSpace(capsuleHash) && string.IsNullOrWhiteSpace(libraryHash)
+        var heroHash = Read(rawAssets, "library_hero");
+        return string.IsNullOrWhiteSpace(capsuleHash) &&
+               string.IsNullOrWhiteSpace(libraryHash) &&
+               string.IsNullOrWhiteSpace(heroHash)
             ? null
-            : new SteamMediaAssetMetadata(capsuleHash, libraryHash);
+            : new SteamMediaAssetMetadata(capsuleHash, libraryHash, null, heroHash);
     }
 
     private static string? FindPathValue(KVObject root, params string[] path)

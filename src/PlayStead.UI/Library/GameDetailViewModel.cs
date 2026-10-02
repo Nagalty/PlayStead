@@ -200,10 +200,22 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
 
     public GameQuickPanelViewModel? Activity { get; }
 
-    public string? HeroPath { get; }
+    public string? HeroPath { get; private set; }
 
     public bool HasHero =>
         !string.IsNullOrWhiteSpace(HeroPath);
+
+    public void SetHeroPath(string? path)
+    {
+        if (string.Equals(HeroPath, path, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        HeroPath = path;
+        OnPropertyChanged(nameof(HeroPath));
+        OnPropertyChanged(nameof(HasHero));
+    }
 
     public bool HasCover =>
         Game.HasCover;

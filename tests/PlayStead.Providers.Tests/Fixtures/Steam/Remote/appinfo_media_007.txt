@@ -15,6 +15,21 @@
                     "english" "1159a696d257cbeb3f4479be3466cfba2ae938a0/library_600x900_2x.jpg"
                 }
             }
+            "library_hero"
+            {
+                "image"
+                {
+                    "english" "86d898447e0e475e3f8a9cc1ef660a80032472d7/library_hero.jpg"
+                }
+                "image2x"
+                {
+                    "english" "86d898447e0e475e3f8a9cc1ef660a80032472d7/library_hero_2x.jpg"
+                }
+            }
+        }
+        "library_assets"
+        {
+            "library_hero" "86d898447e0e475e3f8a9cc1ef660a80032472d7"
         }
     }
 }

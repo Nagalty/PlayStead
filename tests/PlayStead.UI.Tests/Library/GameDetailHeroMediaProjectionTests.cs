@@ -27,13 +27,14 @@ public sealed class GameDetailHeroMediaProjectionTests
     }
 
     [Fact]
-    public void Main_window_game_detail_factory_uses_cache_only_hero_lookup()
+    public void Main_window_game_detail_factory_resolves_missing_hero_asynchronously()
     {
         var source = File.ReadAllText(FindUiFile("MainWindow.xaml.cs"));
 
         Assert.Contains("TryGetCachedPath", source, StringComparison.Ordinal);
         Assert.Contains("GameMediaAssetType.Hero", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("ResolveAndCacheAsync", source, StringComparison.Ordinal);
+        Assert.Contains("EnsureDetailHeroAsync", source, StringComparison.Ordinal);
+        Assert.Contains("EnsureHeroAsync", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -55,6 +56,21 @@ public sealed class GameDetailHeroMediaProjectionTests
 
         Assert.Equal("first-hero.jpg", first.HeroPath);
         Assert.Equal("second-hero.jpg", second.HeroPath);
+    }
+
+    [Fact]
+    public void SetHeroPath_updates_hero_value_and_presence_notification()
+    {
+        var viewModel = new GameDetailViewModel(CreateItem(), null, null, null);
+        var changed = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        viewModel.SetHeroPath("resolved-hero.jpg");
+
+        Assert.Equal("resolved-hero.jpg", viewModel.HeroPath);
+        Assert.True(viewModel.HasHero);
+        Assert.Contains(nameof(GameDetailViewModel.HeroPath), changed);
+        Assert.Contains(nameof(GameDetailViewModel.HasHero), changed);
     }
 
     private static LibraryItemViewModel CreateItem() =>

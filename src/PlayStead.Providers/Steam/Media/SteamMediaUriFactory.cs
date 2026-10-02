@@ -68,11 +68,7 @@ public static class SteamMediaUriFactory
                     UriKind.Absolute)
             ],
             GameMediaAssetType.Hero =>
-            [
-                new Uri(
-                    $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_hero.jpg",
-                    UriKind.Absolute)
-            ],
+            CreateHeroCandidates(appId, mediaAssets),
             GameMediaAssetType.Logo =>
             [
                 new Uri(
@@ -99,6 +95,34 @@ public static class SteamMediaUriFactory
             $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900.jpg",
             UriKind.Absolute)
     ];
+
+    private static IReadOnlyList<Uri> CreateHeroCandidates(
+        string appId,
+        SteamMediaAssetMetadata? mediaAssets)
+    {
+        var candidates = new List<Uri>();
+        if (mediaAssets?.HeroAssets is { Count: > 0 } heroAssets)
+        {
+            foreach (var asset in heroAssets)
+            {
+                if (IsSafeHash(asset.Hash) && IsSafeFileName(asset.FileName))
+                {
+                    AddModernCandidates(candidates, appId, asset.Hash, asset.FileName);
+                }
+            }
+        }
+
+        if (candidates.Count == 0 && IsSafeHash(mediaAssets?.LibraryHeroHash))
+        {
+            AddModernCandidates(candidates, appId, mediaAssets!.LibraryHeroHash!,
+                "library_hero_2x.jpg", "library_hero.jpg");
+        }
+
+        candidates.Add(new Uri(
+            $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_hero.jpg",
+            UriKind.Absolute));
+        return candidates;
+    }
 
     private static void AddModernCandidates(
         ICollection<Uri> candidates,

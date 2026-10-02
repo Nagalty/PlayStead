@@ -7,7 +7,9 @@ public sealed record SteamMediaAssetReference(
 public sealed record SteamMediaAssetMetadata(
     string? LibraryCapsuleHash,
     string? Library600x900Hash,
-    IReadOnlyList<SteamMediaAssetReference>? CoverAssets = null)
+    IReadOnlyList<SteamMediaAssetReference>? CoverAssets = null,
+    string? LibraryHeroHash = null,
+    IReadOnlyList<SteamMediaAssetReference>? HeroAssets = null)
 {
     public string? LibraryAssetHash =>
         Library600x900Hash ?? LibraryCapsuleHash;

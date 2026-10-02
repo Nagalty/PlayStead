@@ -64,12 +64,12 @@ public sealed class SteamMediaProvider : IGameMediaProvider
             ? null
             : ReadMediaAssets(steamRoot, identity.ProviderGameId);
 
-        if (assetType == GameMediaAssetType.Cover &&
-            !HasCoverMetadata(mediaAssets) &&
+        if ((assetType is GameMediaAssetType.Cover or GameMediaAssetType.Hero) &&
+            !HasMetadata(mediaAssets, assetType) &&
             _remoteMetadataSource is not null)
         {
             System.Diagnostics.Trace.WriteLine(
-                $"[STEAM-MEDIA-META] AppId={identity.ProviderGameId} Source=LocalAppInfo Result=Missing");
+                $"[STEAM-MEDIA-META] AppId={identity.ProviderGameId} Asset={assetType} Source=LocalAppInfo Result=Missing");
             try
             {
                 mediaAssets = await _remoteMetadataSource.GetAsync(
@@ -156,10 +156,19 @@ public sealed class SteamMediaProvider : IGameMediaProvider
         return payload;
     }
 
-    private static bool HasCoverMetadata(SteamMediaAssetMetadata? metadata) =>
-        metadata is not null &&
-        (metadata.CoverAssets is { Count: > 0 } ||
-         !string.IsNullOrWhiteSpace(metadata.LibraryAssetHash));
+    private static bool HasMetadata(
+        SteamMediaAssetMetadata? metadata,
+        GameMediaAssetType assetType) =>
+        assetType switch
+        {
+            GameMediaAssetType.Cover => metadata is not null &&
+                (metadata.CoverAssets is { Count: > 0 } ||
+                 !string.IsNullOrWhiteSpace(metadata.LibraryAssetHash)),
+            GameMediaAssetType.Hero => metadata is not null &&
+                (metadata.HeroAssets is { Count: > 0 } ||
+                 !string.IsNullOrWhiteSpace(metadata.LibraryHeroHash)),
+            _ => true
+        };
 
     private SteamMediaAssetMetadata? ReadMediaAssets(
         string steamRoot,
