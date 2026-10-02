@@ -257,17 +257,150 @@ public sealed class SteamStoreGameMetadataSourceTests
         Assert.Equal(24, source.Current.Completed);
     }
 
-    private SteamStoreGameMetadataSource CreateSource(Func<string, HttpContent> response, MemoryStore? store = null)
+    [Fact]
+    public async Task Manual_bridge_target_fans_out_a_steam_patch_with_exact_app_id()
+    {
+        var manualGame = GameId.New();
+        var requests = new List<string>();
+        var source = CreateSource(
+            _ =>
+            {
+                requests.Add("2075800");
+                return Json("{\"2075800\":{\"success\":true,\"data\":{\"steam_appid\":2075800,\"name\":\"Manual game\"}}}");
+            },
+            resolver: new TargetResolver(new ProviderGameMetadataTarget(manualGame, ProviderKind.Steam, "2075800", ProviderGameMetadataTargetOrigin.ManualBridge)));
+
+        var patch = Assert.Single(await source.GetAsync(
+            new LibrarySnapshot([], [Installation(manualGame, ProviderKind.Manual, "manual:game")]),
+            CancellationToken.None));
+
+        Assert.Equal(manualGame, patch.GameId);
+        Assert.Equal(ProviderKind.Steam, patch.Provider);
+        Assert.Equal("2075800", patch.ProviderGameId);
+        Assert.Single(requests);
+    }
+
+    [Fact]
+    public async Task Shared_app_id_is_requested_once_and_fanned_out_to_each_target()
+    {
+        var first = GameId.New();
+        var second = GameId.New();
+        var requests = 0;
+        var source = CreateSource(
+            _ =>
+            {
+                Interlocked.Increment(ref requests);
+                return Fixture("SteamStore/1203620.json");
+            },
+            resolver: new TargetResolver(
+                new ProviderGameMetadataTarget(first, ProviderKind.Steam, "1203620", ProviderGameMetadataTargetOrigin.ManualBridge),
+                new ProviderGameMetadataTarget(second, ProviderKind.Steam, "1203620", ProviderGameMetadataTargetOrigin.ManualBridge)));
+
+        var patches = await source.GetAsync(new LibrarySnapshot([], []), CancellationToken.None);
+
+        Assert.Equal(1, requests);
+        Assert.Equal(2, patches.Count);
+        Assert.Equal(new[] { first, second }.OrderBy(x => x.Value), patches.Select(x => x.GameId).OrderBy(x => x.Value));
+    }
+
+    [Fact]
+    public async Task Progress_is_counted_per_unique_source_identity()
+    {
+        var source = CreateSource(
+            _ => Fixture("SteamStore/1203620.json"),
+            resolver: new TargetResolver(
+                new ProviderGameMetadataTarget(GameId.New(), ProviderKind.Steam, "1203620", ProviderGameMetadataTargetOrigin.Native),
+                new ProviderGameMetadataTarget(GameId.New(), ProviderKind.Steam, "1203620", ProviderGameMetadataTargetOrigin.ManualBridge),
+                new ProviderGameMetadataTarget(GameId.New(), ProviderKind.Steam, "553850", ProviderGameMetadataTargetOrigin.ManualBridge)));
+
+        await source.GetAsync(new LibrarySnapshot([], []), CancellationToken.None);
+
+        Assert.Equal(2, source.Current.Total);
+        Assert.Equal(2, source.Current.Completed);
+    }
+
+    [Fact]
+    public async Task Changed_provider_game_id_forces_refresh()
+    {
+        var game = GameId.New();
+        var store = new MemoryStore(Metadata(game, "2075800", Now, complete: true));
+        var requests = 0;
+        var source = CreateSource(
+            _ =>
+            {
+                Interlocked.Increment(ref requests);
+                return Fixture("SteamStore/1203620.json");
+            },
+            store,
+            resolver: new TargetResolver(new ProviderGameMetadataTarget(game, ProviderKind.Steam, "999999", ProviderGameMetadataTargetOrigin.ManualBridge)));
+
+        _ = await source.GetAsync(new LibrarySnapshot([], []), CancellationToken.None);
+
+        Assert.Equal(1, requests);
+    }
+
+    [Fact]
+    public async Task Failure_for_one_source_identity_does_not_block_other_groups()
+    {
+        var source = CreateSource(
+            uri => uri.Contains("553850", StringComparison.Ordinal)
+                ? throw new HttpRequestException("offline")
+                : Json("{\"1203620\":{\"success\":true,\"data\":{\"steam_appid\":1203620,\"name\":\"Game\"}}}"),
+            resolver: new TargetResolver(
+                new ProviderGameMetadataTarget(GameId.New(), ProviderKind.Steam, "1203620", ProviderGameMetadataTargetOrigin.Native),
+                new ProviderGameMetadataTarget(GameId.New(), ProviderKind.Steam, "553850", ProviderGameMetadataTargetOrigin.ManualBridge)));
+
+        var patches = await source.GetAsync(new LibrarySnapshot([], []), CancellationToken.None);
+
+        Assert.Single(patches);
+        Assert.Equal(1, source.Current.Failed);
+        Assert.Equal(2, source.Current.Completed);
+    }
+
+    [Fact]
+    public async Task Cancellation_is_propagated_without_being_counted_as_failure()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var source = new SteamStoreGameMetadataSource(
+            new RecordingClient((_, token) => Task.FromCanceled<SteamStoreAppDetails?>(token)),
+            new MemoryStore(),
+            new FixedTimeProvider(Now),
+            targetResolver: new TargetResolver(new ProviderGameMetadataTarget(GameId.New(), ProviderKind.Steam, "1203620", ProviderGameMetadataTargetOrigin.Native)));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            source.GetAsync(new LibrarySnapshot([], []), cancellation.Token));
+        Assert.Equal(0, source.Current.Failed);
+    }
+
+    [Fact]
+    public async Task Stale_manual_bridge_target_is_not_reinserted_after_link_changes()
+    {
+        var target = new ProviderGameMetadataTarget(GameId.New(), ProviderKind.Steam, "3768760", ProviderGameMetadataTargetOrigin.ManualBridge);
+        var source = CreateSource(
+            _ => Json("{\"3768760\":{\"success\":true,\"data\":{\"steam_appid\":3768760,\"name\":\"Old link\"}}}"),
+            resolver: new TargetResolver(target) { Current = false });
+
+        Assert.Empty(await source.GetAsync(new LibrarySnapshot([], []), CancellationToken.None));
+    }
+
+    private SteamStoreGameMetadataSource CreateSource(
+        Func<string, HttpContent> response,
+        MemoryStore? store = null,
+        IProviderGameMetadataTargetResolver? resolver = null)
     {
         store ??= new MemoryStore();
         var handler = new StubHandler(response);
-        return new SteamStoreGameMetadataSource(new SteamStoreAppDetailsClient(new HttpClient(handler)), store, new FixedTimeProvider(Now));
+        return new SteamStoreGameMetadataSource(new SteamStoreAppDetailsClient(new HttpClient(handler)), store, new FixedTimeProvider(Now), targetResolver: resolver);
     }
 
     private static HttpContent Fixture(string relative) => Json(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", relative.Replace('/', Path.DirectorySeparatorChar))));
     private static HttpContent Json(string value) => new StringContent(value, System.Text.Encoding.UTF8, "application/json");
     private static LibrarySnapshot Snapshot(GameId game, string appId) => new([], [Installation(game, appId)]);
     private static GameInstallation Installation(GameId game, string appId) => new(InstallationId.New(), game, ProviderKind.Steam, appId, "C:\\Games", null, true, true, Now);
+
+    private static GameInstallation Installation(GameId game, ProviderKind provider, string externalId) =>
+        new(InstallationId.New(), game, provider, externalId, "C:\\Games", null, true, true, Now);
 
     private static ProviderGameMetadata Metadata(GameId game, string appId, DateTimeOffset refreshed, bool complete) =>
         ProviderGameMetadata.Create(game, ProviderKind.Steam, appId, refreshed,
@@ -317,6 +450,14 @@ public sealed class SteamStoreGameMetadataSourceTests
     {
         public Task<SteamStoreAppDetails?> GetAsync(string appId, CancellationToken cancellationToken) =>
             callback(appId, cancellationToken);
+    }
+
+    private sealed class TargetResolver(params ProviderGameMetadataTarget[] targets) : IProviderGameMetadataTargetResolver
+    {
+        public bool Current { get; set; } = true;
+        public Task<IReadOnlyList<ProviderGameMetadataTarget>> ResolveAsync(LibrarySnapshot snapshot, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ProviderGameMetadataTarget>>(targets);
+        public Task<bool> IsCurrentAsync(ProviderGameMetadataTarget target, CancellationToken cancellationToken) => Task.FromResult(Current);
     }
 
     private static class InterlockedExtensions

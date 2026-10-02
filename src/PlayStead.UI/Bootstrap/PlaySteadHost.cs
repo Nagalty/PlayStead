@@ -351,6 +351,9 @@ public static class PlaySteadHost
             services.GetRequiredService<SteamLocalProviderActivitySource>());
         builder.Services.AddSingleton<ProviderActivityReconciliationService>();
         builder.Services.AddSingleton<IProviderGameMetadataStore, SqliteProviderGameMetadataStore>();
+        builder.Services.AddSingleton<IProviderGameMetadataTargetResolver>(services =>
+            new ProviderGameMetadataTargetResolver(
+                services.GetRequiredService<IManualMetadataLinkStore>()));
         builder.Services.AddSingleton<IManualMetadataReconciliationService>(services =>
             new ManualMetadataReconciliationService(
                 services.GetRequiredService<ILibraryStore>(),

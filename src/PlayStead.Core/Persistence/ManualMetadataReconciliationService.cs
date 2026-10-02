@@ -14,6 +14,7 @@ public sealed record ManualMetadataReconciliationResult(
 
 public interface IManualMetadataReconciliationService
 {
+    event EventHandler? Changed;
     Task<ManualMetadataReconciliationResult> ReconcileAsync(CancellationToken cancellationToken);
 }
 
@@ -23,6 +24,7 @@ public sealed class ManualMetadataReconciliationService : IManualMetadataReconci
     private readonly ICanonicalCatalogStore _catalogStore;
     private readonly IManualMetadataLinkStore _linkStore;
     private readonly IProviderGameMetadataStore _metadataStore;
+    public event EventHandler? Changed;
 
     public ManualMetadataReconciliationService(
         ILibraryStore libraryStore,
@@ -41,6 +43,7 @@ public sealed class ManualMetadataReconciliationService : IManualMetadataReconci
         var matched = 0;
         var updated = 0;
         var skipped = 0;
+        var staleMetadataRemoved = false;
 
         LibrarySnapshot snapshot;
         try
@@ -89,6 +92,16 @@ public sealed class ManualMetadataReconciliationService : IManualMetadataReconci
                     mediaSource,
                     DateTimeOffset.UtcNow);
                 matched++;
+                var newSteamExternalId = link.MediaSource is { Provider: ProviderKind.Steam } currentSteam
+                    ? currentSteam.ExternalId
+                    : null;
+                if (existing?.MediaSource is { Provider: ProviderKind.Steam } previousSteam &&
+                    !string.Equals(previousSteam.ExternalId, newSteamExternalId, StringComparison.Ordinal))
+                {
+                    await _metadataStore.DeleteAsync(installation.GameId, ProviderKind.Steam, cancellationToken).ConfigureAwait(false);
+                    staleMetadataRemoved = true;
+                }
+
                 if (existing is null || existing.CanonicalCatalogId != link.CanonicalCatalogId || existing.MediaSource != link.MediaSource)
                 {
                     await _linkStore.UpsertAsync(link, cancellationToken).ConfigureAwait(false);
@@ -118,6 +131,9 @@ public sealed class ManualMetadataReconciliationService : IManualMetadataReconci
                 Trace.WriteLine($"[STARTUP] ManualMetadataReconciliation installation={installation.Id} Error={ex.GetType().Name}");
             }
         }
+
+        if (staleMetadataRemoved)
+            Changed?.Invoke(this, EventArgs.Empty);
 
         Trace.WriteLine($"[STARTUP] ManualMetadataReconciliation Matched={matched} Updated={updated} Skipped={skipped}");
         return new(matched, updated, skipped);

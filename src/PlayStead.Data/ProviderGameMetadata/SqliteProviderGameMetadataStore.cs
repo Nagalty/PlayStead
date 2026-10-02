@@ -75,6 +75,19 @@ public sealed class SqliteProviderGameMetadataStore : IProviderGameMetadataStore
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task DeleteAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = "DELETE FROM provider_game_metadata WHERE game_id=$game_id AND provider=$provider;";
+        command.Parameters.AddWithValue("$game_id", gameId.Value.ToString("D"));
+        command.Parameters.AddWithValue("$provider", (int)provider);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task<IReadOnlyList<Metadata>> ReadAsync(GameId? gameId, ProviderKind? provider, CancellationToken cancellationToken)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);

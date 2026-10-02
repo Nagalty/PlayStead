@@ -137,6 +137,13 @@ public sealed class LocalStartupPipelineTests : IDisposable
 
     private sealed class RecordingManualReconciliationService(Action? onCall = null) : IManualMetadataReconciliationService
     {
+#pragma warning disable CS0067
+        public event EventHandler? Changed
+        {
+            add { }
+            remove { }
+        }
+#pragma warning restore CS0067
         public int CallCount { get; private set; }
         public Task<ManualMetadataReconciliationResult> ReconcileAsync(CancellationToken cancellationToken)
         {

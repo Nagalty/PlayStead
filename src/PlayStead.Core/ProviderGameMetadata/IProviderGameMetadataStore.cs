@@ -7,4 +7,5 @@ public interface IProviderGameMetadataStore
     Task<IReadOnlyList<ProviderGameMetadata>> GetAllAsync(CancellationToken cancellationToken);
     Task<ProviderGameMetadata?> GetAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken);
     Task UpsertAsync(ProviderGameMetadata metadata, CancellationToken cancellationToken);
+    Task DeleteAsync(GameId gameId, ProviderKind provider, CancellationToken cancellationToken) => Task.CompletedTask;
 }

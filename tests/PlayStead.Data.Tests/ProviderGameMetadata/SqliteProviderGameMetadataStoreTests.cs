@@ -73,6 +73,32 @@ public sealed class SqliteProviderGameMetadataStoreTests : IDisposable
         Assert.StartsWith("123-", loaded!.ProviderGameId, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Delete_is_idempotent_and_honors_cancellation()
+    {
+        Directory.CreateDirectory(_root);
+        var options = new DatabaseOptions(Path.Combine(_root, "playstead.db"), Path.Combine(_root, "backups"));
+        await new DatabaseInitializer(options).InitializeAsync(CancellationToken.None);
+        var game = GameId.New();
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={options.DatabasePath};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            var command = connection.CreateCommand();
+            command.CommandText = "INSERT INTO games(game_id,title,created_utc,updated_utc) VALUES($id,'Game',$now,$now);";
+            command.Parameters.AddWithValue("$id", game.Value.ToString("D"));
+            command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var store = new SqliteProviderGameMetadataStore(options);
+        await store.UpsertAsync(Metadata.Create(game, ProviderKind.Steam, "123", DateTimeOffset.UtcNow), CancellationToken.None);
+        await store.DeleteAsync(game, ProviderKind.Steam, CancellationToken.None);
+        await store.DeleteAsync(game, ProviderKind.Steam, CancellationToken.None);
+
+        Assert.Null(await store.GetAsync(game, ProviderKind.Steam, CancellationToken.None));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.DeleteAsync(game, ProviderKind.Steam, new CancellationToken(true)));
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
