@@ -5,7 +5,6 @@ using PlayStead.Core.Media;
 using PlayStead.Data.Media;
 using PlayStead.Providers.Gog;
 using PlayStead.UI.Tests.TestSupport;
-using Xunit.Sdk;
 
 namespace PlayStead.UI.Tests.Library;
 
@@ -40,36 +39,74 @@ public sealed class GogMediaWebpUiTests
         }
     }
 
-    [Fact]
+    [WpfWebpFact]
     public void Wpf_decodes_GOG_WebP_fixture_for_current_image_projection()
+    {
+        PlaySteadWpfTestResources.Run(() =>
+        {
+            var path = Path.Combine(
+                AppContext.BaseDirectory,
+                "Fixtures",
+                "Gog",
+                "gog_vertical_cover.webp");
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.UriSource = new Uri(path, UriKind.Absolute);
+            image.EndInit();
+            image.Freeze();
+
+            Assert.True(image.PixelWidth > 0);
+            Assert.True(image.PixelHeight > 0);
+        });
+    }
+}
+
+internal sealed class WpfWebpFactAttribute : FactAttribute
+{
+    public WpfWebpFactAttribute()
+    {
+        if (!WicWebpCapability.IsAvailable())
+            Skip = "WIC WebP decoder is not available on this Windows environment.";
+    }
+}
+
+internal static class WicWebpCapability
+{
+    public static bool IsAvailable()
+    {
+        var available = false;
+        var thread = new Thread(() => available = TryDecode());
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        return available;
+    }
+
+    private static bool TryDecode()
     {
         try
         {
-            PlaySteadWpfTestResources.Run(() =>
-            {
-                var path = Path.Combine(
-                    AppContext.BaseDirectory,
-                    "Fixtures",
-                    "Gog",
-                    "gog_vertical_cover.webp");
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.CacheOption = BitmapCacheOption.OnLoad;
-                image.UriSource = new Uri(path, UriKind.Absolute);
-                image.EndInit();
-                image.Freeze();
-
-                Assert.True(image.PixelWidth > 0);
-                Assert.True(image.PixelHeight > 0);
-            });
+            var path = Path.Combine(
+                AppContext.BaseDirectory,
+                "Fixtures",
+                "Gog",
+                "gog_vertical_cover.webp");
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.UriSource = new Uri(path, UriKind.Absolute);
+            image.EndInit();
+            image.Freeze();
+            return image.PixelWidth > 0 && image.PixelHeight > 0;
         }
         catch (NotSupportedException exception) when (IsMissingWicWebpDecoder(exception))
         {
-            throw SkipException.ForSkip("WIC WebP decoder is not available on this Windows environment.");
+            return false;
         }
         catch (COMException exception) when (exception.HResult == unchecked((int)0x88982F8B))
         {
-            throw SkipException.ForSkip("WIC WebP decoder is not available on this Windows environment.");
+            return false;
         }
     }
 
