@@ -252,7 +252,7 @@ public sealed class GameDetailActivityTests
     }
 
     [Fact]
-    public void Recent_activity_card_binding_tracks_data_and_collapses_when_empty()
+    public void Recent_activity_card_binding_tracks_data_and_shows_empty_state()
     {
         RunSta(() =>
         {
@@ -268,12 +268,14 @@ public sealed class GameDetailActivityTests
                 window.Show();
                 Drain(view.Dispatcher);
                 var card = Assert.IsType<Border>(view.FindName("RecentActivity"));
-                Assert.Equal(Visibility.Collapsed, card.Visibility);
+                Assert.Equal(Visibility.Visible, card.Visibility);
+                Assert.True(activity.HasNoRecentActivity);
 
                 store.Replace([CompletedSession(gameId, DateTimeOffset.Now.AddHours(-2), TimeSpan.FromMinutes(80))]);
                 detail.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
                 Drain(view.Dispatcher);
                 Assert.Equal(Visibility.Visible, card.Visibility);
+                Assert.False(activity.HasNoRecentActivity);
 
                 var rows = Assert.IsType<ItemsControl>(view.FindName("RecentActivityItems"));
                 Assert.Single(rows.Items);

@@ -185,6 +185,8 @@ public sealed class GameQuickPanelViewModel :
     public bool HasRecentActivity =>
         _recentActivitySessions.Count > 0;
 
+    public bool HasNoRecentActivity => !HasRecentActivity;
+
     public async Task LoadSessionSummaryAsync(
         CancellationToken cancellationToken)
     {
@@ -423,6 +425,7 @@ public sealed class GameQuickPanelViewModel :
         _recentActivitySessions = value;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RecentActivitySessions)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasRecentActivity)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasNoRecentActivity)));
     }
 
     private static string FormatDuration(

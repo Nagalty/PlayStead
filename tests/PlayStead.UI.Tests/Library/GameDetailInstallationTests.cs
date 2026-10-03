@@ -37,6 +37,26 @@ public sealed class GameDetailInstallationTests
         Assert.Equal(@"H:\007 First Light", viewModel.InstallPath);
         Assert.Equal("H:", viewModel.InstallDriveLabel);
     }
+
+    [Fact]
+    public void Installation_projection_exposes_explicit_fallbacks_when_fields_are_missing()
+    {
+        var item = new LibraryItemViewModel(
+            GameId.New(),
+            "Unknown install",
+            ProviderKind.Manual,
+            "Manuel",
+            string.Empty,
+            null,
+            null,
+            IsSessionActive: false);
+
+        var viewModel = new GameDetailViewModel(item);
+
+        Assert.Equal("Taille inconnue", viewModel.InstalledSizeLabel);
+        Assert.Equal("—", viewModel.InstallDriveDisplay);
+        Assert.Equal("—", viewModel.InstallPathDisplay);
+    }
     [Fact]
     public void Installation_view_exposes_authoritative_local_fields()
     {

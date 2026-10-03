@@ -156,15 +156,11 @@ public sealed class GameDetailMetadataProjectionTests
             view.UpdateLayout();
             FlushBindings(view.Dispatcher);
 
-            // The general-info card is initially collapsed; loading metadata
-            // updates the card binding and must also update each computed row flag.
-            Assert.Equal(Visibility.Collapsed, FindByVisibilityBinding(view, "HasGeneralInfo").Visibility);
+            // The general-info card remains present even before metadata arrives.
             vm.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
             FlushBindings(view.Dispatcher);
             view.UpdateLayout();
 
-            var card = FindByVisibilityBinding(view, "HasGeneralInfo");
-            Assert.Equal(Visibility.Visible, card.Visibility);
             Assert.True(vm.HasDeveloper);
             Assert.True(vm.HasPublisher);
             Assert.False(vm.HasReleaseDate);
@@ -189,8 +185,8 @@ public sealed class GameDetailMetadataProjectionTests
             Assert.Equal(Visibility.Visible, publisherValue.Visibility);
             Assert.Equal("Keen Games GmbH", publisherValue.Text);
 
-            Assert.Equal(Visibility.Collapsed, FindText(view, "Date de sortie").Visibility);
-            Assert.Equal(Visibility.Collapsed, FindByTextBinding(view, "ReleaseDateDisplay").Visibility);
+            Assert.Equal(Visibility.Visible, FindText(view, "Date de sortie").Visibility);
+            Assert.Equal(Visibility.Visible, FindByTextBinding(view, "ReleaseDateDisplay").Visibility);
         });
     }
 

@@ -405,18 +405,17 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" Text="Taille installée" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasInstalledSize, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                <TextBlock Grid.Row="0" HorizontalAlignment="Right" Text="{Binding InstalledSizeLabel}" Style="{DynamicResource PlayStead.Text.Body}" Visibility="{Binding HasInstalledSize, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                <TextBlock Grid.Row="1" Margin="0,8,0,0" Text="Disque" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasInstallDrive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                <TextBlock Grid.Row="1" Margin="0,8,0,0" HorizontalAlignment="Right" Text="{Binding InstallDriveLabel}" Style="{DynamicResource PlayStead.Text.Body}" Visibility="{Binding HasInstallDrive, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                <TextBlock Grid.Row="2" Margin="0,8,0,0" Text="Chemin d’installation" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasInstallPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                <TextBlock Grid.Row="2" Margin="0,8,0,0" HorizontalAlignment="Right" Text="{Binding InstallPath}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap" Visibility="{Binding HasInstallPath, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <TextBlock Grid.Row="0" Text="Taille installée" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                <TextBlock Grid.Row="0" HorizontalAlignment="Right" Text="{Binding InstalledSizeLabel}" Style="{DynamicResource PlayStead.Text.Body}"/>
+                                <TextBlock Grid.Row="1" Margin="0,8,0,0" Text="Disque" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                <TextBlock Grid.Row="1" Margin="0,8,0,0" HorizontalAlignment="Right" Text="{Binding InstallDriveDisplay}" Style="{DynamicResource PlayStead.Text.Body}"/>
+                                <TextBlock Grid.Row="2" Margin="0,8,0,0" Text="Chemin d’installation" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                <TextBlock Grid.Row="2" Margin="0,8,0,0" HorizontalAlignment="Right" Text="{Binding InstallPathDisplay}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap"/>
                             </Grid>
                         </StackPanel>
                     </Border>
                     <Border Margin="0,18,0,0"
-                            Style="{DynamicResource PlayStead.Surface.Card}"
-                            Visibility="{Binding HasGraphicsTechnologies, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Style="{DynamicResource PlayStead.Surface.Card}">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.Grid}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
@@ -434,6 +433,10 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <TextBlock Margin="0,12,0,0"
+                                       Text="Aucune technologie graphique connue pour ce jeu."
+                                       Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                       Visibility="{Binding HasNoGraphicsTechnologies, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -443,10 +446,7 @@
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0"
-                        Style="{DynamicResource PlayStead.Surface.Card}"
-                        Visibility="{Binding Activity.HasRecentActivity,
-                                             Converter={StaticResource BooleanToVisibilityConverter},
-                                             FallbackValue=Collapsed}">
+                        Style="{DynamicResource PlayStead.Surface.Card}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.History}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
@@ -473,12 +473,15 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <TextBlock Margin="{DynamicResource PlayStead.Gap.Block.Small}"
+                                   Text="Aucune activité récente connue pour ce jeu."
+                                   Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                   Visibility="{Binding Activity.HasNoRecentActivity, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </StackPanel>
                 </Border>
 
                 <Border Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,18,0,0"
-                        Style="{DynamicResource PlayStead.Surface.Card}"
-                        Visibility="{Binding HasGeneralInfo, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        Style="{DynamicResource PlayStead.Surface.Card}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.Info}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
@@ -496,13 +499,13 @@
                                 <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="Développeur" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasDeveloper, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                            <TextBlock Grid.Column="1" Margin="12,0,18,0" Text="{Binding DeveloperDisplay}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap" Visibility="{Binding HasDeveloper, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                            <TextBlock Grid.Column="2" Text="Éditeur" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasPublisher, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                            <TextBlock Grid.Column="3" Margin="12,0,0,0" Text="{Binding PublisherDisplay}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap" Visibility="{Binding HasPublisher, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,10,0,0" Text="Date de sortie" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasReleaseDate, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,10,0,0" Text="{Binding ReleaseDateDisplay}" Style="{DynamicResource PlayStead.Text.Body}" Visibility="{Binding HasReleaseDate, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,10,0,0" Text="Genres" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasGenres, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <TextBlock Grid.Column="0" Text="Développeur" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                            <TextBlock Grid.Column="1" Margin="12,0,18,0" Text="{Binding DeveloperDisplay, TargetNullValue=Inconnu}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap"/>
+                            <TextBlock Grid.Column="2" Text="Éditeur" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                            <TextBlock Grid.Column="3" Margin="12,0,0,0" Text="{Binding PublisherDisplay, TargetNullValue=Inconnu}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,10,0,0" Text="Date de sortie" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,10,0,0" Text="{Binding ReleaseDateDisplay, TargetNullValue=Inconnue}" Style="{DynamicResource PlayStead.Text.Body}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,10,0,0" Text="Genres" Style="{DynamicResource PlayStead.Text.Caption}"/>
                             <ItemsControl Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,8,0,0" ItemsSource="{Binding Genres}" Visibility="{Binding HasGenres, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
@@ -515,7 +518,8 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,10,0,0" Text="Modes" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasGameModes, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,8,0,0" Text="Non renseignés" Style="{DynamicResource PlayStead.Text.BodySecondary}" Visibility="{Binding HasNoGenres, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,10,0,0" Text="Modes" Style="{DynamicResource PlayStead.Text.Caption}"/>
                             <ItemsControl Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,8,0,0" ItemsSource="{Binding GameModes}" Visibility="{Binding HasGameModes, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
@@ -526,6 +530,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Margin="12,8,0,0" Text="Inconnus" Style="{DynamicResource PlayStead.Text.BodySecondary}" Visibility="{Binding HasNoGameModes, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </Grid>
                     </StackPanel>
                 </Border>

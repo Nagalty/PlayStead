@@ -234,8 +234,14 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public bool HasInstalledSize =>
         Game.InstalledSizeBytes.HasValue;
 
+    public bool HasNoInstalledSize => !HasInstalledSize;
+
     public bool HasInstallDrive =>
         !string.IsNullOrWhiteSpace(InstallDriveLabel);
+
+    public bool HasNoInstallDrive => !HasInstallDrive;
+
+    public bool HasNoInstallPath => !HasInstallPath;
 
     public bool HasSteamStatus =>
         Game.HasSteamStatus;
@@ -277,6 +283,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             GraphicsTechnologies = await _graphicsTechnologyDetectionService.DetectAsync(GameId, InstallPath, Title, cancellationToken);
             OnPropertyChanged(nameof(GraphicsTechnologies));
             OnPropertyChanged(nameof(HasGraphicsTechnologies));
+            OnPropertyChanged(nameof(HasNoGraphicsTechnologies));
         }
 
         if (_catalogStore is null || Game.CanonicalContentId is not CatalogContentId contentId)
@@ -308,6 +315,10 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
 
     public string InstalledSizeLabel { get; }
 
+    public string InstalledSizeDisplay => HasInstalledSize ? InstalledSizeLabel : "Inconnue";
+    public string InstallDriveDisplay => HasInstallDrive ? InstallDriveLabel : "—";
+    public string InstallPathDisplay => HasInstallPath ? InstallPath : "—";
+
     public string SteamStatusLabel { get; }
 
     public string? DeveloperDisplay { get; private set; }
@@ -317,6 +328,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public IReadOnlyList<string> GameModes { get; private set; } = [];
     public bool HasGenres => Genres.Count > 0;
     public bool HasGameModes => GameModes.Count > 0;
+    public bool HasNoGenres => !HasGenres;
+    public bool HasNoGameModes => !HasGameModes;
     public ModDetectionState ModState { get; private set; } = ModDetectionState.Unknown;
     public bool HasModEvidence => ModState != ModDetectionState.Unknown;
     public string ModStatusLabel => ModState switch
@@ -373,6 +386,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public IReadOnlyList<GameLocalArtifact> LocalArtifacts { get; private set; } = [];
     public IReadOnlyList<GraphicsTechnologyObservation> GraphicsTechnologies { get; private set; } = [];
     public bool HasGraphicsTechnologies => GraphicsTechnologies.Count > 0;
+    public bool HasNoGraphicsTechnologies => !HasGraphicsTechnologies;
     public bool HasLocalArtifacts => LocalArtifacts.Count > 0;
     public bool ShowLocalArtifactHelper => !HasLocalArtifacts;
     public bool HasLocalArtifactArea => true;
@@ -738,6 +752,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(GameModes));
         OnPropertyChanged(nameof(HasGenres));
         OnPropertyChanged(nameof(HasGameModes));
+        OnPropertyChanged(nameof(HasNoGenres));
+        OnPropertyChanged(nameof(HasNoGameModes));
         OnPropertyChanged(nameof(HasGeneralInfo));
     }
 
