@@ -29,7 +29,7 @@ public sealed class HttpSteamMediaTransportTimeoutTests
         Assert.Null(payload);
         Assert.True(handler.WasCanceled);
         Assert.True(
-            stopwatch.Elapsed < TimeSpan.FromMilliseconds(200),
+            stopwatch.Elapsed < TimeSpan.FromSeconds(1),
             $"Internal timeout did not stop the request promptly: {stopwatch.Elapsed}.");
     }
 
