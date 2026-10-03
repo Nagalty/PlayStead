@@ -27,6 +27,48 @@ public sealed class GameDetailVisualContractTests
     }
 
     [Fact]
+    public void Lower_detail_sections_use_neutral_semantic_icons()
+    {
+        var xaml = ReadView();
+
+        Assert.True(CountOccurrences(xaml, "Fill=\"Transparent\"") >= 8);
+        Assert.True(CountOccurrences(xaml, "Stroke=\"{DynamicResource PlayStead.Brush.TextSecondary}\"") >= 8);
+        Assert.True(CountOccurrences(xaml, "StrokeThickness=\"1.5\"") >= 8);
+        Assert.Contains("PlayStead.Icon.Gamepad", xaml, StringComparison.Ordinal);
+        Assert.Contains("M2,4 H18 V16 H2 Z", xaml, StringComparison.Ordinal);
+        Assert.Contains("M1,5 H8 L10,3 H19 V17 H1 Z", xaml, StringComparison.Ordinal);
+        Assert.Contains("PlayStead.Icon.History", xaml, StringComparison.Ordinal);
+        Assert.Contains("PlayStead.Icon.Info", xaml, StringComparison.Ordinal);
+        Assert.Contains("PlayStead.Icon.Grid", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Ton jeu\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Installation\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Technologies graphiques\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Activité récente\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Infos générales\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Fichiers locaux\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Copper_identity_does_not_introduce_hardcoded_color_or_change_hero_contract()
+    {
+        var xaml = ReadView();
+
+        Assert.DoesNotContain("PlayStead.Brush.Copper\" Fill=\"#", xaml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("x:Name=\"GameDetailHero\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"GameDetailContentRail\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Content_rail_keeps_breathing_room_after_the_last_card()
+    {
+        var xaml = ReadView();
+
+        Assert.Contains("x:Name=\"GameDetailContentRail\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"24,-30,24,24\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"LocalArtifactsSection\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Detail_keeps_one_primary_action_and_existing_layout_contracts()
     {
         var xaml = ReadView();

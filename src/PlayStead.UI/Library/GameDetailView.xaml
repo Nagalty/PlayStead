@@ -295,7 +295,7 @@
             <StackPanel Grid.Row="1"
                         x:Name="GameDetailContentRail"
                         HorizontalAlignment="Stretch"
-                        Margin="24,-30">
+                        Margin="24,-30,24,24">
             <Grid x:Name="DetailColumns"
                   Margin="0,18,0,0">
                 <Grid.RowDefinitions>
@@ -317,7 +317,10 @@
                         Margin="0,0,9,0"
                         Style="{DynamicResource PlayStead.Surface.Card}">
                     <StackPanel>
-                        <controls:SectionHeader Title="Ton jeu"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.Gamepad}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                            <controls:SectionHeader Title="Ton jeu"/>
+                        </StackPanel>
                         <TextBlock Margin="0,8,0,0"
                                    Text="Tes stats et ta dernière session."
                                    Style="{DynamicResource PlayStead.Text.BodySecondary}"/>
@@ -391,7 +394,10 @@
                     <Border x:Name="InstallationPanel"
                             Style="{DynamicResource PlayStead.Surface.Card}">
                         <StackPanel>
-                            <controls:SectionHeader Title="Installation"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="M2,4 H18 V16 H2 Z M5,8 A3,3 0 1 0 11,8 A3,3 0 1 0 5,8 M13,8 H16" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                                <controls:SectionHeader Title="Installation"/>
+                            </StackPanel>
                             <controls:StatusBadge Margin="0,10,0,0" Text="{Binding ProviderLabel}"/>
                             <Grid Margin="0,12,0,0">
                                 <Grid.RowDefinitions>
@@ -412,7 +418,10 @@
                             Style="{DynamicResource PlayStead.Surface.Card}"
                             Visibility="{Binding HasGraphicsTechnologies, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
-                            <controls:SectionHeader Title="Technologies graphiques" />
+                            <StackPanel Orientation="Horizontal">
+                                <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.Grid}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                                <controls:SectionHeader Title="Technologies graphiques" />
+                            </StackPanel>
                             <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding GraphicsTechnologies}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -439,7 +448,10 @@
                                              Converter={StaticResource BooleanToVisibilityConverter},
                                              FallbackValue=Collapsed}">
                     <StackPanel>
-                        <controls:SectionHeader Title="Activité récente"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.History}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                            <controls:SectionHeader Title="Activité récente"/>
+                        </StackPanel>
                         <ItemsControl x:Name="RecentActivityItems"
                                       Margin="{DynamicResource PlayStead.Gap.Block.Small}"
                                       ItemsSource="{Binding Activity.RecentActivitySessions}">
@@ -469,7 +481,7 @@
                         Visibility="{Binding HasGeneralInfo, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
-                            <Path Width="16" Height="16" Margin="0,0,8,0" Data="{DynamicResource PlayStead.Icon.Info}" Style="{DynamicResource PlayStead.Icon.Navigation}" Stretch="Uniform"/>
+                            <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.Info}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
                             <controls:SectionHeader Title="Infos générales"/>
                         </StackPanel>
                         <Grid Margin="0,12,0,0">
@@ -525,7 +537,10 @@
                         Style="{DynamicResource PlayStead.Surface.Card}"
                         Visibility="{Binding HasModEvidence, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel>
-                        <controls:SectionHeader Title="Mods" />
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.Grid}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                            <controls:SectionHeader Title="Mods" />
+                        </StackPanel>
                         <TextBlock Margin="0,8,0,0"
                                    Text="{Binding ModStatusLabel}"
                                    Style="{DynamicResource PlayStead.Text.Body}" />
@@ -539,7 +554,10 @@
                         Margin="0,18,0,0"
                         Style="{DynamicResource PlayStead.Surface.Card}">
                     <StackPanel>
-                        <controls:SectionHeader Title="Ce qui a bougé" />
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.History}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                            <controls:SectionHeader Title="Ce qui a bougé" />
+                        </StackPanel>
                         <TextBlock Margin="0,8,0,0"
                                    Text="{Binding BuildHistorySummary}"
                                    Style="{DynamicResource PlayStead.Text.BodySecondary}" />
@@ -581,7 +599,10 @@
                         Style="{DynamicResource PlayStead.Surface.Card}"
                         Visibility="Visible">
                     <StackPanel>
-                        <controls:SectionHeader Title="Fichiers locaux" />
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="M1,5 H8 L10,3 H19 V17 H1 Z" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                            <controls:SectionHeader Title="Fichiers locaux" />
+                        </StackPanel>
                         <TextBlock Text="Protège les sauvegardes, configurations et fichiers importants de ce jeu."
                                    Style="{DynamicResource PlayStead.Text.BodySecondary}"
                                    TextWrapping="Wrap" />

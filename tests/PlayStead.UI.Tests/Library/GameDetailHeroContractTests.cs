@@ -314,7 +314,7 @@ public sealed class GameDetailHeroContractTests
             ((string?)element.Attribute("Color")) == "#FF0B1117");
 
         var source = File.ReadAllText(FindUiFile("Library/GameDetailView.xaml"));
-        Assert.Contains("Margin=\"24,-30\"", source, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"24,-30,24,24\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -333,7 +333,7 @@ public sealed class GameDetailHeroContractTests
         Assert.Equal("0", (string?)heroRail.Attribute("Margin"));
         Assert.Null(contentRail.Attribute("MaxWidth"));
         Assert.Equal("Stretch", (string?)contentRail.Attribute("HorizontalAlignment"));
-        Assert.Equal("24,-30", (string?)contentRail.Attribute("Margin"));
+        Assert.Equal("24,-30,24,24", (string?)contentRail.Attribute("Margin"));
     }
 
     [Fact]
