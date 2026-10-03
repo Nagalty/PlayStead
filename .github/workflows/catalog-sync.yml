@@ -157,6 +157,12 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/pages-site
+      - name: Upload validated catalog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: playstead-catalog-${{ github.run_number }}
+          path: ${{ runner.temp }}/catalog
+          retention-days: 90
 
   deploy-pages:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs['publish-pages'] == true }}
@@ -187,9 +193,3 @@ jobs:
           curl --fail --silent --show-error "$payload_url" -o "$RUNNER_TEMP/public-payload.gz"
           jq -e --arg sha "$(sha256sum "$RUNNER_TEMP/public-payload.gz" | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')" '.payloadSha256 == $sha' "$RUNNER_TEMP/public-manifest.json"
           echo "PUBLIC_CATALOG_HTTP=PASS"
-      - name: Upload validated catalog artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: playstead-catalog-${{ github.run_number }}
-          path: ${{ runner.temp }}/catalog
-          retention-days: 90
