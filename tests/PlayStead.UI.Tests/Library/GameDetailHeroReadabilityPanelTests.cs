@@ -15,14 +15,29 @@ public sealed class GameDetailHeroReadabilityPanelTests
             .Single(element => element.Attributes().Any(attribute =>
                 attribute.Name.LocalName == "Name" && attribute.Value == "HeroContentRail"));
 
-        Assert.Equal("Left", (string?)rail.Attribute("HorizontalAlignment"));
-        Assert.Equal("520", (string?)rail.Attribute("Width"));
-        Assert.Equal("0.86", (string?)rail.Attribute("Opacity"));
-        Assert.Equal(
-            "{DynamicResource PlayStead.Brush.SurfaceStrong}",
-            (string?)rail.Attribute("Background"));
-        Assert.Contains(rail.Descendants(), element =>
+        Assert.Equal("Stretch", (string?)rail.Attribute("HorizontalAlignment"));
+        Assert.Null(rail.Attribute("Width"));
+        Assert.Equal("Transparent", (string?)rail.Attribute("Background"));
+        Assert.Null(rail.Attribute("Opacity"));
+        Assert.DoesNotContain(rail.Descendants(), element =>
             element.Name.LocalName == "LinearGradientBrush");
+
+        var fade = View.Descendants().Single(element =>
+            element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Name" && attribute.Value == "HeroVerticalFade"));
+        Assert.Contains(fade.Descendants(), element =>
+            element.Name.LocalName == "LinearGradientBrush");
+
+        var scrim = View.Descendants().Single(element =>
+            element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Name" && attribute.Value == "HeroLeftScrim"));
+        Assert.Equal("False", (string?)scrim.Attribute("IsHitTestVisible"));
+        Assert.Equal("Stretch", (string?)scrim.Attribute("HorizontalAlignment"));
+        Assert.Contains(scrim.Descendants(), element =>
+            element.Name.LocalName == "LinearGradientBrush");
+        Assert.Contains(scrim.Descendants(), element =>
+            element.Name.LocalName == "GradientStop" &&
+            ((string?)element.Attribute("Color")) == "#000F1118");
     }
 
     [Fact]
@@ -50,6 +65,6 @@ public sealed class GameDetailHeroReadabilityPanelTests
             .ToArray();
 
         Assert.Single(rails);
-        Assert.Equal("Left", (string?)rails[0].Attribute("HorizontalAlignment"));
+        Assert.Equal("Stretch", (string?)rails[0].Attribute("HorizontalAlignment"));
     }
 }

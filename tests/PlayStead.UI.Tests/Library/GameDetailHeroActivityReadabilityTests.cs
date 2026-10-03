@@ -24,6 +24,29 @@ public sealed class GameDetailHeroActivityReadabilityTests
     }
 
     [Fact]
+    public void Activity_stats_use_two_compact_independent_surfaces()
+    {
+        var document = System.Xml.Linq.XDocument.Parse(Hero);
+        var stats = document.Descendants()
+            .Single(element =>
+                element.Name.LocalName == "WrapPanel" &&
+                ((string?)element.Attribute("Margin")) == "0,12,0,0");
+        var surfaces = stats.Elements()
+            .Where(element => element.Name.LocalName == "Border")
+            .ToArray();
+
+        Assert.Equal(2, surfaces.Length);
+        Assert.All(surfaces, surface =>
+        {
+            Assert.Equal("6", (string?)surface.Attribute("CornerRadius"));
+            Assert.Equal("{DynamicResource PlayStead.Brush.SurfaceStrong}", (string?)surface.Attribute("Background"));
+            Assert.Equal("{DynamicResource PlayStead.Brush.Border}", (string?)surface.Attribute("BorderBrush"));
+            Assert.Equal("1", (string?)surface.Attribute("BorderThickness"));
+        });
+        Assert.DoesNotContain("x:Name=\"HeroStatsBackplate\"", Hero, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Activity_provider_details_remain_conditionally_visible()
     {
         Assert.Contains("Visibility=\"{Binding Activity.HasProviderActivity", Hero, StringComparison.Ordinal);

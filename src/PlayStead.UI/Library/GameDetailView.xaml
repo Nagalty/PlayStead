@@ -10,7 +10,8 @@
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled">
+                  HorizontalScrollBarVisibility="Disabled"
+                  HorizontalContentAlignment="Stretch">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -30,6 +31,7 @@
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding HasHero}"
                                          Value="True">
+                                <Setter Property="Height" Value="560"/>
                                 <Setter Property="Background">
                                     <Setter.Value>
                                         <ImageBrush ImageSource="{Binding HeroPath}"
@@ -40,61 +42,136 @@
                         </Style.Triggers>
                     </Style>
                 </Border.Style>
-                <Grid>
-                    <Border x:Name="HeroContentRail"
-                            HorizontalAlignment="Left"
-                            Margin="0"
-                            Width="600"
-                            Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
-                            Opacity="0.92">
-                        <Border.OpacityMask>
+                <Grid x:Name="HeroContentRailContainer"
+                      HorizontalAlignment="Stretch"
+                      Margin="0">
+                    <Border x:Name="HeroVerticalFade"
+                            IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Offset="0" Color="#000F1118"/>
+                                <GradientStop Offset="0.6" Color="#000F1118"/>
+                                <GradientStop Offset="0.82" Color="#240B1117"/>
+                                <GradientStop Offset="0.94" Color="#A80B1117"/>
+                                <GradientStop Offset="1" Color="#FF0B1117"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+
+                    <Border x:Name="HeroLeftScrim"
+                            IsHitTestVisible="False"
+                            HorizontalAlignment="Stretch">
+                        <Border.Background>
                             <LinearGradientBrush StartPoint="0,0.5"
                                                  EndPoint="1,0.5">
-                                <GradientStop Offset="0"
-                                              Color="#FF000000"/>
-                                <GradientStop Offset="0.58"
-                                              Color="#F2000000"/>
-                                <GradientStop Offset="0.86"
-                                              Color="#70000000"/>
-                                <GradientStop Offset="1"
-                                              Color="#00000000"/>
+                                <GradientStop Offset="0" Color="#780F1118"/>
+                                <GradientStop Offset="0.22" Color="#400F1118"/>
+                                <GradientStop Offset="0.5" Color="#120F1118"/>
+                                <GradientStop Offset="1" Color="#000F1118"/>
                             </LinearGradientBrush>
-                        </Border.OpacityMask>
+                        </Border.Background>
                     </Border>
 
-                    <Border Width="176"
-                            Height="264"
-                            Margin="24,24,0,24"
-                            CornerRadius="12"
-                            ClipToBounds="True"
-                            Background="Transparent"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Center">
-                        <controls:GameArtwork SourcePath="{Binding CoverPath}"
-                                              HasArtwork="{Binding HasCover}"
-                                              Title="{Binding Title}"
-                                              ProviderLabel="{Binding ProviderLabel}"
-                                              Width="176"
-                                              Height="264"
-                                              HorizontalAlignment="Left"
-                                              VerticalAlignment="Center">
-                            <controls:GameArtwork.Clip>
-                                <RectangleGeometry Rect="0,0,176,264"
-                                                    RadiusX="12"
-                                                    RadiusY="12"/>
-                            </controls:GameArtwork.Clip>
-                        </controls:GameArtwork>
-                    </Border>
+                    <Border x:Name="HeroContentRail"
+                            HorizontalAlignment="Stretch"
+                            Margin="0"
+                            Background="Transparent" />
 
-                    <StackPanel x:Name="HeroContent"
-                                Margin="214,44,20,44"
-                                HorizontalAlignment="Stretch"
+                    <Grid x:Name="HeroContentGutter"
+                          Margin="24,0"
+                          HorizontalAlignment="Stretch">
+                        <Border Width="176"
+                                Height="264"
+                                Margin="24,24,0,24"
+                                CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
+                                Background="Transparent"
+                                HorizontalAlignment="Left"
                                 VerticalAlignment="Center">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#CC000000"
+                                                  Opacity="0.42"
+                                                  BlurRadius="10"
+                                                  ShadowDepth="3" />
+                            </Border.Effect>
+                            <Border Width="176"
+                                    Height="264"
+                                    CornerRadius="{DynamicResource PlayStead.Radius.Medium}"
+                                    ClipToBounds="True"
+                                    Background="Transparent">
+                                <Border.OpacityMask>
+                                    <VisualBrush Stretch="Fill">
+                                        <VisualBrush.Visual>
+                                            <Border Width="176"
+                                                    Height="264"
+                                                    Background="Black"
+                                                    CornerRadius="{DynamicResource PlayStead.Radius.Medium}" />
+                                        </VisualBrush.Visual>
+                                    </VisualBrush>
+                                </Border.OpacityMask>
+                                <Grid>
+                                    <Image Source="{Binding CoverPath}"
+                                           Stretch="UniformToFill"
+                                           StretchDirection="Both"
+                                           HorizontalAlignment="Stretch"
+                                           VerticalAlignment="Stretch"
+                                           SnapsToDevicePixels="True">
+                                        <Image.Style>
+                                            <Style TargetType="Image">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasCover}"
+                                                                 Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Image.Style>
+                                    </Image>
+
+                                    <controls:GameArtwork SourcePath="{Binding CoverPath}"
+                                                          HasArtwork="False"
+                                                          Title="{Binding Title}"
+                                                          ProviderLabel="{Binding ProviderLabel}"
+                                                          Width="176"
+                                                          Height="264"
+                                                          HorizontalAlignment="Stretch"
+                                                          VerticalAlignment="Stretch">
+                                        <controls:GameArtwork.Style>
+                                            <Style TargetType="controls:GameArtwork">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasCover}"
+                                                                 Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </controls:GameArtwork.Style>
+                                    </controls:GameArtwork>
+                                </Grid>
+                            </Border>
+                        </Border>
+
+                        <StackPanel x:Name="HeroContent"
+                                    Margin="214,44,20,44"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Center">
                         <TextBlock Text="{Binding DisplayTitle}"
                                    Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
                                    FontSize="30"
                                    FontWeight="Bold"
-                                   TextTrimming="CharacterEllipsis"/>
+                                   HorizontalAlignment="Left"
+                                   MaxWidth="560"
+                                   MaxHeight="78"
+                                   TextWrapping="Wrap"
+                                   TextTrimming="CharacterEllipsis">
+                            <TextBlock.Effect>
+                                <DropShadowEffect Color="#CC000000"
+                                                  Opacity="0.84"
+                                                  BlurRadius="6"
+                                                  ShadowDepth="1" />
+                            </TextBlock.Effect>
+                        </TextBlock>
 
                         <StackPanel x:Name="HeroPlatformRow"
                                     Margin="0,8,0,0"
@@ -107,30 +184,42 @@
                                    Visibility="{Binding Activity.HasSessionHistory,
                                                 Converter={StaticResource BooleanToVisibilityConverter},
                                                 FallbackValue=Collapsed}">
-                            <StackPanel Margin="0,0,32,0">
-                                <TextBlock Text="Temps joué"
-                                           Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                           FontSize="12"
-                                           FontWeight="SemiBold"/>
-                                <StackPanel Margin="0,3,0,0" Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Activity.TotalPlayTimeLabel}"
+                            <Border Margin="0,0,16,0"
+                                    Padding="12,8"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                                    BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="Temps joué"
+                                               Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Margin="0,3,0,0"
+                                               Text="{Binding Activity.TotalPlayTimeLabel}"
                                                Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
                                                FontSize="15"
                                                FontWeight="SemiBold"/>
                                 </StackPanel>
-                            </StackPanel>
-                            <StackPanel>
-                                <TextBlock Text="Dernière partie"
-                                           Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
-                                           FontSize="12"
-                                           FontWeight="SemiBold"/>
-                                <TextBlock Margin="0,3,0,0"
-                                           Text="{Binding Activity.LastActivityLabel}"
-                                           Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           TextWrapping="Wrap"/>
-                            </StackPanel>
+                            </Border>
+                            <Border Padding="12,8"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource PlayStead.Brush.SurfaceStrong}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                                    BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="Dernière partie"
+                                               Foreground="{DynamicResource PlayStead.Brush.TextSecondary}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Margin="0,3,0,0"
+                                               Text="{Binding Activity.LastActivityLabel}"
+                                               Foreground="{DynamicResource PlayStead.Brush.TextPrimary}"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
                         </WrapPanel>
 
                         <TextBlock Margin="0,8,0,0"
@@ -198,12 +287,15 @@
                                     Margin="{DynamicResource PlayStead.Gap.Inline.Cta}"
                                     Visibility="{Binding IsInGamesDuMoment, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         </WrapPanel>
-                    </StackPanel>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </Border>
 
             <StackPanel Grid.Row="1"
-                        Margin="{DynamicResource PlayStead.Spacing.4}">
+                        x:Name="GameDetailContentRail"
+                        HorizontalAlignment="Stretch"
+                        Margin="24,-30">
             <Grid x:Name="DetailColumns"
                   Margin="0,18,0,0">
                 <Grid.RowDefinitions>

@@ -32,8 +32,10 @@ public sealed class GameDetailHeroBackdropLayoutTests
         Assert.Null(rootLayout.Attribute("Margin"));
         Assert.Null(hero.Attribute("Margin"));
         Assert.Equal(
-            "{DynamicResource PlayStead.Spacing.4}",
+            "24,-30",
             (string?)contentInset.Attribute("Margin"));
+        var scrollViewer = document.Descendants().Single(element => element.Name.LocalName == "ScrollViewer");
+        Assert.Equal("Stretch", (string?)scrollViewer.Attribute("HorizontalContentAlignment"));
         Assert.Contains("MinHeight=\"320\"", View, StringComparison.Ordinal);
     }
 
@@ -41,8 +43,8 @@ public sealed class GameDetailHeroBackdropLayoutTests
     public void Hero_media_and_local_gradient_are_preserved()
     {
         Assert.Contains("{Binding HeroPath}", View, StringComparison.Ordinal);
-        Assert.Contains("Width=\"600\"", View, StringComparison.Ordinal);
-        Assert.Contains("OpacityMask", View, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"HeroContentRail\"", View, StringComparison.Ordinal);
+        Assert.Contains("LinearGradientBrush", View, StringComparison.Ordinal);
         Assert.Contains("PlaySplitButton", View, StringComparison.Ordinal);
     }
 
@@ -61,14 +63,9 @@ public sealed class GameDetailHeroBackdropLayoutTests
         var rail = children[railIndex];
 
         Assert.True(railIndex >= 0 && contentIndex > railIndex);
-        Assert.True(double.Parse((string?)rail.Attribute("Opacity") ?? "0", System.Globalization.CultureInfo.InvariantCulture) >= 0.9);
-        var stops = rail.Descendants().Where(element => element.Name.LocalName == "GradientStop").ToArray();
-        Assert.True(stops.Length >= 3);
-        Assert.Contains(stops, stop =>
-            string.Equals((string?)stop.Attribute("Offset"), "0", StringComparison.Ordinal) &&
-            !string.Equals((string?)stop.Attribute("Color"), "#00000000", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(stops, stop =>
-            string.Equals((string?)stop.Attribute("Color"), "#00000000", StringComparison.OrdinalIgnoreCase));
+        Assert.Null(rail.Attribute("Opacity"));
+        Assert.Equal("Transparent", (string?)rail.Attribute("Background"));
+        Assert.DoesNotContain(rail.Descendants(), element => element.Name.LocalName == "GradientStop");
         Assert.DoesNotContain("Steam", rail.ToString(), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("GOG", rail.ToString(), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Manual", rail.ToString(), StringComparison.OrdinalIgnoreCase);

@@ -19,7 +19,7 @@ public sealed class GameDetailVisualContractTests
         var xaml = ReadView();
 
         Assert.Contains("PlayStead.Brush.", xaml, StringComparison.Ordinal);
-        Assert.Contains("PlayStead.Spacing.", xaml, StringComparison.Ordinal);
+        Assert.Contains("PlayStead.Gap.", xaml, StringComparison.Ordinal);
         Assert.Contains("PlayStead.Surface.Card", xaml, StringComparison.Ordinal);
         Assert.Contains("PlayStead.Font.Body", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"#", xaml, StringComparison.OrdinalIgnoreCase);
