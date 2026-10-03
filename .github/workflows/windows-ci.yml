@@ -53,7 +53,8 @@ jobs:
           $totalCount = 0
           $passedCount = 0
           $failedCount = 0
-          $notExecutedCount = 0
+          $explicitSkippedCount = 0
+          $trxNotExecutedCounter = 0
           $errorCount = 0
           $timeoutCount = 0
           $abortedCount = 0
@@ -71,19 +72,46 @@ jobs:
               $totalCount += [int]$counters.total
               $passedCount += [int]$counters.passed
               $failedCount += [int]$counters.failed
-              $notExecutedCount += [int]$counters.notExecuted
+              $trxNotExecutedCounter += [int]$counters.notExecuted
               $errorCount += [int]$counters.error
               $timeoutCount += [int]$counters.timeout
               $abortedCount += [int]$counters.aborted
               $inconclusiveCount += [int]$counters.inconclusive
               $notRunnableCount += [int]$counters.notRunnable
+
+              $results = @(
+                  $xml.SelectNodes("//*[local-name()='UnitTestResult']")
+              )
+              $explicitSkippedCount += @(
+                  $results | Where-Object { $_.outcome -eq "NotExecuted" }
+              ).Count
+
+              $unknownOutcomes = @(
+                  $results |
+                      Where-Object {
+                          $_.outcome -notin @(
+                              "Passed",
+                              "Failed",
+                              "NotExecuted",
+                              "Error",
+                              "Timeout",
+                              "Aborted",
+                              "Inconclusive",
+                              "NotRunnable"
+                          )
+                      }
+              )
+              if ($unknownOutcomes.Count -ne 0) {
+                  throw "TRX contains unknown UnitTestResult outcomes: $($unknownOutcomes.outcome -join ', ')"
+              }
           }
 
           Write-Host "TRX files: $($trxFiles.Count)"
           Write-Host "Total: $totalCount"
           Write-Host "Passed: $passedCount"
           Write-Host "Failed: $failedCount"
-          Write-Host "Skipped/Not executed: $notExecutedCount"
+          Write-Host "Skipped (explicit UnitTestResult): $explicitSkippedCount"
+          Write-Host "TRX Counters.notExecuted (diagnostic only): $trxNotExecutedCounter"
 
           if ($totalCount -lt $MinimumExpectedTests) {
               throw "Test baseline regression: $totalCount < $MinimumExpectedTests"
@@ -103,11 +131,11 @@ jobs:
               throw "TRX contains non-clean result counters."
           }
 
-          if (($passedCount + $notExecutedCount) -ne $totalCount) {
-              throw "TRX mismatch: passed=$passedCount skipped=$notExecutedCount total=$totalCount"
+          if (($passedCount + $explicitSkippedCount) -ne $totalCount) {
+              throw "TRX mismatch: passed=$passedCount explicitSkipped=$explicitSkippedCount total=$totalCount"
           }
 
-          Write-Host "PlayStead CI test gate PASS: passed=$passedCount skipped=$notExecutedCount total=$totalCount"
+          Write-Host "PlayStead CI test gate PASS: passed=$passedCount explicitSkipped=$explicitSkippedCount total=$totalCount"
 
       - name: Upload test results
         if: always()
