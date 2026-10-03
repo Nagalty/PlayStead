@@ -1,6 +1,5 @@
 # PlayStead UI hard-coded-value debt baseline.
 # Format: relative/path.xaml|Category|Value|OccurrenceCount
-src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,2,0,0|3
 # Fixed media geometry is allowed only when protected by focused feature tests.
 # Exception: Game Detail Hero cover 176x264 and RectangleGeometry clip are validated fixed media geometry.
 # Exception: responsive breakpoints and GridLength proportions are structural and outside these scanned categories.
@@ -68,7 +67,7 @@ src/PlayStead.UI/Home/HomeView.xaml|Spacing|12,8|1
 src/PlayStead.UI/Home/HomeView.xaml|Spacing|6,0,0,0|3
 src/PlayStead.UI/Home/HomeView.xaml|Spacing|6,2|2
 src/PlayStead.UI/Home/HomeView.xaml|Spacing|8,0,0,0|3
-src/PlayStead.UI/Library/GameDetailView.xaml|CornerRadius|12|1
+src/PlayStead.UI/Library/GameDetailView.xaml|CornerRadius|6|2
 src/PlayStead.UI/Library/GameDetailView.xaml|FontSize|12|4
 src/PlayStead.UI/Library/GameDetailView.xaml|FontSize|13|3
 src/PlayStead.UI/Library/GameDetailView.xaml|FontSize|14|1
@@ -76,21 +75,27 @@ src/PlayStead.UI/Library/GameDetailView.xaml|FontSize|15|2
 src/PlayStead.UI/Library/GameDetailView.xaml|FontSize|30|1
 src/PlayStead.UI/Library/GameDetailView.xaml|FontWeight|Bold|1
 src/PlayStead.UI/Library/GameDetailView.xaml|FontWeight|SemiBold|5
-src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#00000000|1
-src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#EE000000|1
-src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#FF000000|1
-src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0|2
+src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#000F1118|3
+src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#120F1118|1
+src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#240B1117|1
+src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#400F1118|1
+src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#780F1118|1
+src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#A80B1117|1
+src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#CC000000|2
+src/PlayStead.UI/Library/GameDetailView.xaml|HexColor|#FF0B1117|1
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0|3
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,0,10|3
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,14,4|1
-src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,32,0|1
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,16,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,6,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,6,4|1
-src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,8,0|1
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,8,0|8
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,0,9,0|1
-src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,10,0,0|5
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,10,0,0|6
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,10,0,4|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,12,0,0|8
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,18,0,0|7
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,2,0,0|3
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,22,0,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,3,0,0|6
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,4,0,0|9
@@ -99,11 +104,14 @@ src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|0,8,0,0|10
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,0,0,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,0,18,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,10,0,0|1
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,8|2
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|12,8,0,0|2
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|16,0,0,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|16,0,12,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|20,14|2
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|214,44,20,44|1
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|24,-30,24,24|1
+src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|24,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|24,24,0,24|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|3,0,3,0|1
 src/PlayStead.UI/Library/GameDetailView.xaml|Spacing|6,0,0,0|1

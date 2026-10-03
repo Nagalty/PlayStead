@@ -32,7 +32,7 @@ public sealed class GameDetailHeroBackdropLayoutTests
         Assert.Null(rootLayout.Attribute("Margin"));
         Assert.Null(hero.Attribute("Margin"));
         Assert.Equal(
-            "24,-30",
+            "24,-30,24,24",
             (string?)contentInset.Attribute("Margin"));
         var scrollViewer = document.Descendants().Single(element => element.Name.LocalName == "ScrollViewer");
         Assert.Equal("Stretch", (string?)scrollViewer.Attribute("HorizontalContentAlignment"));

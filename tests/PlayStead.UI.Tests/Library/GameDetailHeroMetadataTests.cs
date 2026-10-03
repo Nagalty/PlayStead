@@ -25,17 +25,12 @@ public sealed class GameDetailHeroMetadataTests
         Assert.Contains("Text=\"Dernière partie\"", ViewSource, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Activity.LastActivityLabel}\"", ViewSource, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\" jouées\"", ViewSource, StringComparison.Ordinal);
-        Assert.Contains("Margin=\"0,0,32,0\"", ViewSource, StringComparison.Ordinal);
         Assert.DoesNotContain("Margin=\"0,0,{DynamicResource", ViewSource, StringComparison.Ordinal);
-
-        var firstGroup = ViewSource.IndexOf("<StackPanel Margin=\"0,0,32,0\">", StringComparison.Ordinal);
-        var secondGroup = ViewSource.IndexOf("<StackPanel>", firstGroup, StringComparison.Ordinal);
-
-        Assert.True(firstGroup >= 0);
-        Assert.True(secondGroup > firstGroup);
-        Assert.True(ViewSource.IndexOf("Text=\"Temps joué\"", firstGroup, StringComparison.Ordinal) < secondGroup);
-        Assert.True(ViewSource.IndexOf("Activity.TotalPlayTimeLabel", firstGroup, StringComparison.Ordinal) < secondGroup);
-        Assert.Contains("Text=\"Dernière partie\"", ViewSource[secondGroup..], StringComparison.Ordinal);
+        Assert.Contains("<UniformGrid Margin=\"0,12,0,0\" Columns=\"3\">", ViewSource, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Temps joué\"", ViewSource, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Dernière partie\"", ViewSource, StringComparison.Ordinal);
+        Assert.Contains("Activity.TotalPlayTimeLabel", ViewSource, StringComparison.Ordinal);
+        Assert.Contains("Activity.LastActivityLabel", ViewSource, StringComparison.Ordinal);
     }
 
     [Fact]
