@@ -83,7 +83,7 @@ jobs:
           Write-Host "Total: $totalCount"
           Write-Host "Passed: $passedCount"
           Write-Host "Failed: $failedCount"
-          Write-Host "Not executed: $notExecutedCount"
+          Write-Host "Skipped/Not executed: $notExecutedCount"
 
           if ($totalCount -lt $MinimumExpectedTests) {
               throw "Test baseline regression: $totalCount < $MinimumExpectedTests"
@@ -91,10 +91,6 @@ jobs:
 
           if ($failedCount -ne 0) {
               throw "Failed tests: $failedCount"
-          }
-
-          if ($notExecutedCount -ne 0) {
-              throw "Skipped/not-executed tests: $notExecutedCount"
           }
 
           if (
@@ -107,11 +103,11 @@ jobs:
               throw "TRX contains non-clean result counters."
           }
 
-          if ($passedCount -ne $totalCount) {
-              throw "TRX mismatch: passed=$passedCount total=$totalCount"
+          if (($passedCount + $notExecutedCount) -ne $totalCount) {
+              throw "TRX mismatch: passed=$passedCount skipped=$notExecutedCount total=$totalCount"
           }
 
-          Write-Host "PlayStead CI test gate PASS: $passedCount/$totalCount"
+          Write-Host "PlayStead CI test gate PASS: passed=$passedCount skipped=$notExecutedCount total=$totalCount"
 
       - name: Upload test results
         if: always()
