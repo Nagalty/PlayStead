@@ -37,7 +37,7 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
         var version = Convert.ToInt32(
             await versionCommand.ExecuteScalarAsync());
 
-        Assert.Equal(26, version);
+        Assert.Equal(28, version);
 
         var tablesCommand = connection.CreateCommand();
         tablesCommand.CommandText = """
@@ -85,7 +85,7 @@ public sealed class DatabaseSteamEvidenceMigrationTests : IDisposable
         var version = Convert.ToInt32(
             await versionCommand.ExecuteScalarAsync());
 
-        Assert.Equal(26, version);
+        Assert.Equal(28, version);
 
         var titleCommand = connection.CreateCommand();
         titleCommand.CommandText =
