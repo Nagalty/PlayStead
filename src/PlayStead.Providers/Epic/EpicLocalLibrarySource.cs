@@ -150,7 +150,18 @@ public sealed class EpicLocalLibrarySource : ILocalLibrarySource
             manifest.DisplayName.Trim(),
             installPath,
             manifest.InstallSize is >= 0 ? manifest.InstallSize : null,
-            observedAtUtc) with { ContentKind = InstallationContentKind.Game };
+            observedAtUtc) with
+        {
+            ContentKind = InstallationContentKind.Game,
+            LaunchMetadata = new ProviderLaunchMetadata(
+                ProviderKind.Epic,
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["CatalogNamespace"] = manifest.CatalogNamespace?.Trim() ?? string.Empty,
+                    ["CatalogItemId"] = manifest.CatalogItemId?.Trim() ?? string.Empty,
+                    ["AppName"] = manifest.AppName?.Trim() ?? string.Empty
+                })
+        };
         return true;
     }
 

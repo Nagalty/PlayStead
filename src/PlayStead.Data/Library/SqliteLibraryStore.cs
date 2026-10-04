@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using PlayStead.Core.Catalog;
 using PlayStead.Core.Library;
@@ -272,7 +273,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                     last_seen_utc = $lastSeenUtc,
                     executable_path = $executablePath,
                     working_directory = $workingDirectory,
-                    launch_arguments = $launchArguments
+                    launch_arguments = $launchArguments,
+                    provider_launch_metadata_json = $launchMetadata
                 WHERE installation_id = $installationId;
                 """;
             update.Parameters.AddWithValue(
@@ -293,6 +295,9 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
             update.Parameters.AddWithValue(
                 "$launchArguments",
                 (object?)discovered.LaunchArguments ?? DBNull.Value);
+            update.Parameters.AddWithValue(
+                "$launchMetadata",
+                (object?)SerializeLaunchMetadata(discovered.LaunchMetadata) ?? DBNull.Value);
 
             await update.ExecuteNonQueryAsync(
                 cancellationToken);
@@ -317,7 +322,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                 last_seen_utc,
                 executable_path,
                 working_directory,
-                launch_arguments)
+                launch_arguments,
+                provider_launch_metadata_json)
             VALUES(
                 $installationId,
                 $gameId,
@@ -330,7 +336,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                 $lastSeenUtc,
                 $executablePath,
                 $workingDirectory,
-                $launchArguments);
+                $launchArguments,
+                $launchMetadata);
             """;
         insert.Parameters.AddWithValue(
             "$installationId",
@@ -362,6 +369,9 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
         insert.Parameters.AddWithValue(
             "$launchArguments",
             (object?)discovered.LaunchArguments ?? DBNull.Value);
+        insert.Parameters.AddWithValue(
+            "$launchMetadata",
+            (object?)SerializeLaunchMetadata(discovered.LaunchMetadata) ?? DBNull.Value);
 
         await insert.ExecuteNonQueryAsync(
             cancellationToken);
@@ -452,7 +462,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                 executable_path,
                 working_directory,
                 launch_arguments,
-                install_root_path
+                install_root_path,
+                provider_launch_metadata_json
             FROM installations
             ORDER BY game_id, installation_id;
             """;
@@ -495,7 +506,8 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                     executablePath,
                     workingDirectory,
                     reader.IsDBNull(11) ? null : reader.GetString(11),
-                    installRoot ?? (provider == ProviderKind.Manual ? workingDirectory : null)));
+                    installRoot ?? (provider == ProviderKind.Manual ? workingDirectory : null),
+                    DeserializeLaunchMetadata(reader.IsDBNull(13) ? null : reader.GetString(13))));
         }
 
         return result;
@@ -649,6 +661,14 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
         value.ToUniversalTime().ToString(
             "O",
             CultureInfo.InvariantCulture);
+
+    private static string? SerializeLaunchMetadata(ProviderLaunchMetadata? metadata) =>
+        metadata is null ? null : JsonSerializer.Serialize(metadata);
+
+    private static ProviderLaunchMetadata? DeserializeLaunchMetadata(string? json) =>
+        string.IsNullOrWhiteSpace(json)
+            ? null
+            : JsonSerializer.Deserialize<ProviderLaunchMetadata>(json);
 
     private static DateTimeOffset ParseUtc(
         string value) =>

@@ -50,6 +50,42 @@ public sealed class SqliteLibraryStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Epic_launch_metadata_survives_scan_and_reload()
+    {
+        var (store, _) = await CreateStoreAsync();
+        var observed = Utc(8, 0);
+        var discovered = DiscoveredInstallation.Create(
+            ProviderKind.Epic,
+            "581c8d4fd9574884bff66cbdbaa42def",
+            "Hell Let Loose",
+            @"G:\HellLetLooseG0WU4",
+            65_671_088_232,
+            observed) with
+        {
+            LaunchMetadata = new ProviderLaunchMetadata(
+                ProviderKind.Epic,
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["CatalogNamespace"] = "6430e58041234e41b8f81f68f01450ed",
+                    ["CatalogItemId"] = "581c8d4fd9574884bff66cbdbaa42def",
+                    ["AppName"] = "3e02273b543f4ff0a1c24d3b534a9ac3"
+                })
+        };
+
+        await store.ApplySourceScanAsync(
+            SourceScanResult.Success(ProviderKind.Epic, observed, [discovered with { LaunchMetadata = null }]),
+            CancellationToken.None);
+
+        await store.ApplySourceScanAsync(
+            SourceScanResult.Success(ProviderKind.Epic, observed.AddMinutes(5), [discovered]),
+            CancellationToken.None);
+
+        var installation = Assert.Single((await store.LoadSnapshotAsync(CancellationToken.None)).Installations);
+        Assert.Equal("6430e58041234e41b8f81f68f01450ed", installation.LaunchMetadata?["CatalogNamespace"]);
+        Assert.Equal("3e02273b543f4ff0a1c24d3b534a9ac3", installation.LaunchMetadata?["AppName"]);
+    }
+
+    [Fact]
     public async Task Second_identical_scan_reuses_game_and_installation_identity()
     {
         var (store, _) = await CreateStoreAsync();

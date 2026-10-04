@@ -14,4 +14,5 @@ public sealed record GameInstallation(
     string? ExecutablePath = null,
     string? WorkingDirectory = null,
     string? LaunchArguments = null,
-    string? InstallRootPath = null);
+    string? InstallRootPath = null,
+    ProviderLaunchMetadata? LaunchMetadata = null);

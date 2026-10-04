@@ -1,5 +1,6 @@
 using System.IO;
 using PlayStead.Core.Library;
+using PlayStead.Core.ProviderInstallUpdate;
 
 namespace PlayStead.UI.Launching;
 
@@ -9,11 +10,13 @@ public sealed class GameLaunchService
         _externalUriLauncher;
     private readonly ILocalProcessLauncher _localProcessLauncher;
     private readonly IManualSessionLaunchSink? _sessionLaunchSink;
+    private readonly ProviderInstallUpdateStateReconciliationService? _installUpdates;
 
     public GameLaunchService(
         IExternalUriLauncher externalUriLauncher,
         ILocalProcessLauncher? localProcessLauncher = null,
-        IManualSessionLaunchSink? sessionLaunchSink = null)
+        IManualSessionLaunchSink? sessionLaunchSink = null,
+        ProviderInstallUpdateStateReconciliationService? installUpdates = null)
     {
         ArgumentNullException.ThrowIfNull(
             externalUriLauncher);
@@ -22,6 +25,7 @@ public sealed class GameLaunchService
             externalUriLauncher;
         _localProcessLauncher = localProcessLauncher ?? new LocalProcessLauncher();
         _sessionLaunchSink = sessionLaunchSink;
+        _installUpdates = installUpdates;
     }
 
     public bool CanLaunch(
@@ -30,11 +34,22 @@ public sealed class GameLaunchService
         ArgumentNullException.ThrowIfNull(
             installation);
 
-        return installation.Provider == ProviderKind.Manual
-            ? installation.IsPresent &&
-              File.Exists(installation.ExecutablePath) &&
-              Directory.Exists(installation.WorkingDirectory)
-            : SteamLaunchUriFactory.CreateOrNull(installation) is not null;
+        var update = _installUpdates?.GetAll().FirstOrDefault(value =>
+            value.GameId == installation.GameId && value.Provider == installation.Provider);
+        if (update is not null &&
+            (update.Status == ProviderInstallUpdateStatus.Downloading ||
+             update.Status == ProviderInstallUpdateStatus.Staging))
+            return false;
+
+        return installation.Provider switch
+        {
+            ProviderKind.Manual => installation.IsPresent &&
+                                   File.Exists(installation.ExecutablePath) &&
+                                   Directory.Exists(installation.WorkingDirectory),
+            ProviderKind.Steam => SteamLaunchUriFactory.CreateOrNull(installation) is not null,
+            ProviderKind.Epic => EpicLaunchUriFactory.CreateOrNull(installation) is not null,
+            _ => false
+        };
     }
 
     public bool TryLaunch(
@@ -43,11 +58,11 @@ public sealed class GameLaunchService
         ArgumentNullException.ThrowIfNull(
             installation);
 
+        if (!CanLaunch(installation))
+            return false;
+
         if (installation.Provider == ProviderKind.Manual)
         {
-            if (!CanLaunch(installation))
-                return false;
-
             if (_localProcessLauncher is IProcessIdentityLauncher identityLauncher)
             {
                 var identity = identityLauncher.StartWithIdentity(
@@ -70,7 +85,12 @@ public sealed class GameLaunchService
                 installation.LaunchArguments);
         }
 
-        var uri = SteamLaunchUriFactory.CreateOrNull(installation);
+        var uri = installation.Provider switch
+        {
+            ProviderKind.Steam => SteamLaunchUriFactory.CreateOrNull(installation),
+            ProviderKind.Epic => EpicLaunchUriFactory.CreateOrNull(installation),
+            _ => null
+        };
 
         if (uri is null)
         {

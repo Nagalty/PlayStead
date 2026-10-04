@@ -4,7 +4,7 @@ namespace PlayStead.Data.Database;
 
 public sealed class DatabaseInitializer
 {
-    private const int TargetVersion = 26;
+    private const int TargetVersion = 28;
 
     private static readonly IReadOnlyDictionary<int, string> MigrationFiles =
         new Dictionary<int, string>
@@ -34,7 +34,9 @@ public sealed class DatabaseInitializer
             [23] = "023_user_defined_local_artifacts.sql",
             [24] = "024_manual_game_launch.sql",
             [25] = "025_manual_install_root.sql",
-            [26] = "026_manual_metadata_links.sql"
+            [26] = "026_manual_metadata_links.sql",
+            [27] = "027_provider_launch_metadata.sql",
+            [28] = "028_process_signature_absence_baseline.sql"
         };
 
     private readonly DatabaseOptions _options;
@@ -166,7 +168,7 @@ public sealed class DatabaseInitializer
         var migration = connection.CreateCommand();
         migration.Transaction = (SqliteTransaction)transaction;
         var canApply = true;
-        if (version is 24 or 25)
+        if (version is 24 or 25 or 27 or 28)
         {
             migration.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='installations';";
             canApply = Convert.ToInt32(await migration.ExecuteScalarAsync(cancellationToken)) == 1;

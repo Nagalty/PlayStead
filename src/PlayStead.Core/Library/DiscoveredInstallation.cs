@@ -10,7 +10,8 @@ public sealed record DiscoveredInstallation(
     InstallationContentKind ContentKind = InstallationContentKind.Unknown,
     string? ExecutablePath = null,
     string? WorkingDirectory = null,
-    string? LaunchArguments = null)
+    string? LaunchArguments = null,
+    ProviderLaunchMetadata? LaunchMetadata = null)
 {
     public static DiscoveredInstallation Create(
         ProviderKind provider,

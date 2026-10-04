@@ -42,6 +42,10 @@ public sealed class EpicLocalLibrarySourceTests : IDisposable
         Assert.Equal(Path.GetFullPath(_installPath), installation.InstallPath);
         Assert.Equal(65671088232L, installation.InstalledSizeBytes);
         Assert.Equal(InstallationContentKind.Game, installation.ContentKind);
+        Assert.Equal(ProviderKind.Epic, installation.LaunchMetadata?.Provider);
+        Assert.Equal("namespace", installation.LaunchMetadata?["CatalogNamespace"]);
+        Assert.Equal("catalog-id", installation.LaunchMetadata?["CatalogItemId"]);
+        Assert.Equal("app-name", installation.LaunchMetadata?["AppName"]);
     }
 
     [Fact]
