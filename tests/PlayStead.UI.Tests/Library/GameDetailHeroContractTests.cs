@@ -183,7 +183,8 @@ public sealed class GameDetailHeroContractTests
         Assert.Contains("ElementName=GameDetailRoot", viewSource, StringComparison.Ordinal);
         Assert.Contains("Binding PlayLabel, RelativeSource={RelativeSource AncestorType=UserControl}", splitButton, StringComparison.Ordinal);
         Assert.Contains("Binding IsSessionActive, ElementName=Root", splitButton, StringComparison.Ordinal);
-        Assert.Contains("Setter Property=\"IsEnabled\"", splitButton, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding PlayCommand}\"", splitButton, StringComparison.Ordinal);
+        Assert.DoesNotContain("Setter Property=\"IsEnabled\"", splitButton, StringComparison.Ordinal);
     }
 
     [Fact]
