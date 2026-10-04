@@ -313,6 +313,16 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<IGameMediaProvider>(services =>
             new GogMediaProvider(
                 services.GetRequiredService<GogLocalMediaLocator>()));
+        builder.Services.AddSingleton<EpicLocalMediaLocator>(_ =>
+            new EpicLocalMediaLocator([
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Epic", "EpicGamesLauncher", "Data"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EpicGamesLauncher", "Saved")
+            ]));
+        builder.Services.AddSingleton<IGameMediaProvider>(services =>
+            new EpicMediaProvider(
+                services.GetRequiredService<EpicLocalMediaLocator>(),
+                services.GetRequiredService<ICanonicalCatalogStore>(),
+                services.GetRequiredService<HttpClient>()));
 
         builder.Services.AddSingleton<GameMediaResolver>();
         builder.Services.AddSingleton<IGameMediaResolver>(services =>

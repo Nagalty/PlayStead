@@ -213,7 +213,17 @@ public sealed class SqliteCanonicalCatalogStore : PlayStead.Core.Persistence.ICa
             Guid.Parse(reader.GetString(9))),
             reader.IsDBNull(10)
                 ? null
-                : JsonSerializer.Deserialize<string[]>(reader.GetString(10)));
+                : JsonSerializer.Deserialize<string[]>(reader.GetString(10)),
+            reader.IsDBNull(11) && reader.IsDBNull(12)
+                ? null
+                : new CatalogMedia(
+                    reader.IsDBNull(11) ? null : reader.GetString(11),
+                    reader.IsDBNull(12) ? null : reader.GetString(12),
+                    reader.IsDBNull(13) ? null : reader.GetInt32(13),
+                    reader.IsDBNull(14) ? null : reader.GetInt32(14),
+                    reader.IsDBNull(15) ? null : reader.GetInt32(15),
+                    reader.IsDBNull(16) ? null : reader.GetInt32(16),
+                    reader.IsDBNull(17) ? null : reader.GetString(17)));
 
     private const string ContentSelect = """
         SELECT
@@ -227,7 +237,14 @@ public sealed class SqliteCanonicalCatalogStore : PlayStead.Core.Persistence.ICa
             publisher,
             status,
             redirect_target_id,
-            genres_json
+            genres_json,
+            cover_url,
+            hero_url,
+            cover_width,
+            cover_height,
+            hero_width,
+            hero_height,
+            media_source
         FROM catalog_contents
         """;
 }

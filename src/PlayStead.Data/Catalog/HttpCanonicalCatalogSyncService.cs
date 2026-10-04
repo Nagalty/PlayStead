@@ -109,7 +109,7 @@ public sealed class HttpCanonicalCatalogSyncService : ICanonicalCatalogSyncServi
         var document = JsonSerializer.Deserialize<CanonicalCatalogDocument>(documentBytes, JsonOptions)
             ?? throw new InvalidDataException("Catalog payload is empty.");
         Trace.WriteLine($"[CATALOG-SYNC] Document Schema={document.SchemaVersion} Version={document.CatalogVersion} Entries={document.Entries.Count}");
-        if (document.SchemaVersion != SupportedSchemaVersionV1 || document.CatalogVersion != manifest.CatalogVersion || document.Entries.Count != manifest.EntryCount)
+        if (document.SchemaVersion is not (SupportedSchemaVersionV1 or SupportedSchemaVersionV2) || document.CatalogVersion != manifest.CatalogVersion || document.Entries.Count != manifest.EntryCount)
             throw new InvalidDataException("Catalog document metadata does not match the manifest.");
         Trace.WriteLine("[CATALOG-SYNC] Import START");
         await _importer.ImportAsync(document, token).ConfigureAwait(false);

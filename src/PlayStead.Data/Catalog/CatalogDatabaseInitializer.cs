@@ -4,8 +4,8 @@ namespace PlayStead.Data.Catalog;
 
 public sealed class CatalogDatabaseInitializer
 {
-    private const int TargetVersion = 2;
-    private static readonly string[] MigrationFiles = ["001_catalog_initial.sql", "002_catalog_genres.sql"];
+    private const int TargetVersion = 3;
+    private static readonly string[] MigrationFiles = ["001_catalog_initial.sql", "002_catalog_genres.sql", "003_catalog_media.sql"];
     private readonly CatalogDatabaseOptions _options;
 
     public CatalogDatabaseInitializer(CatalogDatabaseOptions options)

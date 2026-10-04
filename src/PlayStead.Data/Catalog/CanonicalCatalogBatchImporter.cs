@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Net;
 using Microsoft.Data.Sqlite;
 using PlayStead.Core.Catalog;
 
@@ -9,14 +10,15 @@ namespace PlayStead.Data.Catalog;
 public sealed class CanonicalCatalogBatchImporter
 {
     private readonly CatalogDatabaseOptions _options;
-    private const int SupportedSchemaVersion = 1;
+    private const int SupportedSchemaVersionV1 = 1;
+    private const int SupportedSchemaVersionV2 = 2;
 
     public CanonicalCatalogBatchImporter(CatalogDatabaseOptions options) => _options = options;
 
     public async Task ImportAsync(CanonicalCatalogDocument document, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(document);
-        if (document.SchemaVersion != SupportedSchemaVersion)
+        if (document.SchemaVersion is not (SupportedSchemaVersionV1 or SupportedSchemaVersionV2))
             throw new InvalidDataException($"Unsupported catalog schema {document.SchemaVersion}.");
         Validate(document);
 
@@ -29,7 +31,7 @@ public sealed class CanonicalCatalogBatchImporter
             foreach (var entry in document.Entries)
             {
                 var insert = connection.CreateCommand(); insert.Transaction = transaction;
-                insert.CommandText = "INSERT INTO catalog_contents(internal_content_id,public_id,content_kind,canonical_title,normalized_title,release_date,developer,publisher,genres_json,status) VALUES($id,$public,1,$title,$normalized,$release,$developer,$publisher,$genres,1);";
+                insert.CommandText = "INSERT INTO catalog_contents(internal_content_id,public_id,content_kind,canonical_title,normalized_title,release_date,developer,publisher,genres_json,status,cover_url,hero_url,cover_width,cover_height,hero_width,hero_height,media_source) VALUES($id,$public,1,$title,$normalized,$release,$developer,$publisher,$genres,1,$cover,$hero,$cw,$ch,$hw,$hh,$source);";
                 insert.Parameters.AddWithValue("$id", entry.Id.Value.ToString("D"));
                 insert.Parameters.AddWithValue("$public", entry.PublicId.Value);
                 insert.Parameters.AddWithValue("$title", entry.CanonicalTitle);
@@ -38,6 +40,13 @@ public sealed class CanonicalCatalogBatchImporter
                 insert.Parameters.AddWithValue("$developer", entry.Developer ?? string.Empty);
                 insert.Parameters.AddWithValue("$publisher", entry.Publisher ?? string.Empty);
                 insert.Parameters.AddWithValue("$genres", entry.Genres.Count == 0 ? "[]" : JsonSerializer.Serialize(entry.Genres));
+                insert.Parameters.AddWithValue("$cover", (object?)entry.Media?.CoverUrl ?? DBNull.Value);
+                insert.Parameters.AddWithValue("$hero", (object?)entry.Media?.HeroUrl ?? DBNull.Value);
+                insert.Parameters.AddWithValue("$cw", (object?)entry.Media?.CoverWidth ?? DBNull.Value);
+                insert.Parameters.AddWithValue("$ch", (object?)entry.Media?.CoverHeight ?? DBNull.Value);
+                insert.Parameters.AddWithValue("$hw", (object?)entry.Media?.HeroWidth ?? DBNull.Value);
+                insert.Parameters.AddWithValue("$hh", (object?)entry.Media?.HeroHeight ?? DBNull.Value);
+                insert.Parameters.AddWithValue("$source", (object?)entry.Media?.Source ?? DBNull.Value);
                 await insert.ExecuteNonQueryAsync(cancellationToken);
                 foreach (var reference in entry.ProviderRefs)
                 {
@@ -80,7 +89,26 @@ public sealed class CanonicalCatalogBatchImporter
             foreach (var reference in entry.ProviderRefs)
                 if (!Enum.IsDefined(reference.Provider) || string.IsNullOrWhiteSpace(reference.ExternalId) || !refs.Add((reference.Provider, reference.ExternalId)))
                     throw new InvalidDataException("Catalog contains an invalid or duplicate provider reference.");
+            if (entry.Media is { } media)
+            {
+                ValidateMediaUrl(media.CoverUrl);
+                ValidateMediaUrl(media.HeroUrl);
+                if (media.CoverWidth is <= 0 || media.CoverHeight is <= 0 || media.HeroWidth is <= 0 || media.HeroHeight is <= 0)
+                    throw new InvalidDataException("Catalog media dimensions are invalid.");
+            }
         }
+    }
+
+    private static void ValidateMediaUrl(string? value)
+    {
+        if (value is null) return;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps
+            || uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || IPAddress.TryParse(uri.Host, out var address) && IPAddress.IsLoopback(address)
+            || uri.Query.Length != 0
+            || uri.UserInfo.Length != 0)
+            throw new InvalidDataException("Catalog media URL must be an HTTPS URL without query credentials.");
     }
 
     private static async Task ExecuteAsync(SqliteConnection connection, SqliteTransaction transaction, string sql, CancellationToken token)

@@ -20,7 +20,7 @@ var records = parsed.InputPath is not null ? await LoadExportAsync(parsed.InputP
 var entries = BuildEntries(records);
 var generatedAt = DateTimeOffset.TryParse(Environment.GetEnvironmentVariable("PLAYSTEAD_CATALOG_GENERATED_AT_UTC"), out var fixedTime) ? fixedTime.ToUniversalTime() : DateTimeOffset.UtcNow;
 var catalogVersion = parsed.CatalogVersion ?? long.Parse(generatedAt.ToString("yyyyMMddHHmm"), System.Globalization.CultureInfo.InvariantCulture);
-var document = new CanonicalCatalogDocument(1, catalogVersion, generatedAt, entries);
+var document = new CanonicalCatalogDocument(2, catalogVersion, generatedAt, entries);
 var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
 var payload = JsonSerializer.SerializeToUtf8Bytes(document, jsonOptions);
 var compressedPayload = CompressDeterministically(payload);
@@ -44,7 +44,15 @@ static List<CanonicalCatalogEntry> BuildEntries(IEnumerable<IgdbRecord> source)
     return candidates.Select((item, index) => new CanonicalCatalogEntry(new CatalogContentId(StableGuid(item.Record.Id)), PlaySteadPublicId.Parse($"PlayStead-{index + 1:000000}"), item.Record.Name, item.Normalized,
         item.Record.ReleaseDate is null ? null : DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(item.Record.ReleaseDate.Value).UtcDateTime), item.Record.Developer, item.Record.Publisher,
         (item.Record.Genres ?? []).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray(),
-        (item.Record.ExternalGames ?? []).Where(x => x is not null && !string.IsNullOrWhiteSpace(x.ExternalId)).Select(x => new CanonicalCatalogProviderReference(MapProvider(x.Source), x.ExternalId!, null, CatalogProvenance.Igdb, CatalogConfidence.Deterministic, DateTimeOffset.UnixEpoch)).Where(x => x.Provider is CatalogProviderKind.Steam or CatalogProviderKind.Epic or CatalogProviderKind.Gog).GroupBy(x => (x.Provider, x.ExternalId)).Select(x => x.First()).OrderBy(x => x.Provider).ThenBy(x => x.ExternalId, StringComparer.Ordinal).ToArray(), CatalogProvenance.Igdb, DateTimeOffset.UnixEpoch)).ToList();
+        (item.Record.ExternalGames ?? []).Where(x => x is not null && !string.IsNullOrWhiteSpace(x.ExternalId)).Select(x => new CanonicalCatalogProviderReference(MapProvider(x.Source), x.ExternalId!, null, CatalogProvenance.Igdb, CatalogConfidence.Deterministic, DateTimeOffset.UnixEpoch)).Where(x => x.Provider is CatalogProviderKind.Steam or CatalogProviderKind.Epic or CatalogProviderKind.Gog).GroupBy(x => (x.Provider, x.ExternalId)).Select(x => x.First()).OrderBy(x => x.Provider).ThenBy(x => x.ExternalId, StringComparer.Ordinal).ToArray(), CatalogProvenance.Igdb, DateTimeOffset.UnixEpoch, BuildMedia(item.Record))).ToList();
+}
+
+static CatalogMedia? BuildMedia(IgdbRecord record)
+{
+    var cover = string.IsNullOrWhiteSpace(record.CoverImageId) ? null : $"https://images.igdb.com/igdb/image/upload/t_600x900/{record.CoverImageId}.jpg";
+    var heroId = record.ArtworkImageIds?.FirstOrDefault() ?? record.ScreenshotImageIds?.FirstOrDefault();
+    var hero = string.IsNullOrWhiteSpace(heroId) ? null : $"https://images.igdb.com/igdb/image/upload/t_1920x1080/{heroId}.jpg";
+    return cover is null && hero is null ? null : new CatalogMedia(cover, hero, cover is null ? null : 600, cover is null ? null : 900, hero is null ? null : 1920, hero is null ? null : 1080, "igdb");
 }
 
 static CatalogProviderKind MapProvider(string? source) => source?.Trim().ToLowerInvariant() switch { "steam" => CatalogProviderKind.Steam, "epic" or "epic games store" => CatalogProviderKind.Epic, "gog" or "gog.com" => CatalogProviderKind.Gog, _ => CatalogProviderKind.Igdb };
@@ -68,7 +76,7 @@ static void ValidateArtifact(CanonicalCatalogDocument document, CanonicalCatalog
 
 static async Task WriteAtomicallyAsync(string path, byte[] content) { var temp = path + ".tmp"; await File.WriteAllBytesAsync(temp, content); File.Move(temp, path, true); }
 
-public sealed record IgdbRecord(string Id, string Name, string? Developer, string? Publisher, string[]? Genres, IgdbExternal[]? ExternalGames, long? ReleaseDate = null);
+public sealed record IgdbRecord(string Id, string Name, string? Developer, string? Publisher, string[]? Genres, IgdbExternal[]? ExternalGames, long? ReleaseDate = null, string? CoverImageId = null, string[]? ArtworkImageIds = null, string[]? ScreenshotImageIds = null);
 public sealed record IgdbExternal(string? Source, string? ExternalId);
 
 internal sealed record Arguments(string? InputPath, string OutputPath, bool DryRun, long? CatalogVersion)
@@ -110,7 +118,7 @@ public static class IgdbClient
         DateTimeOffset? lastRequest = null;
         for (var offset = 0; ; offset += 500)
         {
-            const string fields = "fields id,name,first_release_date,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,genres.name,external_games.external_game_source.name,external_games.uid;";
+            const string fields = "fields id,name,first_release_date,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,genres.name,cover.image_id,artworks.image_id,screenshots.image_id,external_games.external_game_source.name,external_games.uid;";
             var query = $"{fields} limit 500; offset {offset};";
             using var response = await PostIgdbPageAsync(client, query, lastRequest);
             lastRequest = DateTimeOffset.UtcNow;
@@ -162,7 +170,9 @@ public static class IgdbClient
         var publishers = companies.Where(x => x.TryGetProperty("publisher", out var p) && p.GetBoolean()).Select(x => x.GetProperty("company").GetProperty("name").GetString()).OfType<string>();
         var genres = game.TryGetProperty("genres", out var genreArray) && genreArray.ValueKind == JsonValueKind.Array ? genreArray.EnumerateArray().Select(x => x.GetProperty("name").GetString()).OfType<string>().ToArray() : [];
         var external = game.TryGetProperty("external_games", out var externalArray) && externalArray.ValueKind == JsonValueKind.Array ? externalArray.EnumerateArray().Select(x => new IgdbExternal(x.TryGetProperty("external_game_source", out var source) && source.ValueKind == JsonValueKind.Object && source.TryGetProperty("name", out var name) ? name.GetString() : null, x.TryGetProperty("uid", out var uid) ? uid.GetString() : null)).ToArray() : [];
-        return new(game.GetProperty("id").GetInt64().ToString(), game.GetProperty("name").GetString() ?? string.Empty, developers.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).FirstOrDefault(), publishers.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).FirstOrDefault(), genres.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray(), external, game.TryGetProperty("first_release_date", out var date) ? date.GetInt64() : null);
+        var cover = game.TryGetProperty("cover", out var coverObject) && coverObject.ValueKind == JsonValueKind.Object && coverObject.TryGetProperty("image_id", out var coverId) ? coverId.GetString() : null;
+        static string[] ReadImageIds(JsonElement value, string property) => value.TryGetProperty(property, out var values) && values.ValueKind == JsonValueKind.Array ? values.EnumerateArray().Where(x => x.TryGetProperty("image_id", out _)).Select(x => x.GetProperty("image_id").GetString()).OfType<string>().ToArray() : [];
+        return new(game.GetProperty("id").GetInt64().ToString(), game.GetProperty("name").GetString() ?? string.Empty, developers.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).FirstOrDefault(), publishers.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).FirstOrDefault(), genres.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray(), external, game.TryGetProperty("first_release_date", out var date) ? date.GetInt64() : null, cover, ReadImageIds(game, "artworks"), ReadImageIds(game, "screenshots"));
     }
     private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);
 }

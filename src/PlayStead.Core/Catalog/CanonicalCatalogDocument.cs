@@ -17,7 +17,17 @@ public sealed record CanonicalCatalogEntry(
     IReadOnlyList<string> Genres,
     IReadOnlyList<CanonicalCatalogProviderReference> ProviderRefs,
     CatalogProvenance Provenance,
-    DateTimeOffset ObservedAtUtc);
+    DateTimeOffset ObservedAtUtc,
+    CatalogMedia? Media = null);
+
+public sealed record CatalogMedia(
+    string? CoverUrl,
+    string? HeroUrl,
+    int? CoverWidth = null,
+    int? CoverHeight = null,
+    int? HeroWidth = null,
+    int? HeroHeight = null,
+    string? Source = null);
 
 public sealed record CanonicalCatalogProviderReference(
     CatalogProviderKind Provider,
