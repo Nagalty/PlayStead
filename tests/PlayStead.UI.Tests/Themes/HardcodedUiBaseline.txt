@@ -67,7 +67,7 @@ src/PlayStead.UI/Home/HomeView.xaml|Spacing|12,8|1
 src/PlayStead.UI/Home/HomeView.xaml|Spacing|6,0,0,0|3
 src/PlayStead.UI/Home/HomeView.xaml|Spacing|6,2|2
 src/PlayStead.UI/Home/HomeView.xaml|Spacing|8,0,0,0|3
-src/PlayStead.UI/Library/GameDetailView.xaml|CornerRadius|6|2
+src/PlayStead.UI/Library/GameDetailView.xaml|CornerRadius|6|3
 src/PlayStead.UI/Library/GameDetailView.xaml|FontSize|12|4
 src/PlayStead.UI/Library/GameDetailView.xaml|FontSize|13|3
 src/PlayStead.UI/Library/GameDetailView.xaml|FontSize|14|1
