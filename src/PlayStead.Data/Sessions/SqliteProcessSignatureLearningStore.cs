@@ -34,14 +34,18 @@ public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearn
         command.CommandText = """
             SELECT game_id, root_path, generation_id, policy_version, concurrency_token,
                    last_sequence_number, has_ambiguous_installation,
-                   inventory_json, reference_json, confirmation_json, reasons_json
+                   inventory_json, reference_json, confirmation_json, reasons_json,
+                   absence_baseline_established
             FROM process_signature_learning WHERE installation_id=$installation;
             """;
         command.Parameters.AddWithValue("$installation", installationId.ToString());
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var found = await reader.ReadAsync(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!found) return null;
+        if (!found)
+        {
+            return null;
+        }
         try
         {
             if (reader.GetInt64(6) is not (0 or 1))
@@ -51,7 +55,7 @@ public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearn
                 reader.GetInt32(3), Guid.ParseExact(reader.GetString(4), "N"), reader.GetInt64(5), reader.GetBoolean(6),
                 reader.IsDBNull(8) ? null : Deserialize<LearningEpisodeSummary>(reader.GetString(8)),
                 reader.IsDBNull(9) ? null : Deserialize<LearningEpisodeSummary>(reader.GetString(9)),
-                Deserialize<DiscoveryReason[]>(reader.GetString(10)));
+                Deserialize<DiscoveryReason[]>(reader.GetString(10)), reader.GetBoolean(11));
             var scope = state.Inventory.Scope;
             if (scope.InstallationId != installationId || scope.GameId.Value != Guid.Parse(reader.GetString(0)) ||
                 !PathEquals(scope.RootPath, reader.GetString(1)) || scope.GenerationId != Guid.Parse(reader.GetString(2)))
@@ -92,16 +96,18 @@ public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearn
                 existing.PolicyVersion != state.PolicyVersion;
             if (learningInvalidated)
                 state = new ProcessSignatureLearningState(state.Inventory, state.PolicyVersion, state.ConcurrencyToken,
-                    state.LastSequenceNumber, state.HasAmbiguousInstallation, null, null, state.Reasons);
+                    state.LastSequenceNumber, state.HasAmbiguousInstallation, null, null, state.Reasons,
+                    existing.AbsenceBaselineEstablished && SameLearningIdentity(existing.Inventory, state.Inventory));
         }
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = existing is null ? """
             INSERT INTO process_signature_learning(installation_id, game_id, root_path, generation_id,
                 policy_version, concurrency_token, last_sequence_number, has_ambiguous_installation,
-                inventory_json, reference_json, confirmation_json, reasons_json)
+                inventory_json, reference_json, confirmation_json, reasons_json,
+                absence_baseline_established)
             VALUES($installation, $gameId, $root, $generation, $policy, $newToken,
-                $sequence, $ambiguous, $inventory, $reference, $confirmation, $reasons)
+                $sequence, $ambiguous, $inventory, $reference, $confirmation, $reasons, $absenceBaseline)
             ON CONFLICT(installation_id) DO NOTHING;
             """ : """
             UPDATE process_signature_learning
@@ -109,7 +115,8 @@ public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearn
                 policy_version=$policy, concurrency_token=$newToken,
                 last_sequence_number=$sequence, has_ambiguous_installation=$ambiguous,
                 inventory_json=$inventory, reference_json=$reference,
-                confirmation_json=$confirmation, reasons_json=$reasons
+                confirmation_json=$confirmation, reasons_json=$reasons,
+                absence_baseline_established=$absenceBaseline
             WHERE installation_id=$installation AND concurrency_token=$expectedToken;
             """;
         if (existing is not null)
@@ -126,6 +133,7 @@ public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearn
         command.Parameters.AddWithValue("$reference", state.Reference is null ? DBNull.Value : JsonSerializer.Serialize(state.Reference));
         command.Parameters.AddWithValue("$confirmation", state.Confirmation is null ? DBNull.Value : JsonSerializer.Serialize(state.Confirmation));
         command.Parameters.AddWithValue("$reasons", JsonSerializer.Serialize(state.Reasons));
+        command.Parameters.AddWithValue("$absenceBaseline", state.AbsenceBaselineEstablished);
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1) return false;
         if (signatureInvalidated)
         {
@@ -220,6 +228,11 @@ public sealed class SqliteProcessSignatureLearningStore : IProcessSignatureLearn
         left.GameId == right.GameId && left.InstallationId == right.InstallationId &&
         PathEquals(left.RootPath, right.RootPath) && left.GenerationId == right.GenerationId &&
         left.IsPresent == right.IsPresent;
+
+    private static bool SameLearningIdentity(ExecutableInventory left, ExecutableInventory right) =>
+        left.Scope.GameId == right.Scope.GameId && left.Scope.InstallationId == right.Scope.InstallationId &&
+        PathEquals(left.Scope.RootPath, right.Scope.RootPath) &&
+        left.Scope.IsPresent == right.Scope.IsPresent;
 
     private static bool InventoryEquals(ExecutableInventory left, ExecutableInventory right) =>
         left.Scope.GameId == right.Scope.GameId && left.Scope.InstallationId == right.Scope.InstallationId &&

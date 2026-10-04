@@ -194,6 +194,31 @@ public sealed class SessionRuntimeTests
     }
 
     [Fact]
+    public async Task Hll_accepted_main_process_creates_and_ends_session()
+    {
+        const string name = "HLLEpicGamesStore-Win64-Shipping.exe";
+        const string path = @"G:\HellLetLooseG0WU4\HLL\Binaries\Win64\HLLEpicGamesStore-Win64-Shipping.exe";
+        var process = new ProcessSnapshot(100, name, path, T0);
+        var source = new QueueProcessSnapshotSource([[], [process], [process], []]);
+        var game = Guid.Parse("33333333-cccc-4444-8888-333333333333");
+        var sessions = new FakeSessionStore();
+        var time = new MutableTimeProvider(T0);
+        var sut = CreateRuntime(source, new FakeProcessSignatureStore(
+            Signature(game, name, path)), sessions, time);
+
+        await sut.RefreshAsync(CancellationToken.None);
+        var first = await sut.RefreshAsync(CancellationToken.None);
+        Assert.Empty(first.ActiveSessions);
+        var active = await sut.RefreshAsync(CancellationToken.None);
+        Assert.Equal(game, Assert.Single(active.ActiveSessions).GameId);
+
+        time.SetUtcNow(T0.AddMinutes(2));
+        var ended = await sut.RefreshAsync(CancellationToken.None);
+        Assert.Empty(ended.ActiveSessions);
+        Assert.Equal(SessionState.Ended, sessions.Upserts[^1].State);
+    }
+
+    [Fact]
     public async Task One_frame_main_match_does_not_create_a_false_session()
     {
         var source = new QueueProcessSnapshotSource(
@@ -407,13 +432,15 @@ public sealed class SessionRuntimeTests
 
     private static ProcessSignature Signature(
         Guid gameId,
-        string executableName)
+        string executableName,
+        string? executablePath = null)
         => new(
             gameId,
             [
                 new ProcessSignatureEntry(
                     executableName,
-                    ProcessSignatureEntryKind.Main)
+                    ProcessSignatureEntryKind.Main,
+                    executablePath)
             ],
             ProcessSignatureOrigin.Manual,
             T0);

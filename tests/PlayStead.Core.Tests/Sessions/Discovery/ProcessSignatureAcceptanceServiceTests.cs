@@ -47,6 +47,29 @@ public sealed class ProcessSignatureAcceptanceServiceTests
         Assert.Equal(["signature", "session"], d.PersistenceOrder);
     }
 
+    [Fact]
+    public async Task Accepted_main_replaces_stale_inventory_first_reference()
+    {
+        var d = new Driver();
+        var game = d.State.Inventory.Candidates.Single();
+        var helper = new ExecutableCandidate(@"C:\Games\Example\helper.exe", "helper.exe",
+            new FileRevision(11, Now.AddDays(-1)));
+        var inventory = new ExecutableInventory(d.Scope, InventoryCompleteness.Complete,
+            [helper, game], []);
+        LearningEpisodeSummary Episode(long sequence) => new(Guid.NewGuid(), sequence, d.Scope,
+            ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, Now.AddMinutes(sequence),
+            Now.AddMinutes(sequence).AddSeconds(30), 1, 9, EpisodeQuality.Complete,
+            [new(helper.ExecutablePath, helper.Revision, true, true, []),
+             new(game.ExecutablePath, game.Revision, true, true, [new SnapshotRange(4, 7)])]);
+        d.State = new(inventory, ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
+            Guid.NewGuid(), 2, false, Episode(1), Episode(2), []);
+        d.Current = new(inventory, false);
+
+        Assert.True(await d.AcceptAsync());
+        Assert.Equal(game.ExecutablePath, d.State.Reference!.Candidates.Single().ExecutablePath);
+        Assert.Equal(game.ExecutablePath, Assert.Single(d.Writes).Signature.Entries.Single().ExecutablePath);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

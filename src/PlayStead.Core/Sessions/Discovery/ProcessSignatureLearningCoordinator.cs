@@ -69,7 +69,9 @@ public sealed class ProcessSignatureLearningCoordinator
                 state = new ProcessSignatureLearningState(inventory,
                     ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, Guid.NewGuid(),
                     loaded?.LastSequenceNumber ?? 0, context.HasAmbiguousInstallation,
-                    null, null, reason is null ? [] : [reason.Value]);
+                    null, null, reason is null ? [] : [reason.Value],
+                    loaded?.AbsenceBaselineEstablished == true &&
+                    SameLearningIdentity(loaded.Inventory, inventory));
                 if (changed && loaded is not null)
                 {
                     var quarantined = new InstallationLearning(loaded)
@@ -97,6 +99,7 @@ public sealed class ProcessSignatureLearningCoordinator
                 }
             }
             var installation = new InstallationLearning(state) { Prepared = true };
+            installation.KnownAbsence = state.AbsenceBaselineEstablished ? 2 : 0;
             lock (_installations) _installations[id] = installation;
             return state;
         }
@@ -146,7 +149,8 @@ public sealed class ProcessSignatureLearningCoordinator
                     : ChangedReason(installation.State.Inventory, inventory,
                         installation.State.HasAmbiguousInstallation, context.HasAmbiguousInstallation);
                 var replacement = NewState(installation.State, inventory, context.HasAmbiguousInstallation,
-                    null, null, installation.State.LastSequenceNumber, [reason]);
+                    null, null, installation.State.LastSequenceNumber, [reason],
+                    installation.State.AbsenceBaselineEstablished);
                 await SaveAsync(installation, replacement, cancellationToken, invalidation: true);
                 installation.ResetCapture();
             }
@@ -242,6 +246,12 @@ public sealed class ProcessSignatureLearningCoordinator
                         var namedCandidates = state.Inventory.Candidates.Where(item =>
                             string.Equals(item.ExecutableName, process.ExecutableName,
                                 StringComparison.OrdinalIgnoreCase)).ToArray();
+                        if (string.IsNullOrWhiteSpace(process.ExecutablePath) &&
+                            namedCandidates.Length == 1 &&
+                            IsTransientRootBootstrap(state.Inventory, namedCandidates[0], installation.Current))
+                        {
+                            continue;
+                        }
                         if (namedCandidates.Any(candidate =>
                                 !ExecutableSupportClassifier.IsSupportExecutable(
                                     state.Inventory, candidate, unrealFamily)))
@@ -289,8 +299,14 @@ public sealed class ProcessSignatureLearningCoordinator
                     }
                     else installation.BaselineUnknown.IntersectWith(unknown);
                     installation.KnownAbsence = Math.Min(2, installation.KnownAbsence + 1);
-                    if (!absenceBaselineWasEstablished && installation.KnownAbsence >= 2)
+                    if (!absenceBaselineWasEstablished && installation.KnownAbsence >= 2 &&
+                        installation.HadCandidateObservation && state.Reference is null &&
+                        state.Confirmation is null)
                     {
+                        var baselineState = NewState(state, state.Inventory,
+                            state.HasAmbiguousInstallation, state.Reference, state.Confirmation,
+                            state.LastSequenceNumber, state.Reasons, absenceBaselineEstablished: true);
+                        await SaveAsync(installation, baselineState, cancellationToken);
                         Trace.WriteLine(
                             $"[DISCOVERY-ABSENCE] GameId={state.Inventory.Scope.GameId} " +
                             "RelevantObservationCount=0 " +
@@ -316,6 +332,10 @@ public sealed class ProcessSignatureLearningCoordinator
                     return null;
                 }
                 return await CompleteAsync(installation, batch, cancellationToken);
+            }
+            else
+            {
+                installation.HadCandidateObservation = true;
             }
             if (installation.Current is null)
             {
@@ -422,6 +442,26 @@ public sealed class ProcessSignatureLearningCoordinator
         var existing = await _signatureStore.GetAsync(state.Inventory.Scope.GameId.Value, cancellationToken);
         var decision = _policy.Evaluate(new DiscoveryEvaluation(state.Inventory, episodes,
             state.HasAmbiguousInstallation, existing?.Origin));
+        var mainEvidence = completed.Candidates
+            .Where(candidate => candidate.PresenceRanges.Count != 0)
+            .OrderByDescending(candidate => candidate.PresenceRanges[^1].Last)
+            .FirstOrDefault();
+        var mainCandidate = mainEvidence is null ? null : state.Inventory.Candidates.FirstOrDefault(candidate =>
+            string.Equals(candidate.ExecutablePath, mainEvidence.ExecutablePath,
+                StringComparison.OrdinalIgnoreCase));
+        var unrealFamily = UnrealExecutableFamily.TryCreate(state.Inventory);
+        var competitorTrace = BuildPromotionCompetitorTrace(state.Inventory, completed,
+            decision, unrealFamily);
+        var observedCompetitors = state.Inventory.Candidates.Count(candidate =>
+            completed.Candidates.FirstOrDefault(evidence =>
+                string.Equals(evidence.ExecutablePath, candidate.ExecutablePath,
+                    StringComparison.OrdinalIgnoreCase))?.PresenceRanges.Count > 0);
+        var inventoryOnlyCompetitors = state.Inventory.Candidates.Count(candidate =>
+            completed.Candidates.FirstOrDefault(evidence =>
+                string.Equals(evidence.ExecutablePath, candidate.ExecutablePath,
+                    StringComparison.OrdinalIgnoreCase))?.PresenceRanges.Count is null or 0);
+        var trueAmbiguousCompetitors = decision.Kind == DiscoveryDecisionKind.Ambiguous
+            ? Math.Max(0, observedCompetitors - 1) : 0;
         Trace.WriteLine(
             $"[PROCESS-FORENSIC] LearningResult GameId={state.Inventory.Scope.GameId} " +
             $"Action={(decision.Kind == DiscoveryDecisionKind.PromoteMain ? "PromoteMain" : decision.Reasons[0].ToString())}");
@@ -441,7 +481,16 @@ public sealed class ProcessSignatureLearningCoordinator
             installation.KnownAbsence = 2;
             return decision;
         }
-        var reference = retain ? state.Reference ?? completed : null;
+        // Persist only the runtime winner as the episode reference. The completed
+        // summary contains every inventory candidate (including never-observed
+        // support/install executables); persisting that raw inventory summary made
+        // the first candidate look like the reference after a reload.
+        var runtimeWinner = mainEvidence is null ? completed :
+            new LearningEpisodeSummary(completed.EpisodeId, completed.SequenceNumber,
+                completed.Scope, completed.PolicyVersion, completed.StartedAtUtc,
+                completed.EndedAtUtc, completed.FirstSnapshot, completed.LastSnapshot,
+                completed.Quality, [mainEvidence]);
+        var reference = retain ? state.Reference ?? runtimeWinner : null;
         var confirmation = decision.Kind == DiscoveryDecisionKind.PromoteMain ? completed : null;
         var replacement = NewState(state, state.Inventory, state.HasAmbiguousInstallation,
             reference, confirmation, completed.SequenceNumber, decision.Reasons);
@@ -480,7 +529,7 @@ public sealed class ProcessSignatureLearningCoordinator
         var inventory = new ExecutableInventory(newScope, InventoryCompleteness.Incomplete,
             state.Inventory.Candidates, state.Inventory.Issues.Concat([issue]).ToArray());
         var replacement = NewState(state, inventory, state.HasAmbiguousInstallation,
-            null, null, state.LastSequenceNumber, [reason]);
+            null, null, state.LastSequenceNumber, [reason], false);
         await SaveAsync(installation, replacement, cancellationToken, invalidation: true);
         installation.ResetCapture();
         return new DiscoveryDecision(DiscoveryDecisionKind.InsufficientEvidence, null, [reason]);
@@ -536,9 +585,20 @@ public sealed class ProcessSignatureLearningCoordinator
 
     private static ProcessSignatureLearningState NewState(ProcessSignatureLearningState old,
         ExecutableInventory inventory, bool ambiguous, LearningEpisodeSummary? reference,
-        LearningEpisodeSummary? confirmation, long sequence, IReadOnlyList<DiscoveryReason> reasons) =>
+        LearningEpisodeSummary? confirmation, long sequence, IReadOnlyList<DiscoveryReason> reasons,
+        bool? absenceBaselineEstablished = null) =>
         new(inventory, ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion, Guid.NewGuid(),
-            sequence, ambiguous, reference, confirmation, reasons);
+            sequence, ambiguous, reference, confirmation, reasons,
+            absenceBaselineEstablished ?? old.AbsenceBaselineEstablished);
+
+    private static bool SameLearningIdentity(ExecutableInventory left, ExecutableInventory right)
+    {
+        var a = left.Scope;
+        var b = right.Scope;
+        return a.GameId == b.GameId && a.InstallationId == b.InstallationId &&
+            a.IsPresent == b.IsPresent &&
+            string.Equals(a.RootPath, b.RootPath, StringComparison.OrdinalIgnoreCase);
+    }
 
     private static ExecutableInventory AuthoritativeInventory(ExecutableInventory incoming,
         ExecutableInventory? previous)
@@ -590,6 +650,23 @@ public sealed class ProcessSignatureLearningCoordinator
         if (string.IsNullOrWhiteSpace(path)) return false;
         var prefix = root.TrimEnd('\\', '/') + "\\";
         return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTransientRootBootstrap(ExecutableInventory inventory,
+        ExecutableCandidate candidate, CurrentEpisode? current)
+    {
+        if (current is null || !UnderRoot(candidate.ExecutablePath, inventory.Scope.RootPath))
+            return false;
+        var root = inventory.Scope.RootPath.TrimEnd('\\', '/');
+        var relative = candidate.ExecutablePath[(root + "\\").Length..];
+        if (relative.IndexOf('\\') >= 0)
+            return false;
+        return inventory.Candidates.Any(other =>
+            !string.Equals(other.ExecutablePath, candidate.ExecutablePath,
+                StringComparison.OrdinalIgnoreCase) &&
+            UnderRoot(other.ExecutablePath, inventory.Scope.RootPath) &&
+            other.ExecutablePath[(root + "\\").Length..].IndexOf('\\') >= 0 &&
+            current.Identities.ContainsKey(other.ExecutablePath));
     }
 
     private static bool TraceObservation(
@@ -654,6 +731,45 @@ public sealed class ProcessSignatureLearningCoordinator
     private static string Format(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "<null>" : value;
 
+    private static string BuildPromotionCompetitorTrace(ExecutableInventory inventory,
+        LearningEpisodeSummary episode, DiscoveryDecision decision,
+        UnrealExecutableFamily? unrealFamily)
+    {
+        var root = inventory.Scope.RootPath.TrimEnd('\\', '/');
+        var prefix = root + "\\";
+        return string.Join(';', inventory.Candidates.Select(candidate =>
+        {
+            var evidence = episode.Candidates.FirstOrDefault(item =>
+                string.Equals(item.ExecutablePath, candidate.ExecutablePath,
+                    StringComparison.OrdinalIgnoreCase));
+            var positive = evidence?.PresenceRanges.Count > 0;
+            var lastSeen = positive == true ? evidence!.PresenceRanges.Max(range => range.Last) : (long?)null;
+            var seenCount = positive == true
+                ? evidence!.PresenceRanges.Sum(range => range.Last - range.First + 1) : 0;
+            var underRoot = candidate.ExecutablePath.StartsWith(prefix,
+                StringComparison.OrdinalIgnoreCase);
+            var supportExcluded = ExecutableSupportClassifier.IsSupportExecutable(
+                inventory, candidate, unrealFamily);
+            var eligible = decision.Main is not null && string.Equals(
+                decision.Main.ExecutablePath, candidate.ExecutablePath,
+                StringComparison.OrdinalIgnoreCase);
+            return string.Join(',', [
+                $"Name={TraceValue(candidate.ExecutableName)}",
+                $"Path={TraceValue(candidate.ExecutablePath)}",
+                $"ObservedThisEpisode={Bool(positive == true)}",
+                $"SeenCount={seenCount}",
+                $"LastSeen={lastSeen?.ToString() ?? "<none>"}",
+                $"Reliable={Bool(evidence?.HasReliablePath == true && evidence.HasReliableIdentity)}",
+                $"SupportExcluded={Bool(supportExcluded)}",
+                $"UnderInstallRoot={Bool(underRoot)}",
+                $"InventoryOnly={Bool(positive != true)}",
+                $"EligibleAsMain={Bool(eligible)}"]);
+        }));
+    }
+
+    private static string TraceValue(string value) =>
+        string.IsNullOrWhiteSpace(value) ? "<empty>" : value.Replace(';', '_').Replace(',', '_');
+
     private static ExecutableCandidate? ResolveCandidate(ExecutableInventory inventory,
         UnrealExecutableFamily? unrealFamily, CurrentEpisode? current, ProcessSnapshot process)
     {
@@ -699,6 +815,7 @@ public sealed class ProcessSignatureLearningCoordinator
         public CurrentEpisode? Current { get; set; }
         public bool Prepared { get; set; }
         public int KnownAbsence { get; set; }
+        public bool HadCandidateObservation { get; set; }
         public long? LastCaptureSequence { get; set; }
         public DateTimeOffset LastCaptureAt { get; set; }
         public HashSet<(int ProcessId, string Name, DateTimeOffset? StartedAtUtc)> BaselineUnknown { get; } = [];
@@ -707,6 +824,7 @@ public sealed class ProcessSignatureLearningCoordinator
         {
             Current = null;
             KnownAbsence = 0;
+            HadCandidateObservation = false;
             Prepared = false;
             BaselineUnknown.Clear();
         }

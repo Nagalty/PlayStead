@@ -12,7 +12,7 @@ public sealed class UnrealExecutableFamilyDiscoveryTests
     [Fact]
     public void Pathless_family_evidence_semantics_use_policy_version_three()
     {
-        Assert.Equal(3, ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion);
+        Assert.Equal(4, ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion);
     }
 
     [Theory]
@@ -85,27 +85,25 @@ public sealed class UnrealExecutableFamilyDiscoveryTests
     [Theory]
     [InlineData(@"Tools\Unrelated.exe")]
     [InlineData(@"Installers\UnrelatedTool.exe")]
-    public void Unrelated_unobserved_executable_remains_a_competitor(string unobservedPath)
+    public void Unrelated_inventory_only_executable_is_not_a_competitor(string unobservedPath)
     {
         var fixture = Fixture.Create("Test_C", [unobservedPath]);
 
         var result = Evaluate(fixture, rootObserved: false, shippingObserved: true);
 
-        Assert.Equal(DiscoveryDecisionKind.Ambiguous, result.Kind);
-        Assert.Contains(DiscoveryReason.UnobservedCompetitor, result.Reasons);
-        Assert.Null(result.Main);
+        Assert.Equal(DiscoveryDecisionKind.PromoteMain, result.Kind);
+        Assert.Equal(fixture.Shipping.ExecutablePath, result.Main?.ExecutablePath);
     }
 
     [Fact]
-    public void Similar_names_without_the_strict_unreal_layout_remain_ambiguous()
+    public void Similar_names_without_the_strict_unreal_layout_use_observed_evidence()
     {
         var fixture = Fixture.Create("Test_C", includeCanonicalShipping: false);
 
         var result = Evaluate(fixture, rootObserved: true, shippingObserved: false);
 
-        Assert.Equal(DiscoveryDecisionKind.Ambiguous, result.Kind);
-        Assert.Contains(DiscoveryReason.UnobservedCompetitor, result.Reasons);
-        Assert.Null(result.Main);
+        Assert.Equal(DiscoveryDecisionKind.PromoteMain, result.Kind);
+        Assert.Equal(fixture.Root.ExecutablePath, result.Main?.ExecutablePath);
     }
 
     [Fact]

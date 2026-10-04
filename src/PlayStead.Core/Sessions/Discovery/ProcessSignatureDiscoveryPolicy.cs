@@ -4,7 +4,7 @@ namespace PlayStead.Core.Sessions.Discovery;
 
 public sealed class ProcessSignatureDiscoveryPolicy
 {
-    public const int CurrentPolicyVersion = 3;
+    public const int CurrentPolicyVersion = 4;
 
     public DiscoveryDecision Evaluate(DiscoveryEvaluation evaluation)
     {
@@ -33,6 +33,7 @@ public sealed class ProcessSignatureDiscoveryPolicy
         evaluation = ExecutableSupportClassifier.Project(evaluation);
         if (unrealFamily is not null)
             evaluation = unrealFamily.Project(evaluation);
+        evaluation = ProjectShortLivedRootBootstraps(evaluation);
 
         if (evaluation.Inventory.Candidates.Count == 0)
             return new DiscoveryDecision(DiscoveryDecisionKind.InsufficientEvidence,
@@ -81,17 +82,15 @@ public sealed class ProcessSignatureDiscoveryPolicy
                 continue;
             }
 
-            if (evaluation.Inventory.Candidates.Any(candidate =>
-                    FindEvidence(episode, candidate)?.PresenceRanges.Count is null or 0))
-            {
-                reference = null;
-                result = new DiscoveryDecision(DiscoveryDecisionKind.Ambiguous,
-                    null, [DiscoveryReason.UnobservedCompetitor]);
-                continue;
-            }
-
-            var qualified = evaluation.Inventory.Candidates
-                .Where(candidate => CanBeMain(candidate, episode, evaluation.Inventory.Candidates))
+            // Only candidates with positive runtime presence are competitors for this
+            // episode. Inventory discovery is intentionally broader than what was
+            // observed while the game was running, so inventory-only executables
+            // must not create a false UnobservedCompetitor ambiguity.
+            var observedCandidates = evaluation.Inventory.Candidates
+                .Where(candidate => FindEvidence(episode, candidate)?.PresenceRanges.Count > 0)
+                .ToArray();
+            var qualified = observedCandidates
+                .Where(candidate => CanBeMain(candidate, episode, observedCandidates))
                 .ToArray();
             if (qualified.Length != 1)
             {
@@ -205,6 +204,54 @@ public sealed class ProcessSignatureDiscoveryPolicy
             evidence.PresenceRanges[0].First > survivor.PresenceRanges[0].First))
             return DiscoveryReason.LateCompetitor;
         return DiscoveryReason.EquivalentCandidates;
+    }
+
+    private static DiscoveryEvaluation ProjectShortLivedRootBootstraps(
+        DiscoveryEvaluation evaluation)
+    {
+        var root = evaluation.Inventory.Scope.RootPath.TrimEnd('\\', '/');
+        var prefix = root + "\\";
+        var evidenceByPath = evaluation.Inventory.Candidates.ToDictionary(
+            candidate => candidate.ExecutablePath,
+            candidate => evaluation.Episodes
+                .SelectMany(episode => episode.Candidates)
+                .Where(evidence => string.Equals(evidence.ExecutablePath,
+                    candidate.ExecutablePath, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(evidence => evidence.PresenceRanges)
+                .ToArray(), StringComparer.OrdinalIgnoreCase);
+        var lastPositiveByPath = evidenceByPath.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value.Length == 0 ? long.MinValue : pair.Value.Max(range => range.Last),
+            StringComparer.OrdinalIgnoreCase);
+        var maxPositive = lastPositiveByPath.Values.DefaultIfEmpty(long.MinValue).Max();
+        var hasNestedSurvivor = lastPositiveByPath.Any(pair =>
+            pair.Value == maxPositive &&
+            pair.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+            pair.Key[prefix.Length..].IndexOf('\\') >= 0);
+        if (!hasNestedSurvivor)
+            return evaluation;
+        var bootstrapPaths = lastPositiveByPath
+            .Where(pair => pair.Value != long.MinValue && pair.Value < maxPositive)
+            .Where(pair => pair.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .Where(pair => pair.Key[prefix.Length..].IndexOf('\\') < 0)
+            .Select(pair => pair.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (bootstrapPaths.Count == 0)
+            return evaluation;
+
+        var inventory = new ExecutableInventory(evaluation.Inventory.Scope,
+            evaluation.Inventory.Completeness,
+            evaluation.Inventory.Candidates.Where(candidate =>
+                !bootstrapPaths.Contains(candidate.ExecutablePath)).ToArray(),
+            evaluation.Inventory.Issues);
+        var episodes = evaluation.Episodes.Select(episode => new LearningEpisodeSummary(
+            episode.EpisodeId, episode.SequenceNumber, episode.Scope, episode.PolicyVersion,
+            episode.StartedAtUtc, episode.EndedAtUtc, episode.FirstSnapshot,
+            episode.LastSnapshot, episode.Quality,
+            episode.Candidates.Where(candidate =>
+                !bootstrapPaths.Contains(candidate.ExecutablePath)).ToArray())).ToArray();
+        return new DiscoveryEvaluation(inventory, episodes,
+            evaluation.HasAmbiguousInstallation, evaluation.ExistingSignatureOrigin);
     }
 
     private static bool CanBeMain(ExecutableCandidate main, LearningEpisodeSummary episode,

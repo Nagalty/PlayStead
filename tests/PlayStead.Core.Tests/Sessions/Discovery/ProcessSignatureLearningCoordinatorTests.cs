@@ -101,6 +101,190 @@ public sealed class ProcessSignatureLearningCoordinatorTests
     }
 
     [Fact]
+    public async Task Absence_baseline_survives_coordinator_reload_and_allows_next_candidate_episode()
+    {
+        var driver = await Driver.CreateAsync();
+        await driver.CaptureAsync(1, [driver.Process(100)]);
+        await driver.CaptureAsync(2, []);
+        await driver.CaptureAsync(3, []);
+
+        var reloaded = new ProcessSignatureLearningCoordinator(driver.LearningStore,
+            driver.SignatureStore, driver.RevisionSource, new ProcessSignatureDiscoveryPolicy());
+        await reloaded.InitializeAsync(new DiscoveryInventoryContext(driver.Inventory, false),
+            CancellationToken.None);
+
+        Assert.True(reloaded.GetState(driver.Scope.InstallationId)!.AbsenceBaselineEstablished);
+
+        var result = await reloaded.ObserveAsync(driver.Scope.InstallationId,
+            new ProcessObservationBatch(4, T0.AddSeconds(8), EpisodeQuality.Complete,
+                [driver.Process(200)]), CancellationToken.None);
+
+        Assert.Null(result);
+        var state = reloaded.GetState(driver.Scope.InstallationId)!;
+        Assert.Null(state.Reference);
+        Assert.True(state.AbsenceBaselineEstablished);
+    }
+
+    [Fact]
+    public async Task Absence_baseline_survives_restart_with_refreshed_inventory_generation()
+    {
+        var driver = await Driver.CreateAsync();
+        await driver.CaptureAsync(1, [driver.Process(100)]);
+        await driver.CaptureAsync(2, []);
+        await driver.CaptureAsync(3, []);
+        var scope = driver.Scope;
+        var refreshedScope = new InstallationScope(scope.GameId, scope.InstallationId,
+            scope.RootPath, Guid.NewGuid(), scope.IsPresent);
+        var refreshedInventory = new ExecutableInventory(refreshedScope,
+            driver.Inventory.Completeness, driver.Inventory.Candidates, driver.Inventory.Issues);
+        var restarted = new ProcessSignatureLearningCoordinator(driver.LearningStore,
+            driver.SignatureStore, driver.RevisionSource, new ProcessSignatureDiscoveryPolicy());
+
+        var restored = await restarted.InitializeAsync(
+            new DiscoveryInventoryContext(refreshedInventory, false), CancellationToken.None);
+
+        Assert.True(restored.AbsenceBaselineEstablished);
+        var result = await restarted.ObserveAsync(scope.InstallationId,
+            new ProcessObservationBatch(4, T0.AddSeconds(8), EpisodeQuality.Complete,
+                [new ProcessSnapshot(200, "Game.exe", refreshedInventory.Candidates[0].ExecutablePath,
+                    T0.AddSeconds(5))]), CancellationToken.None);
+        Assert.Null(result);
+        Assert.True(restarted.GetState(scope.InstallationId)!.AbsenceBaselineEstablished);
+    }
+
+    [Fact]
+    public async Task Hll_candidate_is_promoted_after_persisted_absence_baseline_and_two_episodes()
+    {
+        const string name = "HLLEpicGamesStore-Win64-Shipping.exe";
+        const string path = @"G:\HellLetLooseG0WU4\HLL\Binaries\Win64\HLLEpicGamesStore-Win64-Shipping.exe";
+        var driver = await Driver.CreateWithCandidatesAsync((name, path));
+
+        var initialCandidate = new ProcessSnapshot(90, name, path, T0.AddSeconds(5));
+        await driver.CaptureAsync(1, [initialCandidate]);
+        await driver.CaptureAsync(2, []);
+        await driver.CaptureAsync(3, []);
+        var reloaded = new ProcessSignatureLearningCoordinator(driver.LearningStore,
+            driver.SignatureStore, driver.RevisionSource, new ProcessSignatureDiscoveryPolicy());
+        await reloaded.InitializeAsync(new DiscoveryInventoryContext(driver.Inventory, false),
+            CancellationToken.None);
+        Assert.True(reloaded.GetState(driver.Scope.InstallationId)!.AbsenceBaselineEstablished);
+
+        async Task<DiscoveryDecision?> Capture(long sequence, IReadOnlyList<ProcessSnapshot> processes) =>
+            await reloaded.ObserveAsync(driver.Scope.InstallationId,
+                new ProcessObservationBatch(sequence, T0.AddSeconds(sequence * 2), EpisodeQuality.Complete,
+                    processes), CancellationToken.None);
+
+        var candidate = new ProcessSnapshot(100, name, path, T0.AddSeconds(5));
+        await Capture(4, [candidate]);
+        await Capture(5, [candidate]);
+        await Capture(6, []);
+        var first = await Capture(7, []);
+        Assert.Equal(DiscoveryReason.AwaitingIndependentEpisode, Assert.Single(first!.Reasons));
+
+        var prepared = await reloaded.PrepareEpisodeAsync(new DiscoveryInventoryContext(driver.Inventory, false),
+            reloaded.GetState(driver.Scope.InstallationId)!.ConcurrencyToken, CancellationToken.None);
+        Assert.True(prepared);
+        var secondCandidate = candidate with { ProcessId = 200, StartedAtUtc = T0.AddSeconds(13) };
+        await Capture(8, [secondCandidate]);
+        await Capture(9, [secondCandidate]);
+        await Capture(10, []);
+        var promoted = await Capture(11, []);
+
+        Assert.Equal(DiscoveryDecisionKind.PromoteMain, promoted!.Kind);
+        Assert.Equal(name, promoted.Main!.ExecutableName);
+        Assert.Equal(path, promoted.Main.ExecutablePath);
+    }
+
+    [Fact]
+    public async Task Hll_bootstrap_disappears_and_shipping_exe_is_promoted_as_the_only_main()
+    {
+        const string launcherName = "Launch_HLL.exe";
+        const string launcherPath = @"G:\HellLetLooseG0WU4\Launch_HLL.exe";
+        const string shippingName = "HLLEpicGamesStore-Win64-Shipping.exe";
+        const string shippingPath = @"G:\HellLetLooseG0WU4\HLL\Binaries\Win64\HLLEpicGamesStore-Win64-Shipping.exe";
+        var driver = await Driver.CreateWithCandidatesAtRootAsync(@"G:\HellLetLooseG0WU4",
+            (launcherName, launcherPath), (shippingName, shippingPath));
+
+        await driver.CaptureAsync(1, [new ProcessSnapshot(10, launcherName, launcherPath, T0.AddSeconds(1))]);
+        await driver.CaptureAsync(2, []);
+        await driver.CaptureAsync(3, []);
+        var reloaded = new ProcessSignatureLearningCoordinator(driver.LearningStore,
+            driver.SignatureStore, driver.RevisionSource, new ProcessSignatureDiscoveryPolicy());
+        await reloaded.InitializeAsync(new DiscoveryInventoryContext(driver.Inventory, false),
+            CancellationToken.None);
+
+        async Task<DiscoveryDecision?> Capture(long sequence, params ProcessSnapshot[] processes) =>
+            await reloaded.ObserveAsync(driver.Scope.InstallationId,
+                new ProcessObservationBatch(sequence, T0.AddSeconds(sequence * 2), EpisodeQuality.Complete,
+                    processes), CancellationToken.None);
+
+        var launch = new ProcessSnapshot(11, launcherName, launcherPath, T0.AddSeconds(7));
+        var shipping = new ProcessSnapshot(12, shippingName, shippingPath, T0.AddSeconds(9));
+        await Capture(4, launch);
+        await Capture(5, launch);
+        await Capture(6, shipping);
+        await Capture(7, shipping);
+        await Capture(8);
+        var first = await Capture(9);
+        Assert.Equal(DiscoveryReason.AwaitingIndependentEpisode, Assert.Single(first!.Reasons));
+
+        Assert.True(await reloaded.PrepareEpisodeAsync(new DiscoveryInventoryContext(driver.Inventory, false),
+            reloaded.GetState(driver.Scope.InstallationId)!.ConcurrencyToken, CancellationToken.None));
+        var secondShipping = shipping with { ProcessId = 22, StartedAtUtc = T0.AddSeconds(21) };
+        await Capture(10, secondShipping);
+        await Capture(11, secondShipping);
+        await Capture(12);
+        var promoted = await Capture(13);
+
+        Assert.Equal(DiscoveryDecisionKind.PromoteMain, promoted!.Kind);
+        Assert.Equal(shippingName, promoted.Main!.ExecutableName);
+        Assert.Equal(shippingPath, promoted.Main.ExecutablePath);
+    }
+
+    [Fact]
+    public async Task Transient_pathless_root_bootstrap_does_not_invalidate_shipping_episode()
+    {
+        const string launcherName = "Launch_HLL.exe";
+        const string launcherPath = @"G:\HellLetLooseG0WU4\Launch_HLL.exe";
+        const string shippingName = "HLLEpicGamesStore-Win64-Shipping.exe";
+        const string shippingPath = @"G:\HellLetLooseG0WU4\HLL\Binaries\Win64\HLLEpicGamesStore-Win64-Shipping.exe";
+        var driver = await Driver.CreateWithCandidatesAtRootAsync(@"G:\HellLetLooseG0WU4",
+            (launcherName, launcherPath), (shippingName, shippingPath));
+        await driver.CaptureAsync(1, [new ProcessSnapshot(10, launcherName, launcherPath, T0.AddSeconds(1))]);
+        await driver.CaptureAsync(2, []);
+        await driver.CaptureAsync(3, []);
+        var reloaded = new ProcessSignatureLearningCoordinator(driver.LearningStore,
+            driver.SignatureStore, driver.RevisionSource, new ProcessSignatureDiscoveryPolicy());
+        await reloaded.InitializeAsync(new DiscoveryInventoryContext(driver.Inventory, false),
+            CancellationToken.None);
+
+        async Task<DiscoveryDecision?> Capture(long sequence, params ProcessSnapshot[] processes) =>
+            await reloaded.ObserveAsync(driver.Scope.InstallationId,
+                new ProcessObservationBatch(sequence, T0.AddSeconds(sequence * 2), EpisodeQuality.Complete,
+                    processes), CancellationToken.None);
+
+        var launch = new ProcessSnapshot(11, launcherName, launcherPath, T0.AddSeconds(7));
+        var shipping = new ProcessSnapshot(12, shippingName, shippingPath, T0.AddSeconds(9));
+        await Capture(4, launch);
+        await Capture(5, launch);
+        await Capture(6, shipping);
+        await Capture(7, shipping);
+        await Capture(8);
+        await Capture(9);
+        Assert.True(await reloaded.PrepareEpisodeAsync(new DiscoveryInventoryContext(driver.Inventory, false),
+            reloaded.GetState(driver.Scope.InstallationId)!.ConcurrencyToken, CancellationToken.None));
+        var secondShipping = shipping with { ProcessId = 22, StartedAtUtc = T0.AddSeconds(21) };
+        await Capture(10, secondShipping);
+        await Capture(11, secondShipping);
+        await Capture(12, new ProcessSnapshot(21, launcherName, null, T0.AddSeconds(19)), secondShipping);
+        await Capture(13);
+        var promoted = await Capture(14);
+
+        Assert.Equal(DiscoveryDecisionKind.PromoteMain, promoted!.Kind);
+        Assert.Equal(shippingPath, promoted.Main!.ExecutablePath);
+    }
+
+    [Fact]
     public async Task Unreal_support_only_capture_does_not_start_episode_or_consume_absence_baseline()
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture);
@@ -1093,13 +1277,37 @@ public sealed class ProcessSignatureLearningCoordinatorTests
     }
 
     [Fact]
-    public async Task Unobserved_competitor_blocks_promotion()
+    public async Task Inventory_only_competitor_does_not_block_promotion()
     {
         var d = await Driver.CreateAsync("Game.exe", "Companion.exe");
         await d.CompleteAsync(1, 100);
-        Assert.Equal([DiscoveryReason.UnobservedCompetitor],
+        Assert.Equal([DiscoveryReason.AwaitingIndependentEpisode],
             d.Coordinator.GetState(d.Scope.InstallationId)!.Reasons);
-        Assert.Null(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+        Assert.NotNull(d.Coordinator.GetState(d.Scope.InstallationId)!.Reference);
+    }
+
+    [Fact]
+    public async Task Awaiting_independent_episode_persists_runtime_winner_not_inventory_first_candidate()
+    {
+        var d = await Driver.CreateAsync("EasyAntiCheat_EOS_Setup.exe", "shipping.exe",
+            "Launch_HLL.exe", "CrashReportClient.exe");
+        await d.CaptureAsync(1, []);
+        await d.CaptureAsync(2, []);
+        await d.CaptureAsync(3, [d.Process("Launch_HLL.exe", 100)]);
+        await d.CaptureAsync(4, [d.Process("shipping.exe", 200)]);
+        await d.CaptureAsync(5, [d.Process("shipping.exe", 200)]);
+        await d.CaptureAsync(6, []);
+        var result = await d.CaptureAsync(7, []);
+
+        Assert.Equal(DiscoveryDecisionKind.InsufficientEvidence, result!.Kind);
+        Assert.Equal([DiscoveryReason.AwaitingIndependentEpisode], result.Reasons);
+        var state = d.Coordinator.GetState(d.Scope.InstallationId)!;
+        Assert.Equal("shipping.exe", state.Reference!.Candidates.Single().ExecutablePath.Split('\\')[^1]);
+        Assert.DoesNotContain(state.Reference.Candidates,
+            candidate => candidate.ExecutablePath.EndsWith("EasyAntiCheat_EOS_Setup.exe",
+                StringComparison.OrdinalIgnoreCase));
+        var reloaded = await d.LearningStore.LoadAsync(d.Scope.InstallationId, CancellationToken.None);
+        Assert.Equal(state.Reference, reloaded!.Reference);
     }
 
     [Fact]
@@ -1344,6 +1552,25 @@ public sealed class ProcessSignatureLearningCoordinatorTests
         {
             var scope = new InstallationScope(GameId.New(), InstallationId.New(),
                 @"C:\Games\Example", Guid.NewGuid(), true);
+            var inventory = new ExecutableInventory(scope, InventoryCompleteness.Complete,
+                candidates.Select(candidate => new ExecutableCandidate(candidate.Path,
+                    candidate.Name, new FileRevision(10, T0))).ToArray(), []);
+            var learningStore = new FakeLearningStore();
+            var signatureStore = new FakeSignatureStore();
+            var revisionSource = new FakeRevisionSource(inventory);
+            var coordinator = new ProcessSignatureLearningCoordinator(learningStore,
+                signatureStore, revisionSource, new ProcessSignatureDiscoveryPolicy());
+            await coordinator.InitializeAsync(new DiscoveryInventoryContext(inventory, false),
+                CancellationToken.None);
+            return new Driver(scope, inventory, learningStore, signatureStore, revisionSource,
+                coordinator);
+        }
+
+        public static async Task<Driver> CreateWithCandidatesAtRootAsync(string rootPath,
+            params (string Name, string Path)[] candidates)
+        {
+            var scope = new InstallationScope(GameId.New(), InstallationId.New(), rootPath,
+                Guid.NewGuid(), true);
             var inventory = new ExecutableInventory(scope, InventoryCompleteness.Complete,
                 candidates.Select(candidate => new ExecutableCandidate(candidate.Path,
                     candidate.Name, new FileRevision(10, T0))).ToArray(), []);

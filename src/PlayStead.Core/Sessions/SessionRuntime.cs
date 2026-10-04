@@ -232,7 +232,6 @@ public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler,
                     signature,
                     processes);
 
-
             if (!match.HasMainProcess)
             {
                 continue;
@@ -357,7 +356,6 @@ public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler,
             await _sessionStore.UpsertAsync(
                 current,
                 cancellationToken);
-
             _lastPersistedAtUtc[
                 signature.GameId] =
                 current.LastSeenAtUtc;
@@ -410,7 +408,6 @@ public sealed class SessionRuntime : ISessionRuntime, IStartupSessionReconciler,
             await _sessionStore.UpsertAsync(
                 ended,
                 cancellationToken);
-
             _active.Remove(
                 gameId);
 

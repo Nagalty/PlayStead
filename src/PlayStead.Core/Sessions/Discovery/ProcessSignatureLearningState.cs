@@ -5,7 +5,7 @@ public sealed record ProcessSignatureLearningState
     public ProcessSignatureLearningState(ExecutableInventory inventory, int policyVersion,
         Guid concurrencyToken, long lastSequenceNumber, bool hasAmbiguousInstallation,
         LearningEpisodeSummary? reference, LearningEpisodeSummary? confirmation,
-        IReadOnlyList<DiscoveryReason> reasons)
+        IReadOnlyList<DiscoveryReason> reasons, bool absenceBaselineEstablished = false)
     {
         ArgumentNullException.ThrowIfNull(inventory);
         ArgumentNullException.ThrowIfNull(reasons);
@@ -22,6 +22,7 @@ public sealed record ProcessSignatureLearningState
         Reference = reference;
         Confirmation = confirmation;
         Reasons = Array.AsReadOnly(reasons.ToArray());
+        AbsenceBaselineEstablished = absenceBaselineEstablished;
     }
 
     public ExecutableInventory Inventory { get; }
@@ -32,4 +33,5 @@ public sealed record ProcessSignatureLearningState
     public LearningEpisodeSummary? Reference { get; }
     public LearningEpisodeSummary? Confirmation { get; }
     public IReadOnlyList<DiscoveryReason> Reasons { get; }
+    public bool AbsenceBaselineEstablished { get; }
 }

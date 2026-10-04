@@ -191,10 +191,27 @@ public sealed class ProcessSignatureDiscoveryPolicyTests
     }
 
     [Fact]
-    public void Candidate_with_no_observed_ranges_is_unobserved_competitor() =>
+    public void Candidate_with_explicit_empty_evidence_is_ignored_without_runtime_presence() =>
         AssertDecision(Evaluate([Episode(1, Evidence(Game, new SnapshotRange(2, 7)),
             Evidence(Companion))], [Game, Companion]),
-            DiscoveryDecisionKind.Ambiguous, DiscoveryReason.UnobservedCompetitor);
+            DiscoveryDecisionKind.InsufficientEvidence, DiscoveryReason.AwaitingIndependentEpisode);
+
+    [Fact]
+    public void Inventory_only_candidates_do_not_create_false_unobserved_competitor_ambiguity()
+    {
+        var launcher = new ExecutableCandidate(@"C:\Games\Example\launcher.exe", "launcher.exe", Revision);
+        var helper = new ExecutableCandidate(@"C:\Games\Example\helper.exe", "helper.exe", Revision);
+        var crashReporter = new ExecutableCandidate(@"C:\Games\Example\crash-reporter.exe", "crash-reporter.exe", Revision);
+        var tool = new ExecutableCandidate(@"C:\Games\Example\tool.exe", "tool.exe", Revision);
+
+        AssertDecision(Evaluate([
+                Episode(1, Evidence(launcher, new SnapshotRange(2, 3)),
+                    Evidence(Game, new SnapshotRange(4, 7))),
+                Episode(2, Evidence(launcher, new SnapshotRange(2, 3)),
+                    Evidence(Game, new SnapshotRange(4, 7)))],
+            [launcher, Game, helper, crashReporter, tool]),
+            DiscoveryDecisionKind.PromoteMain, DiscoveryReason.RepeatedQualifiedEpisodes, Game);
+    }
 
     [Fact]
     public void Late_competitor_is_not_a_startup_companion() =>

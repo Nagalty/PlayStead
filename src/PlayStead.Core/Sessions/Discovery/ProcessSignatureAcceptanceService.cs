@@ -37,11 +37,17 @@ public sealed class ProcessSignatureAcceptanceService
         cancellationToken.ThrowIfCancellationRequested();
         var state = await _learningStore.LoadAsync(installationId, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (state?.Reference is null || state.Confirmation is null) return false;
+        if (state?.Reference is null || state.Confirmation is null)
+        {
+            return false;
+        }
         var current = _currentInventory(installationId);
         if (current is null || current.HasAmbiguousInstallation != state.HasAmbiguousInstallation ||
             !InventoryEquals(current.Inventory, state.Inventory) ||
-            state.PolicyVersion != ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion) return false;
+            state.PolicyVersion != ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion)
+        {
+            return false;
+        }
 
         var stored = await _signatureStore.GetAsync(state.Inventory.Scope.GameId.Value, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
@@ -52,7 +58,32 @@ public sealed class ProcessSignatureAcceptanceService
                 metadata.ValidationState, metadata.InstallationId) : null;
         var decision = _policy.Evaluate(new DiscoveryEvaluation(state.Inventory,
             [state.Reference, state.Confirmation], state.HasAmbiguousInstallation, stored?.Origin));
-        if (decision.Kind != DiscoveryDecisionKind.PromoteMain) return false;
+        if (decision.Kind != DiscoveryDecisionKind.PromoteMain)
+        {
+            return false;
+        }
+
+        // The persisted learning reference may predate the current winner (for
+        // example after an inventory refresh). Align it with the candidate that
+        // the same policy has just accepted before writing MainProcess.
+        var main = decision.Main ?? throw new InvalidOperationException("Promotion requires a main candidate.");
+        var alignedReference = AlignReference(state.Reference, state.Confirmation, main);
+        if (alignedReference is not null &&
+            !string.Equals(state.Reference?.Candidates.FirstOrDefault()?.ExecutablePath,
+                alignedReference.Candidates.FirstOrDefault()?.ExecutablePath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            var alignedState = new ProcessSignatureLearningState(state.Inventory,
+                state.PolicyVersion, Guid.NewGuid(), state.LastSequenceNumber,
+                state.HasAmbiguousInstallation, alignedReference, state.Confirmation,
+                state.Reasons, state.AbsenceBaselineEstablished);
+            if (!await _learningStore.TrySaveAsync(alignedState, state.ConcurrencyToken,
+                    cancellationToken))
+            {
+                return false;
+            }
+            state = alignedState;
+        }
 
         // Every candidate contributes to the proof, including startup companions.
         // Filesystem reads happen outside the conditional database transaction.
@@ -64,7 +95,7 @@ public sealed class ProcessSignatureAcceptanceService
             {
                 var cleared = new ProcessSignatureLearningState(state.Inventory, state.PolicyVersion,
                     Guid.NewGuid(), state.LastSequenceNumber, state.HasAmbiguousInstallation,
-                    null, null, [DiscoveryReason.RevisionChanged]);
+                    null, null, [DiscoveryReason.RevisionChanged], state.AbsenceBaselineEstablished);
                 await _learningStore.TrySaveAsync(cleared, state.ConcurrencyToken, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (expected is not null)
@@ -79,20 +110,24 @@ public sealed class ProcessSignatureAcceptanceService
         if (latestInventory is null || latestInventory.HasAmbiguousInstallation != state.HasAmbiguousInstallation ||
             !InventoryEquals(latestInventory.Inventory, state.Inventory)) return false;
 
-        var main = decision.Main ?? throw new InvalidOperationException("Promotion requires a main candidate.");
         var accepted = new ProcessSignature(state.Inventory.Scope.GameId.Value,
             [new ProcessSignatureEntry(main.ExecutableName, ProcessSignatureEntryKind.Main,
                 main.ExecutablePath, main.Revision)], ProcessSignatureOrigin.Discovered, _timeProvider.GetUtcNow(),
             new DiscoveredSignatureMetadata(state.Inventory.Scope.InstallationId, state.Inventory.Scope.GenerationId,
                 state.PolicyVersion, ProcessSignatureValidationState.Valid, Guid.NewGuid()));
+        var reference = state.Reference ?? throw new InvalidOperationException("Promotion requires a reference episode.");
+        var confirmation = state.Confirmation ?? throw new InvalidOperationException("Promotion requires a confirmation episode.");
         var write = new DiscoveredSignatureWrite(accepted, state.ConcurrencyToken,
-            state.Reference.EpisodeId, state.Confirmation.EpisodeId);
+            reference.EpisodeId, confirmation.EpisodeId);
         var acceptedDurably = expected is null
             ? await _discoveryStore.TryInsertDiscoveredIfAbsentAsync(write, cancellationToken)
             : await _discoveryStore.TryRevalidateDiscoveredAsync(write, expected, cancellationToken);
-        if (!acceptedDurably) return false;
+        if (!acceptedDurably)
+        {
+            return false;
+        }
 
-        await _sessionPromoter.PersistAsync(state.Confirmation, cancellationToken);
+        await _sessionPromoter.PersistAsync(confirmation, cancellationToken);
         return true;
     }
 
@@ -104,6 +139,33 @@ public sealed class ProcessSignatureAcceptanceService
             Equal(pair.First.ExecutablePath, pair.Second.ExecutablePath) && Equal(pair.First.ExecutableName, pair.Second.ExecutableName) &&
             pair.First.Revision == pair.Second.Revision) && left.Issues.Count == right.Issues.Count &&
         left.Issues.Zip(right.Issues).All(pair => pair.First.Kind == pair.Second.Kind && Equal(pair.First.Path, pair.Second.Path));
+
+    private static LearningEpisodeSummary? AlignReference(
+        LearningEpisodeSummary? reference, LearningEpisodeSummary? confirmation,
+        ExecutableCandidate main)
+    {
+        if (reference is null) return null;
+        var evidence = reference.Candidates.FirstOrDefault(candidate =>
+            string.Equals(candidate.ExecutablePath, main.ExecutablePath,
+                StringComparison.OrdinalIgnoreCase));
+        if (evidence is null)
+        {
+            var confirmationEvidence = confirmation?.Candidates.FirstOrDefault(candidate =>
+                string.Equals(candidate.ExecutablePath, main.ExecutablePath,
+                    StringComparison.OrdinalIgnoreCase));
+            if (confirmationEvidence is null) return null;
+            var ranges = confirmationEvidence.PresenceRanges.Where(range =>
+                range.First >= reference.FirstSnapshot && range.Last <= reference.LastSnapshot).ToArray();
+            if (ranges.Length == 0) return null;
+            evidence = new CandidateEpisodeEvidence(confirmationEvidence.ExecutablePath,
+                confirmationEvidence.Revision, confirmationEvidence.HasReliablePath,
+                confirmationEvidence.HasReliableIdentity, ranges);
+        }
+        return new LearningEpisodeSummary(reference.EpisodeId, reference.SequenceNumber,
+            reference.Scope, reference.PolicyVersion, reference.StartedAtUtc,
+            reference.EndedAtUtc, reference.FirstSnapshot, reference.LastSnapshot,
+            reference.Quality, [evidence]);
+    }
 
     private static bool Equal(string? left, string? right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 }

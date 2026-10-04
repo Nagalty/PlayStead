@@ -20,7 +20,7 @@ public sealed class DiscoveryNegativeExclusionTests
     [InlineData("server.exe")]
     [InlineData("UEPrereqSetup_x64.exe")]
     [InlineData("Game-Win64-Shipping.exe")]
-    public void Filename_never_removes_an_unobserved_competitor(string name)
+    public void Inventory_only_filename_does_not_create_an_unobserved_competitor(string name)
     {
         var scope = Scope();
         var revision = Revision();
@@ -31,9 +31,8 @@ public sealed class DiscoveryNegativeExclusionTests
 
         var result = new ProcessSignatureDiscoveryPolicy().Evaluate(evaluation);
 
-        Assert.Equal(DiscoveryDecisionKind.Ambiguous, result.Kind);
-        Assert.Contains(DiscoveryReason.UnobservedCompetitor, result.Reasons);
-        Assert.Null(result.Main);
+        Assert.Equal(DiscoveryDecisionKind.PromoteMain, result.Kind);
+        Assert.Equal(game, result.Main);
     }
 
     [Theory]

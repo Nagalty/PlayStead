@@ -64,6 +64,24 @@ public sealed class SqliteProcessSignatureLearningStoreTests
     }
 
     [Fact]
+    public async Task Refreshed_inventory_generation_preserves_absence_baseline()
+    {
+        var original = Sample();
+        var state = new ProcessSignatureLearningState(original.Inventory, original.PolicyVersion,
+            Guid.NewGuid(), original.LastSequenceNumber, original.HasAmbiguousInstallation,
+            null, null, original.Reasons, true);
+        using var fixture = await SeedAsync(state);
+        Assert.True(await Store(fixture).TrySaveAsync(state, null, Ct));
+
+        var refreshed = new ProcessSignatureLearningState(NewGeneration(state.Inventory),
+            state.PolicyVersion, Guid.NewGuid(), state.LastSequenceNumber,
+            state.HasAmbiguousInstallation, null, null, state.Reasons, true);
+        Assert.True(await Store(fixture).TrySaveAsync(refreshed, state.ConcurrencyToken, Ct));
+        Assert.True((await Store(fixture).LoadAsync(state.Inventory.Scope.InstallationId, Ct))!
+            .AbsenceBaselineEstablished);
+    }
+
+    [Fact]
     public void State_copies_reason_collection()
     {
         var reasons = new[] { DiscoveryReason.AwaitingIndependentEpisode };
@@ -617,10 +635,11 @@ public sealed class SqliteProcessSignatureLearningStoreTests
     private static ProcessSignatureLearningState Copy(ProcessSignatureLearningState state,
         ExecutableInventory? inventory = null, LearningEpisodeSummary? confirmation = null,
         int? policy = null, bool? ambiguous = null, bool clear = false, Guid? token = null,
-        long? sequence = null) => new(inventory ?? state.Inventory, policy ?? state.PolicyVersion,
+        long? sequence = null, bool? absenceBaseline = null) => new(inventory ?? state.Inventory, policy ?? state.PolicyVersion,
             token ?? Guid.NewGuid(), sequence ?? confirmation?.SequenceNumber ?? state.LastSequenceNumber,
             ambiguous ?? state.HasAmbiguousInstallation, clear ? null : state.Reference,
-            clear ? null : confirmation ?? state.Confirmation, state.Reasons);
+            clear ? null : confirmation ?? state.Confirmation, state.Reasons,
+            absenceBaseline ?? state.AbsenceBaselineEstablished);
 
     private static async Task<DiscoveryDatabaseFixture> SeedAsync(ProcessSignatureLearningState state)
     {
