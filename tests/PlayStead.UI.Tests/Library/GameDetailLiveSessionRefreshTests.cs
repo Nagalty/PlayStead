@@ -4,6 +4,7 @@ using PlayStead.Core.Library;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.Steam;
 using PlayStead.UI.Library;
+using PlayStead.UI.Launching;
 using PlayStead.UI.Sessions;
 using PlayStead.UI.Tests.TestSupport;
 
@@ -15,6 +16,19 @@ public sealed class GameDetailLiveSessionRefreshTests
     [Fact] public void CurrentGame_StartSnapshot_RefreshesDetail() => PlaySteadWpfTestResources.Run(() => Assert.True(Exercise(false, true).ViewModel.Game.IsSessionActive));
     [Fact] public void CurrentGame_EndSnapshot_RefreshesDetail() => PlaySteadWpfTestResources.Run(() => Assert.False(Exercise(true, false).ViewModel.Game.IsSessionActive));
     [Fact] public void CurrentGame_EndSnapshot_ReturnsCtaStateToPlay() => PlaySteadWpfTestResources.Run(() => Assert.Null(Exercise(true, false).ViewModel.SessionStatusLabel));
+    [Fact] public void CurrentGame_EndSnapshot_Reenables_launch_view_model_without_navigation() => PlaySteadWpfTestResources.Run(() =>
+    {
+        var id = GameId.New();
+        var monitor = new SessionMonitor(new NoopRuntime(), SessionMonitorOptions.Default, (_, _) => Task.CompletedTask, NullLogger<SessionMonitor>.Instance);
+        var launch = new GameLaunchViewModel(id,
+            [new GameInstallation(InstallationId.New(), id, ProviderKind.Steam, "123", @"C:\\Games\\HLL", 1, true, true, DateTimeOffset.UtcNow)],
+            new GameLaunchService(new RecordingUriLauncher()));
+        var detail = new GameDetailViewModel(Item(id, true), launch, null, null, monitor);
+        detail.Activate();
+        Assert.False(launch.CanPlay);
+        Publish(monitor, Snapshot());
+        Assert.True(launch.CanPlay);
+    });
     [Fact] public void CurrentGame_EndSnapshot_RefreshesActivitySummary() => PlaySteadWpfTestResources.Run(() => Assert.Equal(1, Exercise(true, false).RefreshCount));
     [Fact] public void OtherGame_Snapshot_DoesNotMutateCurrentDetail()
     {
@@ -70,4 +84,5 @@ public sealed class GameDetailLiveSessionRefreshTests
     }
     private sealed record Fixture(GameId GameId, SessionMonitor Monitor, GameDetailViewModel ViewModel, Func<int> Count) { public int RefreshCount => Count(); }
     private sealed class NoopRuntime : ISessionRuntime { public Task<SessionRuntimeSnapshot> RefreshAsync(CancellationToken cancellationToken) => Task.FromResult(Snapshot()); public Task CorrectSessionAsync(SessionCorrectionRequest correction, CancellationToken cancellationToken) => Task.FromException(new NotSupportedException()); }
+    private sealed class RecordingUriLauncher : IExternalUriLauncher { public void Open(Uri uri) { } }
 }

@@ -90,7 +90,7 @@ public sealed class Task08GLaunchUiTests
         var play = elements.FirstOrDefault(element => element.Name.LocalName == "Button" &&
             (element.Attribute("Content")?.Value == "Jouer" || element.Descendants().Any(child => child.Attribute("Text")?.Value == "Jouer")));
         Assert.True(play is not null, $"{file}: main Jouer action is missing.");
-        Assert.True(HasBinding(play!, "IsEnabled", "CanPlay"), $"{file}: Jouer availability must bind to CanPlay.");
+        Assert.True(HasBinding(play!, "Command", "PlayCommand"), $"{file}: Jouer must use the authoritative PlayCommand.");
         Assert.True(play!.Attribute("Click") is not null || HasBinding(play, "Command"),
             $"{file}: Jouer has no action hookup.");
 

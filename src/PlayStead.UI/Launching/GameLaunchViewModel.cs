@@ -1,4 +1,5 @@
 using PlayStead.Core.Library;
+using System.ComponentModel;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 
@@ -7,6 +8,7 @@ namespace PlayStead.UI.Launching;
 public sealed class GameLaunchViewModel
 {
     private readonly GameLaunchService _launchService;
+    private bool _isSessionActive;
 
     public GameLaunchViewModel(
         GameId gameId,
@@ -17,6 +19,7 @@ public sealed class GameLaunchViewModel
         ArgumentNullException.ThrowIfNull(launchService);
 
         _launchService = launchService;
+        _isSessionActive = false;
         var allInstallations = installations.ToArray();
 
         LaunchOptions =
@@ -31,6 +34,7 @@ public sealed class GameLaunchViewModel
             GameLaunchInstallationSelector.SelectDefault(
                 gameId,
                 LaunchOptions);
+        PlayCommand = new RelayCommand(() => _ = TryPlayDefault(), () => CanPlay);
 
         SteamInstallation = allInstallations
             .Where(installation => installation.GameId == gameId)
@@ -42,7 +46,24 @@ public sealed class GameLaunchViewModel
 
     public GameInstallation? DefaultInstallation { get; }
 
-    public bool CanPlay => DefaultInstallation is not null;
+    public bool CanPlay => DefaultInstallation is not null && !_isSessionActive;
+
+    public RelayCommand PlayCommand { get; }
+
+    public bool IsSessionActive => _isSessionActive;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void SetSessionActive(bool isActive)
+    {
+        if (_isSessionActive == isActive)
+            return;
+
+        _isSessionActive = isActive;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSessionActive)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanPlay)));
+        PlayCommand.NotifyCanExecuteChanged();
+    }
 
     public bool HasMultipleLaunchOptions => LaunchOptions.Count > 1;
 
@@ -60,13 +81,13 @@ public sealed class GameLaunchViewModel
 
     public bool TryPlayDefault()
     {
-        return DefaultInstallation is not null &&
-            _launchService.TryLaunch(DefaultInstallation);
+        return CanPlay &&
+            _launchService.TryLaunch(DefaultInstallation!);
     }
 
     public bool TryPlay(GameInstallation installation)
     {
-        return LaunchOptions.Contains(installation) &&
+        return CanPlay && LaunchOptions.Contains(installation) &&
             _launchService.TryLaunch(installation);
     }
 

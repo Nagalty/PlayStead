@@ -154,6 +154,62 @@ public sealed class GameLaunchViewModelTests
             opener.OpenedUris[0].AbsoluteUri);
     }
 
+    [Fact]
+    public void Active_session_for_same_game_disables_play_and_blocks_launch()
+    {
+        var gameId = GameId.New();
+        var opener = new RecordingUriLauncher();
+        var viewModel = new GameLaunchViewModel(gameId,
+            [CreateInstallation(gameId, ProviderKind.Steam, "111", true, true)],
+            new GameLaunchService(opener));
+
+        viewModel.SetSessionActive(true);
+
+        Assert.False(viewModel.PlayCommand.CanExecute(null));
+        Assert.False(viewModel.CanPlay);
+        Assert.False(viewModel.TryPlayDefault());
+        Assert.Empty(opener.OpenedUris);
+    }
+
+    [Fact]
+    public void Active_session_for_another_game_does_not_disable_selected_game()
+    {
+        var gameId = GameId.New();
+        var otherGameId = GameId.New();
+        var viewModel = new GameLaunchViewModel(gameId,
+            [CreateInstallation(gameId, ProviderKind.Steam, "111", true, true)],
+            CreateService());
+        var otherGame = new GameLaunchViewModel(otherGameId,
+            [CreateInstallation(otherGameId, ProviderKind.Steam, "222", true, true)],
+            CreateService());
+
+        otherGame.SetSessionActive(true);
+
+        Assert.True(viewModel.CanPlay);
+        Assert.False(otherGame.CanPlay);
+    }
+
+    [Fact]
+    public void Closing_active_session_reenables_play_and_notifies_binding()
+    {
+        var gameId = GameId.New();
+        var viewModel = new GameLaunchViewModel(gameId,
+            [CreateInstallation(gameId, ProviderKind.Steam, "111", true, true)],
+            CreateService());
+        var changed = new List<string?>();
+        var canExecuteChanged = 0;
+        viewModel.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+        viewModel.PlayCommand.CanExecuteChanged += (_, _) => canExecuteChanged++;
+
+        viewModel.SetSessionActive(true);
+        viewModel.SetSessionActive(false);
+
+        Assert.True(viewModel.CanPlay);
+        Assert.True(viewModel.PlayCommand.CanExecute(null));
+        Assert.Contains(nameof(GameLaunchViewModel.CanPlay), changed);
+        Assert.Equal(2, canExecuteChanged);
+    }
+
     private static GameLaunchService CreateService()
     {
         return new GameLaunchService(

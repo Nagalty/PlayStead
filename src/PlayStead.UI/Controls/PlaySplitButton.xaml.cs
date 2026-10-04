@@ -68,7 +68,9 @@ public partial class PlaySplitButton : UserControl
 
     private void Play_OnClick(object sender, RoutedEventArgs e)
     {
-        Launch(null);
+        // The command owns CanExecute and execution. Keep the handler for the
+        // existing routed-event contract, but avoid launching a second time.
+        e.Handled = true;
     }
 
     private void Options_OnClick(object sender, RoutedEventArgs e)
