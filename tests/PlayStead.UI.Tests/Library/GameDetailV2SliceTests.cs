@@ -25,7 +25,7 @@ public sealed class GameDetailV2SliceTests
         var xaml = View;
         Assert.Contains("Title=\"Installation\"", xaml);
         Assert.Contains("InstalledSizeLabel", xaml);
-        Assert.Contains("InstallDriveLabel", xaml);
+        Assert.Contains("InstallDriveDisplay", xaml);
         Assert.Contains("InstallPath", xaml);
         Assert.DoesNotContain("Données disponibles", xaml);
         Assert.DoesNotContain("État local", xaml);
