@@ -17,7 +17,9 @@ public sealed class SqliteWeeklyActivitySummaryService : IWeeklyActivitySummaryS
     public async Task<WeeklyActivitySummary> GetAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
         var localNow = nowUtc.ToLocalTime();
-        var monday = localNow.Date.AddDays(-(int)localNow.DayOfWeek + (int)DayOfWeek.Monday);
+        var daysSinceMonday =
+            ((int)localNow.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var monday = localNow.Date.AddDays(-daysSinceMonday);
         var startUtc = new DateTimeOffset(monday, localNow.Offset).ToUniversalTime();
         var sessions = await _sessions.GetRecentAsync(10_000, cancellationToken);
         var completed = sessions.Where(session =>
