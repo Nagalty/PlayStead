@@ -399,6 +399,23 @@
                                 <controls:SectionHeader Title="Installation"/>
                             </StackPanel>
                             <controls:StatusBadge Margin="0,10,0,0" Text="{Binding ProviderLabel}"/>
+                            <Border Margin="0,10,0,0"
+                                    Padding="10,8"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
+                                    BorderBrush="{DynamicResource PlayStead.Brush.BorderSubtle}"
+                                    BorderThickness="1"
+                                    Visibility="{Binding HasInstallUpdateState, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding InstallUpdateStatusText}"
+                                               Style="{DynamicResource PlayStead.Text.Body}"
+                                               Foreground="{DynamicResource PlayStead.Brush.Accent}" />
+                                    <TextBlock Margin="0,3,0,0"
+                                               Text="{Binding InstallUpdateDetailText}"
+                                               Style="{DynamicResource PlayStead.Text.BodySecondary}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
                             <Grid Margin="0,12,0,0">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>

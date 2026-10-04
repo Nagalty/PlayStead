@@ -3,7 +3,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using PlayStead.Core.Library;
+using PlayStead.Core.ProviderInstallUpdate;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.GameBuildHistory;
 using PlayStead.Core.Media;
@@ -69,6 +71,7 @@ public partial class MainWindow : Window
     private readonly UserDefinedLocalArtifactService? _userDefinedArtifactService;
     private readonly ILocalArtifactComparisonService? _localArtifactComparisonService;
     private readonly IGraphicsTechnologyDetectionService? _graphicsTechnologyDetectionService;
+    private readonly ProviderInstallUpdateStateReconciliationService? _installUpdates;
     private GameDetailViewModel? _activeGameDetailViewModel;
     private LibraryUiState? _libraryStateBeforeGameDetail;
 
@@ -472,6 +475,7 @@ public partial class MainWindow : Window
         UserDefinedLocalArtifactService? userDefinedArtifactService = null,
         ILocalArtifactComparisonService? localArtifactComparisonService = null,
         IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null,
+        ProviderInstallUpdateStateReconciliationService? installUpdates = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -500,6 +504,7 @@ public partial class MainWindow : Window
         _userDefinedArtifactService = userDefinedArtifactService;
         _localArtifactComparisonService = localArtifactComparisonService;
         _graphicsTechnologyDetectionService = graphicsTechnologyDetectionService;
+        _installUpdates = installUpdates;
         _aboutViewModel = distributionChannelProvider is null
             ? null
             : new AboutViewModel(distributionChannelProvider);
@@ -629,6 +634,20 @@ public partial class MainWindow : Window
 
     private void UpdateQuickPanel()
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            if (Dispatcher.HasShutdownStarted ||
+                Dispatcher.HasShutdownFinished)
+            {
+                return;
+            }
+
+            _ = Dispatcher.BeginInvoke(
+                UpdateQuickPanel,
+                DispatcherPriority.DataBind);
+            return;
+        }
+
         if (DataContext is not LibraryViewModel viewModel ||
             viewModel.SelectedItem is not { } game)
         {
@@ -917,7 +936,8 @@ public partial class MainWindow : Window
                         _userDefinedArtifactService,
                         _localArtifactComparisonService,
                         _graphicsTechnologyDetectionService,
-                        libraryViewModel.ManualMetadataLinkStore)
+                        libraryViewModel.ManualMetadataLinkStore,
+                        _installUpdates)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -940,7 +960,8 @@ public partial class MainWindow : Window
                         _userDefinedArtifactService,
                         _localArtifactComparisonService,
                         _graphicsTechnologyDetectionService,
-                        libraryViewModel.ManualMetadataLinkStore);
+                        libraryViewModel.ManualMetadataLinkStore,
+                        _installUpdates);
 
                 _activeGameDetailViewModel = gameDetailViewModel;
 

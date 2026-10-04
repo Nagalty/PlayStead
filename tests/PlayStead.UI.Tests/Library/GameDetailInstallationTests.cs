@@ -1,11 +1,43 @@
 using PlayStead.Core.Library;
 using PlayStead.Core.Steam;
 using PlayStead.UI.Library;
+using PlayStead.Core.ProviderInstallUpdate;
 
 namespace PlayStead.UI.Tests.Library;
 
 public sealed class GameDetailInstallationTests
 {
+    [Fact]
+    public async Task Update_state_projection_explains_blocked_launch()
+    {
+        var item = new LibraryItemViewModel(GameId.New(), "Hell Let Loose", ProviderKind.Epic, "hll", @"C:\Games\Hll", null, null);
+        var installation = new GameInstallation(InstallationId.New(), item.GameId, ProviderKind.Epic, "hll", item.InstallPath, null, true, true, DateTimeOffset.UtcNow);
+        var updates = new ProviderInstallUpdateStateReconciliationService([new FixedUpdateSource(installation, ProviderInstallUpdateStatus.Downloading)]);
+        await updates.RefreshAsync([installation], CancellationToken.None);
+
+        var viewModel = new GameDetailViewModel(item, null, null, null, installUpdates: updates);
+
+        Assert.True(viewModel.HasInstallUpdateState);
+        Assert.True(viewModel.IsLaunchBlockedByInstallState);
+        Assert.Equal("Mise à jour en cours", viewModel.InstallUpdateStatusText);
+        Assert.Contains("terminée", viewModel.InstallUpdateDetailText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Current_update_state_hides_installation_warning()
+    {
+        var item = new LibraryItemViewModel(GameId.New(), "Game", ProviderKind.Steam, "steam", @"C:\Games\Game", null, null);
+        var installation = new GameInstallation(InstallationId.New(), item.GameId, ProviderKind.Steam, "steam", item.InstallPath, null, true, true, DateTimeOffset.UtcNow);
+        var updates = new ProviderInstallUpdateStateReconciliationService([new FixedUpdateSource(installation, ProviderInstallUpdateStatus.UpToDate)]);
+        await updates.RefreshAsync([installation], CancellationToken.None);
+
+        var viewModel = new GameDetailViewModel(item, null, null, null, installUpdates: updates);
+
+        Assert.False(viewModel.HasInstallUpdateState);
+        Assert.False(viewModel.IsLaunchBlockedByInstallState);
+        Assert.Equal(string.Empty, viewModel.InstallUpdateStatusText);
+    }
+
     [Fact]
     public void Installation_module_exposes_real_local_fields()
     {
@@ -64,10 +96,8 @@ public sealed class GameDetailInstallationTests
         Assert.Contains("x:Name=\"InstallationPanel\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Title=\"Installation\"", xaml, StringComparison.Ordinal);
         Assert.Contains("InstalledSizeLabel", xaml, StringComparison.Ordinal);
-        Assert.Contains("InstallDriveLabel", xaml, StringComparison.Ordinal);
-        Assert.Contains("InstallPath", xaml, StringComparison.Ordinal);
-        Assert.Contains("HasInstallPath", xaml, StringComparison.Ordinal);
-        Assert.Contains("HasInstalledSize", xaml, StringComparison.Ordinal);
+        Assert.Contains("InstallDriveDisplay", xaml, StringComparison.Ordinal);
+        Assert.Contains("InstallPathDisplay", xaml, StringComparison.Ordinal);
         Assert.Contains("BooleanToVisibilityConverter", xaml, StringComparison.Ordinal);
     }
 
@@ -119,5 +149,15 @@ public sealed class GameDetailInstallationTests
 
         throw new DirectoryNotFoundException(
             "PlayStead.UI source directory was not found.");
+    }
+
+    private sealed class FixedUpdateSource(GameInstallation installation, ProviderInstallUpdateStatus status) : IProviderInstallUpdateStateSource
+    {
+        public ProviderKind Provider => installation.Provider;
+
+        public Task<IReadOnlyList<ProviderInstallUpdateState>> GetAsync(IReadOnlyCollection<GameInstallation> installations, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ProviderInstallUpdateState>>([new ProviderInstallUpdateState(
+                installation.GameId, installation.Provider, installation.ExternalId, null, null, status,
+                null, null, null, null, null, null, DateTimeOffset.UtcNow)]);
     }
 }

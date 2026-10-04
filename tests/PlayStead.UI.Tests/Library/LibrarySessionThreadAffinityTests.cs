@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -110,6 +111,55 @@ public sealed class LibrarySessionThreadAffinityTests
                 Assert.All(notificationThreads, onUiThread => Assert.True(onUiThread));
                 Assert.False(Assert.Single(library.Items).IsSessionActive);
                 Assert.Equal("Test Game", library.SelectedItem!.Title);
+            }
+            finally
+            {
+                closePolicy.RequestExit();
+                window.Close();
+                if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            }
+        });
+
+    [Fact]
+    public Task Background_selected_item_notification_updates_quick_panel_on_ui_dispatcher() =>
+        PlaySteadWpfTestResources.RunAsync(async () =>
+        {
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            using var monitor = CreateMonitor(new CancellationTokenSource());
+            var store = new LibraryStore();
+            var library = new LibraryViewModel(store, monitor);
+            await library.RefreshAsync(CancellationToken.None);
+            library.SelectGame(Assert.Single(library.Items));
+
+            var navigation = new NavigationService();
+            var sessions = new SessionViewModel(store, monitor, TimeProvider.System);
+            var root = Path.Combine(Path.GetTempPath(), "PlayStead.Tests", Guid.NewGuid().ToString("N"));
+            var closePolicy = new WindowClosePolicy();
+            var window = new MainWindow(library,
+                new WindowPlacementService(Path.Combine(root, "window.json")), closePolicy,
+                sessions, navigation, new ShellViewModel(navigation),
+                new SettingsViewModel(new UiPreferencesStore(Path.Combine(root, "preferences.json"))),
+                new UiMotionController(), new HomeViewModel(library, sessions, navigation),
+                new GameLaunchService(new NeverLaunch()));
+
+            try
+            {
+                window.Left = 100;
+                window.Top = 100;
+
+                var propertyChanged = (PropertyChangedEventHandler?)typeof(LibraryViewModel)
+                    .GetField("PropertyChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.GetValue(library);
+                Assert.NotNull(propertyChanged);
+
+                await Task.Run(() => propertyChanged!(library,
+                    new PropertyChangedEventArgs(nameof(LibraryViewModel.SelectedItem))));
+
+                await dispatcher.InvokeAsync(() =>
+                {
+                    Assert.True(dispatcher.CheckAccess());
+                    Assert.NotNull(window.FindName("MainContent"));
+                });
             }
             finally
             {

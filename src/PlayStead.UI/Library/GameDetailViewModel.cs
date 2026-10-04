@@ -11,6 +11,7 @@ using PlayStead.UI.Launching;
 using PlayStead.UI.Sessions;
 using PlayStead.Core.Shortlist;
 using PlayStead.Core.ProviderGameMetadata;
+using PlayStead.Core.ProviderInstallUpdate;
 using PlayStead.Core.GameBuildHistory;
 using PlayStead.Core.Modding;
 using PlayStead.Core.LocalArtifacts;
@@ -33,6 +34,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly IGamesDuMomentService? _gamesDuMomentService;
     private readonly IProviderGameMetadataStore? _providerGameMetadataStore;
     private readonly IManualMetadataLinkStore? _manualMetadataLinkStore;
+    private readonly ProviderInstallUpdateStateReconciliationService? _installUpdates;
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
     private readonly IGameLocalArtifactDiscoveryService? _localArtifactDiscoveryService;
     private readonly IArtifactFingerprintService? _artifactFingerprintService;
@@ -87,7 +89,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         UserDefinedLocalArtifactService? userDefinedArtifactService = null,
         ILocalArtifactComparisonService? localArtifactComparisonService = null,
         IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null,
-        IManualMetadataLinkStore? manualMetadataLinkStore = null)
+        IManualMetadataLinkStore? manualMetadataLinkStore = null,
+        ProviderInstallUpdateStateReconciliationService? installUpdates = null)
     {
         ArgumentNullException.ThrowIfNull(
             game);
@@ -122,6 +125,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         Launch =
             launch;
 
+        Launch?.SetSessionActive(game.IsSessionActive);
+
         Activity =
             activity;
 
@@ -132,6 +137,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         _gamesDuMomentService = gamesDuMomentService;
         _providerGameMetadataStore = providerGameMetadataStore;
         _manualMetadataLinkStore = manualMetadataLinkStore;
+        _installUpdates = installUpdates;
         _gameBuildHistoryService = gameBuildHistoryService;
         _localArtifactDiscoveryService = localArtifactDiscoveryService;
         _artifactFingerprintService = artifactFingerprintService;
@@ -185,8 +191,9 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         UserDefinedLocalArtifactService? userDefinedArtifactService = null,
         ILocalArtifactComparisonService? localArtifactComparisonService = null,
         IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null,
-        IManualMetadataLinkStore? manualMetadataLinkStore = null)
-        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService, localArtifactComparisonService, graphicsTechnologyDetectionService, manualMetadataLinkStore)
+        IManualMetadataLinkStore? manualMetadataLinkStore = null,
+        ProviderInstallUpdateStateReconciliationService? installUpdates = null)
+        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService, localArtifactComparisonService, graphicsTechnologyDetectionService, manualMetadataLinkStore, installUpdates)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -230,6 +237,44 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public bool HasInstallPath =>
         !string.IsNullOrWhiteSpace(
             Game.InstallPath);
+
+    private ProviderInstallUpdateState? InstallUpdateState =>
+        _installUpdates?.GetAll().FirstOrDefault(value =>
+            value.GameId == GameId && value.Provider == Game.Provider);
+
+    public bool HasInstallUpdateState =>
+        InstallUpdateState is not null && InstallUpdateState.Status != ProviderInstallUpdateStatus.UpToDate;
+
+    public bool IsLaunchBlockedByInstallState =>
+        InstallUpdateState?.Status is ProviderInstallUpdateStatus.Downloading
+            or ProviderInstallUpdateStatus.Staging
+            or ProviderInstallUpdateStatus.VersionMismatch;
+
+    public string InstallUpdateStatusText => InstallUpdateState?.Status switch
+    {
+        ProviderInstallUpdateStatus.Downloading => "Mise à jour en cours",
+        ProviderInstallUpdateStatus.Staging => "Installation de la mise à jour",
+        ProviderInstallUpdateStatus.VersionMismatch => "Installation incomplète",
+        ProviderInstallUpdateStatus.Unknown => "Jeu temporairement indisponible",
+        _ => string.Empty
+    };
+
+    public string InstallUpdateDetailText => InstallUpdateState?.Status switch
+    {
+        ProviderInstallUpdateStatus.Downloading => "La mise à jour doit être terminée avant de pouvoir lancer le jeu.",
+        ProviderInstallUpdateStatus.Staging => "Epic Games Launcher termine l’installation de la mise à jour.",
+        ProviderInstallUpdateStatus.VersionMismatch => "Termine l’installation dans Epic Games Launcher avant de lancer le jeu.",
+        ProviderInstallUpdateStatus.Unknown => "L’état de l’installation ne permet pas de lancer le jeu pour le moment.",
+        _ => string.Empty
+    };
+
+    public void RefreshInstallUpdateState()
+    {
+        OnPropertyChanged(nameof(HasInstallUpdateState));
+        OnPropertyChanged(nameof(IsLaunchBlockedByInstallState));
+        OnPropertyChanged(nameof(InstallUpdateStatusText));
+        OnPropertyChanged(nameof(InstallUpdateDetailText));
+    }
 
     public bool HasInstalledSize =>
         Game.InstalledSizeBytes.HasValue;
@@ -870,6 +915,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         }
 
         var isSessionActive = snapshot.ActiveSessions.Any(session => session.GameId == GameId.Value);
+        Launch?.SetSessionActive(isSessionActive);
         if (isSessionActive == Game.IsSessionActive)
         {
             return;
