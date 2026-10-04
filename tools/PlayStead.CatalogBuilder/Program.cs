@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using PlayStead.Core.Catalog;
+using PlayStead.CatalogBuilder;
 
 var parsed = Arguments.Parse(args);
 if (parsed is null)
@@ -44,15 +45,15 @@ static List<CanonicalCatalogEntry> BuildEntries(IEnumerable<IgdbRecord> source)
     return candidates.Select((item, index) => new CanonicalCatalogEntry(new CatalogContentId(StableGuid(item.Record.Id)), PlaySteadPublicId.Parse($"PlayStead-{index + 1:000000}"), item.Record.Name, item.Normalized,
         item.Record.ReleaseDate is null ? null : DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(item.Record.ReleaseDate.Value).UtcDateTime), item.Record.Developer, item.Record.Publisher,
         (item.Record.Genres ?? []).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToArray(),
-        (item.Record.ExternalGames ?? []).Where(x => x is not null && !string.IsNullOrWhiteSpace(x.ExternalId)).Select(x => new CanonicalCatalogProviderReference(MapProvider(x.Source), x.ExternalId!, null, CatalogProvenance.Igdb, CatalogConfidence.Deterministic, DateTimeOffset.UnixEpoch)).Where(x => x.Provider is CatalogProviderKind.Steam or CatalogProviderKind.Epic or CatalogProviderKind.Gog).GroupBy(x => (x.Provider, x.ExternalId)).Select(x => x.First()).OrderBy(x => x.Provider).ThenBy(x => x.ExternalId, StringComparer.Ordinal).ToArray(), CatalogProvenance.Igdb, DateTimeOffset.UnixEpoch, BuildMedia(item.Record))).ToList();
+        EpicProviderAliasRegistry.AddProvenAliases((item.Record.ExternalGames ?? []).Where(x => x is not null && !string.IsNullOrWhiteSpace(x.ExternalId)).Select(x => new CanonicalCatalogProviderReference(MapProvider(x.Source), x.ExternalId!, null, CatalogProvenance.Igdb, CatalogConfidence.Deterministic, DateTimeOffset.UnixEpoch)).Where(x => x.Provider is CatalogProviderKind.Steam or CatalogProviderKind.Epic or CatalogProviderKind.Gog).GroupBy(x => (x.Provider, x.ExternalId)).Select(x => x.First()).OrderBy(x => x.Provider).ThenBy(x => x.ExternalId, StringComparer.Ordinal)).ToArray(), CatalogProvenance.Igdb, DateTimeOffset.UnixEpoch, BuildMedia(item.Record))).ToList();
 }
 
 static CatalogMedia? BuildMedia(IgdbRecord record)
 {
-    var cover = string.IsNullOrWhiteSpace(record.CoverImageId) ? null : $"https://images.igdb.com/igdb/image/upload/t_600x900/{record.CoverImageId}.jpg";
+    var cover = IgdbMediaUrlFactory.Cover(record.CoverImageId);
     var heroId = record.ArtworkImageIds?.FirstOrDefault() ?? record.ScreenshotImageIds?.FirstOrDefault();
-    var hero = string.IsNullOrWhiteSpace(heroId) ? null : $"https://images.igdb.com/igdb/image/upload/t_1920x1080/{heroId}.jpg";
-    return cover is null && hero is null ? null : new CatalogMedia(cover, hero, cover is null ? null : 600, cover is null ? null : 900, hero is null ? null : 1920, hero is null ? null : 1080, "igdb");
+    var hero = IgdbMediaUrlFactory.Hero(heroId);
+    return cover is null && hero is null ? null : new CatalogMedia(cover, hero, cover is null ? null : 264, cover is null ? null : 374, hero is null ? null : 1920, hero is null ? null : 1080, "igdb");
 }
 
 static CatalogProviderKind MapProvider(string? source) => source?.Trim().ToLowerInvariant() switch { "steam" => CatalogProviderKind.Steam, "epic" or "epic games store" => CatalogProviderKind.Epic, "gog" or "gog.com" => CatalogProviderKind.Gog, _ => CatalogProviderKind.Igdb };
