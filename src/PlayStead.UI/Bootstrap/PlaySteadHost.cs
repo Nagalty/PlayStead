@@ -405,8 +405,11 @@ public static class PlaySteadHost
             services.GetRequiredService<ProviderGameMetadataOnlineReconciliationService>());
         builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateStateEvaluator>();
         builder.Services.AddSingleton<SteamLocalInstallUpdateStateSource>();
+        builder.Services.AddSingleton<EpicLocalInstallUpdateStateSource>();
         builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateStateSource>(services =>
             services.GetRequiredService<SteamLocalInstallUpdateStateSource>());
+        builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateStateSource>(services =>
+            services.GetRequiredService<EpicLocalInstallUpdateStateSource>());
         builder.Services.AddSingleton<IGameBuildHistoryStore, SqliteGameBuildHistoryStore>();
         builder.Services.AddSingleton<GameBuildHistoryService>(services =>
             new GameBuildHistoryService(
@@ -418,6 +421,7 @@ public static class PlaySteadHost
                 services.GetRequiredService<GameBuildHistoryService>(),
                 services.GetRequiredService<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateProtectionService>()));
         builder.Services.AddSingleton<SteamInstallUpdateLiveRefreshService>();
+        builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateLiveRefreshService>();
         builder.Services.AddSingleton<IHomeSuggestionSelectionStore>(_ =>
             new JsonHomeSuggestionSelectionStore(
                 Path.Combine(dataRoot, "home-suggestion-selection.json")));

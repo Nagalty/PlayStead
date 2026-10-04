@@ -22,6 +22,7 @@ public sealed class ApplicationRuntime
     private readonly ProviderGameMetadataOnlineReconciliationService? _onlineProviderGameMetadata;
     private readonly ProviderInstallUpdateStateReconciliationService? _providerInstallUpdates;
     private readonly SteamInstallUpdateLiveRefreshService? _steamLiveRefresh;
+    private readonly ProviderInstallUpdateLiveRefreshService? _installUpdateLiveRefresh;
     private readonly object _onlineRefreshGate = new();
     private Task? _onlineRefreshTask;
     private CancellationToken _postReadyCancellationToken;
@@ -69,7 +70,8 @@ public sealed class ApplicationRuntime
         ProviderGameMetadataReconciliationService providerGameMetadata,
         ProviderGameMetadataOnlineReconciliationService onlineProviderGameMetadata,
         ProviderInstallUpdateStateReconciliationService providerInstallUpdates,
-        SteamInstallUpdateLiveRefreshService steamLiveRefresh)
+        SteamInstallUpdateLiveRefreshService steamLiveRefresh,
+        ProviderInstallUpdateLiveRefreshService? installUpdateLiveRefresh = null)
         : this(startupPipeline, libraryViewModel, invocationHandler, providerActivity, libraryStore, providerGameMetadata, providerInstallUpdates, steamLiveRefresh)
     {
         _onlineProviderGameMetadata = onlineProviderGameMetadata;
@@ -83,12 +85,16 @@ public sealed class ApplicationRuntime
         ILibraryStore libraryStore,
         ProviderGameMetadataReconciliationService providerGameMetadata,
         ProviderInstallUpdateStateReconciliationService providerInstallUpdates,
-        SteamInstallUpdateLiveRefreshService steamLiveRefresh)
+        SteamInstallUpdateLiveRefreshService steamLiveRefresh,
+        ProviderInstallUpdateLiveRefreshService? installUpdateLiveRefresh = null)
         : this(startupPipeline, libraryViewModel, invocationHandler, providerActivity, libraryStore, providerGameMetadata)
     {
         _providerInstallUpdates = providerInstallUpdates;
         _steamLiveRefresh = steamLiveRefresh;
-        _steamLiveRefresh.SetRefresh(RefreshAsync);
+        _installUpdateLiveRefresh = installUpdateLiveRefresh;
+        _steamLiveRefresh.FallbackInterval = Timeout.InfiniteTimeSpan;
+        _steamLiveRefresh.SetRefresh(RefreshInstallUpdateAsync);
+        _installUpdateLiveRefresh?.SetRefresh(RefreshInstallUpdateAsync);
     }
 
     public ApplicationRuntime(
@@ -139,6 +145,7 @@ public sealed class ApplicationRuntime
                 await _providerInstallUpdates.RefreshAsync((await _libraryStore.LoadSnapshotAsync(cancellationToken)).Installations, cancellationToken));
 
         _steamLiveRefresh?.Start();
+        _installUpdateLiveRefresh?.Start();
 
         return state;
     }
@@ -169,6 +176,15 @@ public sealed class ApplicationRuntime
         StartPostReadyEnrichment(_postReadyCancellationToken);
 
         return snapshot!;
+    }
+
+    public async Task RefreshInstallUpdateAsync(CancellationToken cancellationToken)
+    {
+        if (_providerInstallUpdates is null || _libraryStore is null)
+            return;
+        await _providerInstallUpdates.RefreshAsync(
+            (await _libraryStore.LoadSnapshotAsync(cancellationToken)).Installations,
+            cancellationToken).ConfigureAwait(false);
     }
 
     public void StartPostReadyEnrichment(CancellationToken cancellationToken)

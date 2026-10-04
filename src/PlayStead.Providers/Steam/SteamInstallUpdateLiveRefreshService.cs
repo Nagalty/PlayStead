@@ -28,7 +28,7 @@ public sealed class SteamInstallUpdateLiveRefreshService : IDisposable
     public void SetRefresh(Func<CancellationToken, Task> refresh) => _refresh = refresh;
 
     public TimeSpan DebounceWindow { get; init; } = TimeSpan.FromMilliseconds(750);
-    public TimeSpan FallbackInterval { get; init; } = TimeSpan.FromMinutes(15);
+    public TimeSpan FallbackInterval { get; set; } = TimeSpan.FromMinutes(15);
     public TimeSpan FocusThreshold { get; init; } = TimeSpan.FromMinutes(5);
 
     public void NotifyDeactivated(DateTimeOffset atUtc) => _deactivatedAtUtc = atUtc;
@@ -64,7 +64,8 @@ public sealed class SteamInstallUpdateLiveRefreshService : IDisposable
             // A missing/inaccessible Steam installation is recoverable by fallback refresh.
         }
 
-        _periodic = new Timer(_ => QueueRefresh("periodic"), null, FallbackInterval, FallbackInterval);
+        if (FallbackInterval != Timeout.InfiniteTimeSpan)
+            _periodic = new Timer(_ => QueueRefresh("periodic"), null, FallbackInterval, FallbackInterval);
     }
 
     private void Watch(string directory)
