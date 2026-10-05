@@ -371,12 +371,14 @@
                                            Text="{Binding Activity.ProviderPlayTimeLabel}"
                                            Style="{DynamicResource PlayStead.Text.Body}"/>
                             </StackPanel>
-                            <TextBlock Margin="0,6,0,0"
-                                       Text="Dernière activité provider"
-                                       Style="{DynamicResource PlayStead.Text.Caption}"/>
-                            <TextBlock Margin="0,4,0,0"
-                                       Text="{Binding Activity.ProviderLastPlayedLabel, TargetNullValue=Inconnue}"
-                                       Style="{DynamicResource PlayStead.Text.Body}"/>
+                            <StackPanel Margin="0,6,0,0"
+                                        Visibility="{Binding Activity.HasProviderLastPlayed, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="Dernière activité provider"
+                                           Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                <TextBlock Margin="0,4,0,0"
+                                           Text="{Binding Activity.ProviderLastPlayedLabel}"
+                                           Style="{DynamicResource PlayStead.Text.Body}"/>
+                            </StackPanel>
                             <TextBlock Margin="0,6,0,0"
                                        Text="Suivi PlayStead"
                                        Style="{DynamicResource PlayStead.Text.Caption}"/>

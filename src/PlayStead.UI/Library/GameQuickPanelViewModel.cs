@@ -160,6 +160,8 @@ public sealed class GameQuickPanelViewModel :
 
     public string? ProviderLastPlayedLabel { get; private set; }
 
+    public bool HasProviderLastPlayed => ProviderLastPlayedLabel is not null;
+
     public string? ProviderActivitySourceLabel { get; private set; }
 
     public bool HasProviderActivity =>
@@ -362,6 +364,7 @@ public sealed class GameQuickPanelViewModel :
         OnPropertyChanged(nameof(ProviderPlayTimeLabel));
         OnPropertyChanged(nameof(HasProviderPlayTime));
         OnPropertyChanged(nameof(ProviderLastPlayedLabel));
+        OnPropertyChanged(nameof(HasProviderLastPlayed));
         OnPropertyChanged(nameof(ProviderActivitySourceLabel));
         OnPropertyChanged(nameof(HasProviderActivity));
         OnPropertyChanged(nameof(HasAnyActivity));

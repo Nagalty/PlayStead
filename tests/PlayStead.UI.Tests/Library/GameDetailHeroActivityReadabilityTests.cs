@@ -54,6 +54,13 @@ public sealed class GameDetailHeroActivityReadabilityTests
     }
 
     [Fact]
+    public void Unknown_provider_last_activity_row_is_collapsed_instead_of_showing_placeholder()
+    {
+        Assert.Contains("Visibility=\"{Binding Activity.HasProviderLastPlayed, Converter={StaticResource BooleanToVisibilityConverter}}\"", Hero, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderLastPlayedLabel, TargetNullValue=Inconnue", Hero, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Active_status_remains_primary_semibold()
     {
         Assert.Contains(

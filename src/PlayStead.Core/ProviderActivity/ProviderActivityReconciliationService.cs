@@ -77,8 +77,9 @@ public sealed class ProviderActivityReconciliationService
             return current;
         }
 
-        var playtime = current.TotalPlaytime ?? previous.TotalPlaytime;
-        var lastPlayed = current.LastPlayedAtUtc ?? previous.LastPlayedAtUtc;
+        var isAuthoritative = current.Availability == ProviderActivityAvailability.Complete;
+        var playtime = isAuthoritative ? current.TotalPlaytime : current.TotalPlaytime ?? previous.TotalPlaytime;
+        var lastPlayed = isAuthoritative ? current.LastPlayedAtUtc : current.LastPlayedAtUtc ?? previous.LastPlayedAtUtc;
         var availability = current.Availability == ProviderActivityAvailability.Unknown &&
                            (playtime is not null || lastPlayed is not null)
             ? ProviderActivityAvailability.Partial

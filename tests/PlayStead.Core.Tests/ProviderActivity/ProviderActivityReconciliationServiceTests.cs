@@ -39,7 +39,7 @@ public sealed class ProviderActivityReconciliationServiceTests
             new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero),
             DateTimeOffset.UtcNow,
             ProviderActivityAvailability.Complete);
-        var source = new SequenceSource(complete, ProviderActivityMetadata.Unknown(
+        var source = new SequenceSource(ProviderKind.Steam, complete, ProviderActivityMetadata.Unknown(
             game,
             ProviderKind.Steam,
             "123",
@@ -53,6 +53,29 @@ public sealed class ProviderActivityReconciliationServiceTests
         var persisted = Assert.Single(await store.GetAllAsync(CancellationToken.None));
         Assert.Equal(complete.TotalPlaytime, persisted.TotalPlaytime);
         Assert.Equal(complete.LastPlayedAtUtc, persisted.LastPlayedAtUtc);
+    }
+
+    [Fact]
+    public async Task Complete_refresh_can_clear_a_provider_field_known_to_be_unavailable()
+    {
+        var game = GameId.New();
+        var store = new Store();
+        var first = new ProviderActivityMetadata(
+            game, ProviderKind.Gog, "1495134320", TimeSpan.FromMinutes(23),
+            new DateTimeOffset(2024, 9, 13, 9, 1, 58, TimeSpan.Zero),
+            DateTimeOffset.UtcNow, ProviderActivityAvailability.Complete);
+        var current = new ProviderActivityMetadata(
+            game, ProviderKind.Gog, "1495134320", TimeSpan.FromMinutes(23), null,
+            DateTimeOffset.UtcNow, ProviderActivityAvailability.Complete);
+        var sut = new ProviderActivityReconciliationService(store, [new SequenceSource(ProviderKind.Gog, first, current)]);
+        var snapshot = new LibrarySnapshot([], [new GameInstallation(InstallationId.New(), game, ProviderKind.Gog, "1495134320", "C:\\Game", null, true, true, DateTimeOffset.UtcNow)]);
+
+        await sut.RefreshAsync(snapshot, CancellationToken.None);
+        await sut.RefreshAsync(snapshot, CancellationToken.None);
+
+        var persisted = Assert.Single(await store.GetAllAsync(CancellationToken.None));
+        Assert.Equal(TimeSpan.FromMinutes(23), persisted.TotalPlaytime);
+        Assert.Null(persisted.LastPlayedAtUtc);
     }
 
     [Fact]
@@ -105,10 +128,10 @@ public sealed class ProviderActivityReconciliationServiceTests
         public Task<IReadOnlyList<ProviderActivityMetadata>> GetAsync(IReadOnlyCollection<GameInstallation> _, CancellationToken __) => Task.FromResult<IReadOnlyList<ProviderActivityMetadata>>([value]);
     }
 
-    private sealed class SequenceSource(params ProviderActivityMetadata[] values) : IProviderActivityMetadataSource
+    private sealed class SequenceSource(ProviderKind provider, params ProviderActivityMetadata[] values) : IProviderActivityMetadataSource
     {
         private int _index;
-        public ProviderKind Provider => ProviderKind.Steam;
+        public ProviderKind Provider => provider;
         public Task<IReadOnlyList<ProviderActivityMetadata>> GetAsync(IReadOnlyCollection<GameInstallation> _, CancellationToken __)
         {
             var value = values[Math.Min(_index++, values.Length - 1)];

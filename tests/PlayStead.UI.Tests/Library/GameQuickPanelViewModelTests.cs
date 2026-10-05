@@ -152,6 +152,32 @@ public sealed class GameQuickPanelViewModelTests
         Assert.Equal("0 min", viewModel.PlaySteadTotalPlayTimeLabel);
         Assert.Equal("Steam", viewModel.ProviderActivitySourceLabel);
         Assert.NotNull(viewModel.ProviderLastPlayedLabel);
+        Assert.True(viewModel.HasProviderLastPlayed);
+    }
+
+    [Fact]
+    public async Task Unknown_provider_last_activity_is_hidden_while_playtime_remains_visible()
+    {
+        var gameId = GameId.New();
+        var game = new LibraryItemViewModel(gameId, "GOG game", ProviderKind.Gog, "GOG", @"C:\\Game", null);
+        var providerStore = new FakeProviderActivityStore(new ProviderActivityMetadata(
+            gameId, ProviderKind.Gog, "1495134320", TimeSpan.FromMinutes(23), null,
+            DateTimeOffset.UtcNow, ProviderActivityAvailability.Complete));
+        var viewModel = new GameQuickPanelViewModel(
+            game,
+            new NavigationService(),
+            launch: null,
+            new FakeSessionStore([]),
+            new FakeCorrectionStore(new Dictionary<Guid, SessionCorrection>()),
+            new SessionCorrectionPolicy(),
+            providerStore);
+
+        await viewModel.LoadSessionSummaryAsync(CancellationToken.None);
+
+        Assert.Equal("0 h 23 min", viewModel.ProviderPlayTimeLabel);
+        Assert.True(viewModel.HasProviderActivity);
+        Assert.False(viewModel.HasProviderLastPlayed);
+        Assert.Null(viewModel.ProviderLastPlayedLabel);
     }
 
     [Fact]
