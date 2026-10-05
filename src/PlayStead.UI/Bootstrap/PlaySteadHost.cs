@@ -361,8 +361,11 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<SteamProcessLogSessionParser>();
         builder.Services.AddSingleton<SteamProcessLogSessionImporter>();
         builder.Services.AddSingleton<SteamLocalProviderActivitySource>();
+        builder.Services.AddSingleton<GogLocalProviderActivitySource>();
         builder.Services.AddSingleton<IProviderActivityMetadataSource>(services =>
             services.GetRequiredService<SteamLocalProviderActivitySource>());
+        builder.Services.AddSingleton<IProviderActivityMetadataSource>(services =>
+            services.GetRequiredService<GogLocalProviderActivitySource>());
         builder.Services.AddSingleton<ProviderActivityReconciliationService>();
         builder.Services.AddSingleton<IProviderGameMetadataStore, SqliteProviderGameMetadataStore>();
         builder.Services.AddSingleton<IProviderGameMetadataTargetResolver>(services =>
