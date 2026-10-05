@@ -406,10 +406,13 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateStateEvaluator>();
         builder.Services.AddSingleton<SteamLocalInstallUpdateStateSource>();
         builder.Services.AddSingleton<EpicLocalInstallUpdateStateSource>();
+        builder.Services.AddSingleton<GogLocalInstallUpdateStateSource>();
         builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateStateSource>(services =>
             services.GetRequiredService<SteamLocalInstallUpdateStateSource>());
         builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateStateSource>(services =>
             services.GetRequiredService<EpicLocalInstallUpdateStateSource>());
+        builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateStateSource>(services =>
+            services.GetRequiredService<GogLocalInstallUpdateStateSource>());
         builder.Services.AddSingleton<IGameBuildHistoryStore, SqliteGameBuildHistoryStore>();
         builder.Services.AddSingleton<GameBuildHistoryService>(services =>
             new GameBuildHistoryService(
