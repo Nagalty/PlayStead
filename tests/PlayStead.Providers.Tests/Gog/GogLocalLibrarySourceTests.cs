@@ -25,6 +25,29 @@ public sealed class GogLocalLibrarySourceTests : IDisposable
         Assert.Equal(Path.GetFullPath(install), item.InstallPath);
         Assert.Null(item.InstalledSizeBytes);
         Assert.Equal(InstallationContentKind.Game, item.ContentKind);
+        Assert.Null(item.ExecutablePath);
+    }
+
+    [Fact]
+    public async Task Resolves_first_existing_game_play_task_for_direct_launch()
+    {
+        var install = CreateInstall("The Witcher 3");
+        var executable = Path.Combine(install, "bin", "x64", "witcher3.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(executable)!);
+        File.WriteAllText(executable, string.Empty);
+        WriteInfo(install, "1495134320", "The Witcher 3: Wild Hunt", new[]
+        {
+            new { category = "launcher", path = "REDprelauncher.exe", workingDir = ".", arguments = (string?)null },
+            new { category = "game", path = "bin/x64/missing.exe", workingDir = "bin/x64", arguments = (string?)null },
+            new { category = "game", path = "bin/x64/witcher3.exe", workingDir = "bin/x64", arguments = (string?)"--launcher-silent" }
+        });
+
+        var result = await ScanAsync(install);
+        var item = Assert.Single(result.Installations);
+
+        Assert.Equal(Path.GetFullPath(executable), item.ExecutablePath);
+        Assert.Equal(Path.GetFullPath(Path.Combine(install, "bin", "x64")), item.WorkingDirectory);
+        Assert.Equal("--launcher-silent", item.LaunchArguments);
     }
 
     [Fact]
@@ -92,10 +115,18 @@ public sealed class GogLocalLibrarySourceTests : IDisposable
     }
 
     private static void WriteInfo(string directory, string id, string? name, string suffix = "")
+        => WriteInfo(directory, id, name, playTasks: null, suffix);
+
+    private static void WriteInfo(
+        string directory,
+        string id,
+        string? name,
+        object[]? playTasks,
+        string suffix = "")
     {
         Directory.CreateDirectory(directory);
         var file = Path.Combine(directory, $"goggame-{id}{suffix}.info");
-        File.WriteAllText(file, JsonSerializer.Serialize(new { gameId = id, name }));
+        File.WriteAllText(file, JsonSerializer.Serialize(new { gameId = id, name, playTasks }));
     }
 
     public void Dispose()

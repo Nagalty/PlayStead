@@ -89,6 +89,7 @@ public sealed class GogLocalLibrarySource : ILocalLibrarySource
                         continue;
                     }
 
+                    var launch = ResolveLaunch(info, installPath);
                     installations.Add(DiscoveredInstallation.Create(
                         Provider,
                         externalId,
@@ -97,7 +98,10 @@ public sealed class GogLocalLibrarySource : ILocalLibrarySource
                         installedSizeBytes: null,
                         observedAtUtc) with
                     {
-                        ContentKind = InstallationContentKind.Game
+                        ContentKind = InstallationContentKind.Game,
+                        ExecutablePath = launch.ExecutablePath,
+                        WorkingDirectory = launch.WorkingDirectory,
+                        LaunchArguments = launch.Arguments
                     });
                 }
                 catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
@@ -128,6 +132,28 @@ public sealed class GogLocalLibrarySource : ILocalLibrarySource
             ?? throw new JsonException("GOG game info is empty.");
     }
 
+    private static (string? ExecutablePath, string? WorkingDirectory, string? Arguments) ResolveLaunch(
+        GogGameInfo info,
+        string installPath)
+    {
+        var task = (info.PlayTasks ?? [])
+            .Where(value => string.Equals(value.Category, "game", StringComparison.OrdinalIgnoreCase))
+            .Where(value => !string.IsNullOrWhiteSpace(value.Path))
+            .Select(value =>
+            {
+                var executablePath = Path.GetFullPath(Path.Combine(installPath, value.Path!));
+                var workingDirectory = string.IsNullOrWhiteSpace(value.WorkingDir)
+                    ? Path.GetDirectoryName(executablePath)
+                    : Path.GetFullPath(Path.Combine(installPath, value.WorkingDir));
+                return (Task: value, ExecutablePath: executablePath, WorkingDirectory: workingDirectory);
+            })
+            .FirstOrDefault(value => File.Exists(value.ExecutablePath));
+
+        return task.Task is null
+            ? (null, null, null)
+            : (task.ExecutablePath, task.WorkingDirectory, task.Task.Arguments);
+    }
+
     private static bool TryGetExternalId(string path, out string externalId)
     {
         var match = InfoFileName.Match(Path.GetFileName(path));
@@ -138,6 +164,15 @@ public sealed class GogLocalLibrarySource : ILocalLibrarySource
     private sealed class GogGameInfo
     {
         public string? Name { get; set; }
+        public List<GogPlayTask>? PlayTasks { get; set; }
+    }
+
+    private sealed class GogPlayTask
+    {
+        public string? Category { get; set; }
+        public string? Path { get; set; }
+        public string? WorkingDir { get; set; }
+        public string? Arguments { get; set; }
     }
 }
 

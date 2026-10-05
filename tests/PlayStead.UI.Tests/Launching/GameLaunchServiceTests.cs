@@ -121,6 +121,47 @@ public sealed class GameLaunchServiceTests
     }
 
     [Fact]
+    public void Gog_installation_with_local_executable_uses_direct_process_route()
+    {
+        var root = Directory.CreateTempSubdirectory();
+        var executable = Path.Combine(root.FullName, "game.exe");
+        File.WriteAllText(executable, string.Empty);
+        var launcher = new RecordingProcessLauncher();
+        try
+        {
+            var installation = CreateInstallation(ProviderKind.Gog, "1495134320", true) with
+            {
+                ExecutablePath = executable,
+                WorkingDirectory = root.FullName,
+                LaunchArguments = "--language=fr"
+            };
+            var service = new GameLaunchService(new RecordingUriLauncher(), launcher);
+
+            Assert.True(service.CanLaunch(installation));
+            Assert.True(service.TryLaunch(installation));
+            Assert.Equal(executable, launcher.Path);
+            Assert.Equal(root.FullName, launcher.WorkingDirectory);
+            Assert.Equal("--language=fr", launcher.Arguments);
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Gog_without_local_executable_is_not_launchable_and_does_not_open_provider_uri()
+    {
+        var opener = new RecordingUriLauncher();
+        var service = new GameLaunchService(opener);
+        var installation = CreateInstallation(ProviderKind.Gog, "1495134320", true);
+
+        Assert.False(service.CanLaunch(installation));
+        Assert.False(service.TryLaunch(installation));
+        Assert.Empty(opener.OpenedUris);
+    }
+
+    [Fact]
     public async Task Epic_paused_update_state_disables_launch()
     {
         var installation = CreateEpicInstallation(isPresent: true);
@@ -196,6 +237,21 @@ public sealed class GameLaunchServiceTests
         {
             OpenedUris.Add(
                 uri);
+        }
+    }
+
+    private sealed class RecordingProcessLauncher : ILocalProcessLauncher
+    {
+        public string? Path { get; private set; }
+        public string? WorkingDirectory { get; private set; }
+        public string? Arguments { get; private set; }
+
+        public bool Start(string executablePath, string workingDirectory, string? arguments)
+        {
+            Path = executablePath;
+            WorkingDirectory = workingDirectory;
+            Arguments = arguments;
+            return true;
         }
     }
 

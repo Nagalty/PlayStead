@@ -43,9 +43,8 @@ public sealed class GameLaunchService
 
         return installation.Provider switch
         {
-            ProviderKind.Manual => installation.IsPresent &&
-                                   File.Exists(installation.ExecutablePath) &&
-                                   Directory.Exists(installation.WorkingDirectory),
+            ProviderKind.Manual => CanLaunchLocal(installation),
+            ProviderKind.Gog => CanLaunchGog(installation),
             ProviderKind.Steam => SteamLaunchUriFactory.CreateOrNull(installation) is not null,
             ProviderKind.Epic => EpicLaunchUriFactory.CreateOrNull(installation) is not null,
             _ => false
@@ -62,28 +61,10 @@ public sealed class GameLaunchService
             return false;
 
         if (installation.Provider == ProviderKind.Manual)
-        {
-            if (_localProcessLauncher is IProcessIdentityLauncher identityLauncher)
-            {
-                var identity = identityLauncher.StartWithIdentity(
-                    installation.ExecutablePath!,
-                    installation.WorkingDirectory!,
-                    installation.LaunchArguments);
-                if (identity is null)
-                    return false;
+            return TryLaunchLocal(installation);
 
-                _sessionLaunchSink?.TrackLaunchedProcess(
-                    installation.GameId.Value,
-                    identity.ProcessId,
-                    identity.StartedAtUtc);
-                return true;
-            }
-
-            return _localProcessLauncher.Start(
-                installation.ExecutablePath!,
-                installation.WorkingDirectory!,
-                installation.LaunchArguments);
-        }
+        if (installation.Provider == ProviderKind.Gog)
+            return TryLaunchGog(installation);
 
         var uri = installation.Provider switch
         {
@@ -103,6 +84,34 @@ public sealed class GameLaunchService
         return true;
     }
 
+    private bool TryLaunchLocal(GameInstallation installation)
+    {
+        if (_localProcessLauncher is IProcessIdentityLauncher identityLauncher)
+        {
+            var identity = identityLauncher.StartWithIdentity(
+                installation.ExecutablePath!,
+                installation.WorkingDirectory!,
+                installation.LaunchArguments);
+            if (identity is null)
+                return false;
+
+            _sessionLaunchSink?.TrackLaunchedProcess(
+                installation.GameId.Value,
+                identity.ProcessId,
+                identity.StartedAtUtc);
+            return true;
+        }
+
+        return _localProcessLauncher.Start(
+            installation.ExecutablePath!,
+            installation.WorkingDirectory!,
+            installation.LaunchArguments);
+    }
+
+    private bool TryLaunchGog(GameInstallation installation) => TryLaunchLocal(installation);
+
+    private static bool CanLaunchGog(GameInstallation installation) => CanLaunchLocal(installation);
+
     public bool CanOpenSteam(GameInstallation installation) =>
         SteamLaunchUriFactory.CreateStoreOrNull(installation) is not null;
 
@@ -114,4 +123,9 @@ public sealed class GameLaunchService
         _externalUriLauncher.Open(uri);
         return true;
     }
+
+    private static bool CanLaunchLocal(GameInstallation installation) =>
+        installation.IsPresent &&
+        File.Exists(installation.ExecutablePath) &&
+        Directory.Exists(installation.WorkingDirectory);
 }
