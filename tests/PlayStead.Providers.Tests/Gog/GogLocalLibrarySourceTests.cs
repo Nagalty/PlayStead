@@ -23,9 +23,55 @@ public sealed class GogLocalLibrarySourceTests : IDisposable
         Assert.Equal("1103900211", item.ExternalId);
         Assert.Equal("Crysis Remastered", item.Title);
         Assert.Equal(Path.GetFullPath(install), item.InstallPath);
-        Assert.Null(item.InstalledSizeBytes);
+        Assert.True(item.InstalledSizeBytes > 0);
         Assert.Equal(InstallationContentKind.Game, item.ContentKind);
         Assert.Null(item.ExecutablePath);
+    }
+
+    [Fact]
+    public async Task Calculates_installed_size_recursively_from_files()
+    {
+        var install = CreateInstall("Nested");
+        var nested = Path.Combine(install, "content", "nested");
+        Directory.CreateDirectory(nested);
+        File.WriteAllBytes(Path.Combine(install, "base.bin"), new byte[7]);
+        File.WriteAllBytes(Path.Combine(nested, "payload.bin"), new byte[13]);
+        WriteInfo(install, "150", "Nested Game");
+
+        var result = await ScanAsync(install);
+        var item = Assert.Single(result.Installations);
+        var expected = Directory.EnumerateFiles(install, "*", SearchOption.AllDirectories)
+            .Sum(path => new FileInfo(path).Length);
+
+        Assert.Equal(expected, item.InstalledSizeBytes);
+    }
+
+    [Fact]
+    public async Task Skips_nested_reparse_directory_without_following_outside_root()
+    {
+        var install = CreateInstall("Reparse");
+        var outside = CreateInstall("Outside");
+        File.WriteAllBytes(Path.Combine(outside, "outside.bin"), new byte[101]);
+        WriteInfo(install, "151", "Reparse Game");
+        var link = Path.Combine(install, "linked");
+
+        try
+        {
+            Directory.CreateSymbolicLink(link, outside);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return;
+        }
+
+        File.WriteAllBytes(Path.Combine(install, "local.bin"), new byte[11]);
+        var result = await ScanAsync(install);
+        var item = Assert.Single(result.Installations);
+        var expected = Directory.EnumerateFiles(install, "*", SearchOption.AllDirectories)
+            .Where(path => !path.StartsWith(link + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            .Sum(path => new FileInfo(path).Length);
+
+        Assert.Equal(expected, item.InstalledSizeBytes);
     }
 
     [Fact]

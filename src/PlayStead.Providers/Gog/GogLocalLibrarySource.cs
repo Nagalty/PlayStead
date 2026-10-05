@@ -9,11 +9,15 @@ namespace PlayStead.Providers.Gog;
 
 public sealed class GogLocalLibrarySource : ILocalLibrarySource
 {
+    private static readonly TimeSpan InstalledSizeCacheLifetime = TimeSpan.FromMinutes(2);
     private static readonly Regex InfoFileName = new(
         "^goggame-(?<id>[0-9]+)\\.info$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private readonly IReadOnlyList<string> _installationRoots;
+    private readonly object _sizeCacheGate = new();
+    private readonly Dictionary<string, InstalledSizeCacheEntry> _installedSizeCache =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -32,6 +36,9 @@ public sealed class GogLocalLibrarySource : ILocalLibrarySource
     public ProviderKind Provider => ProviderKind.Gog;
 
     public Task<SourceScanResult> ScanAsync(CancellationToken cancellationToken)
+        => Task.Run(() => ScanCore(cancellationToken), cancellationToken);
+
+    private SourceScanResult ScanCore(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var observedAtUtc = DateTimeOffset.UtcNow;
@@ -90,12 +97,15 @@ public sealed class GogLocalLibrarySource : ILocalLibrarySource
                     }
 
                     var launch = ResolveLaunch(info, installPath);
+                    var installedSize = ResolveInstalledSize(installPath, observedAtUtc, cancellationToken);
+                    if (!installedSize.HasValue)
+                        warnings.Add($"{Path.GetFileName(infoPath)}: installed-size-unavailable");
                     installations.Add(DiscoveredInstallation.Create(
                         Provider,
                         externalId,
                         info.Name.Trim(),
                         installPath,
-                        installedSizeBytes: null,
+                        installedSizeBytes: installedSize,
                         observedAtUtc) with
                     {
                         ContentKind = InstallationContentKind.Game,
@@ -104,7 +114,7 @@ public sealed class GogLocalLibrarySource : ILocalLibrarySource
                         LaunchArguments = launch.Arguments
                     });
                 }
-                catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+                catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or SecurityException)
                 {
                     warnings.Add($"{Path.GetFileName(infoPath)}: {ex.GetType().Name}");
                 }
@@ -118,11 +128,95 @@ public sealed class GogLocalLibrarySource : ILocalLibrarySource
             .ThenBy(item => item.ExternalId, StringComparer.Ordinal)
             .ToArray();
 
-        return Task.FromResult(SourceScanResult.Success(
+        return SourceScanResult.Success(
             Provider,
             observedAtUtc,
             deduplicated,
-            warnings));
+            warnings);
+    }
+
+    private long? ResolveInstalledSize(
+        string installPath,
+        DateTimeOffset observedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        DateTime lastWriteTimeUtc;
+        try
+        {
+            lastWriteTimeUtc = Directory.GetLastWriteTimeUtc(installPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
+        {
+            return null;
+        }
+
+        lock (_sizeCacheGate)
+        {
+            if (_installedSizeCache.TryGetValue(installPath, out var cached) &&
+                cached.LastWriteTimeUtc == lastWriteTimeUtc &&
+                observedAtUtc - cached.CachedAtUtc < InstalledSizeCacheLifetime)
+            {
+                return cached.SizeBytes;
+            }
+        }
+
+        var calculated = CalculateInstalledSize(installPath, cancellationToken);
+        lock (_sizeCacheGate)
+        {
+            _installedSizeCache[installPath] = new InstalledSizeCacheEntry(
+                lastWriteTimeUtc, calculated, observedAtUtc);
+        }
+        return calculated;
+    }
+
+    private static long? CalculateInstalledSize(string installPath, CancellationToken cancellationToken)
+    {
+        var pending = new Stack<string>();
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        pending.Push(installPath);
+        long total = 0;
+
+        while (pending.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var directoryPath = pending.Pop();
+            if (!visited.Add(directoryPath))
+                continue;
+
+            DirectoryInfo directory;
+            try
+            {
+                directory = new DirectoryInfo(directoryPath);
+                if (directory.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                    continue;
+
+                foreach (var entry in directory.EnumerateFileSystemInfos())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (entry.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                        continue;
+
+                    if (entry is DirectoryInfo childDirectory)
+                    {
+                        pending.Push(childDirectory.FullName);
+                        continue;
+                    }
+
+                    if (entry is FileInfo file)
+                        total = checked(total + file.Length);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
+            {
+                return null;
+            }
+            catch (OverflowException)
+            {
+                return null;
+            }
+        }
+
+        return total;
     }
 
     private GogGameInfo ReadInfo(string path)
@@ -174,6 +268,11 @@ public sealed class GogLocalLibrarySource : ILocalLibrarySource
         public string? WorkingDir { get; set; }
         public string? Arguments { get; set; }
     }
+
+    private sealed record InstalledSizeCacheEntry(
+        DateTime LastWriteTimeUtc,
+        long? SizeBytes,
+        DateTimeOffset CachedAtUtc);
 }
 
 public static class GogRegistryInstallRootReader
