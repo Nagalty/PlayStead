@@ -178,6 +178,14 @@ public static class PlaySteadHost
             ILibraryGameLookup,
             SqliteLibraryGameLookup>();
 
+        builder.Services.AddSingleton<
+            IProviderIdentityStore,
+            SqliteProviderIdentityStore>();
+        builder.Services.AddSingleton<CanonicalProviderIdentityLinker>(services =>
+            new CanonicalProviderIdentityLinker(
+                services.GetRequiredService<ICanonicalCatalogStore>(),
+                services.GetRequiredService<IProviderIdentityStore>()));
+
         builder.Services.AddSingleton<ILocalIdentityResolutionCoordinator>(services =>
             new LocalIdentityResolutionCoordinator(
                 services.GetRequiredService<ILibraryGameLookup>(),
@@ -185,7 +193,9 @@ public static class PlaySteadHost
                 services.GetRequiredService<IIdentityResolutionStore>(),
                 services.GetRequiredService<ILocalIdentityReconciler>(),
                 services.GetRequiredService<IIdentityDecisionStore>(),
-                services.GetRequiredService<IIdentityNotificationProducer>()));
+                services.GetRequiredService<IIdentityNotificationProducer>(),
+                services.GetRequiredService<ICanonicalCatalogStore>(),
+                services.GetRequiredService<IProviderIdentityStore>()));
 
         builder.Services.AddSingleton<INotificationStore, SqliteNotificationStore>();
         builder.Services.AddSingleton<INotificationCenterService, NotificationCenterService>();
@@ -329,6 +339,11 @@ public static class PlaySteadHost
             new ManualMediaIdentityBridge(
                 services.GetRequiredService<GameMediaResolver>(),
                 services.GetRequiredService<IManualMetadataLinkStore>()));
+        builder.Services.AddSingleton<ICanonicalGameMediaResolver>(services =>
+            new CanonicalGameMediaResolver(
+                services.GetRequiredService<IProviderIdentityStore>(),
+                services.GetRequiredService<IGameMediaCache>(),
+                services.GetServices<IGameMediaProvider>()));
 
         builder.Services.AddSingleton<
             SteamLibraryFoldersReader>();
@@ -594,7 +609,9 @@ public static class PlaySteadHost
                     services.GetRequiredService<IProviderGameMetadataStore>(),
                     services.GetRequiredService<IProviderActivityMetadataStore>(),
                     services.GetRequiredService<ISessionStore>(),
-                    services.GetRequiredService<IManualMetadataLinkStore>());
+                    services.GetRequiredService<IManualMetadataLinkStore>(),
+                    services.GetRequiredService<ICanonicalGameMediaResolver>(),
+                    services.GetRequiredService<CanonicalProviderIdentityLinker>());
                 viewModel.AttachCollectionStore(
                     services.GetRequiredService<PlayStead.Core.Collections.IGameCollectionStore>());
                 viewModel.AttachAttentionService(

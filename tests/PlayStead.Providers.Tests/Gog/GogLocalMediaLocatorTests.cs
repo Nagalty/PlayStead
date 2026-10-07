@@ -43,6 +43,15 @@ public sealed class GogLocalMediaLocatorTests : IDisposable
     }
 
     [Fact]
+    public void Square_icon_is_not_accepted_as_logo()
+    {
+        var cache = CreateCache("1495134320");
+        CopyFixture("gog_square_icon.webp", Path.Combine(cache, "hash_glx_square_icon_v2.webp"));
+
+        Assert.Null(new GogLocalMediaLocator(_root).TryLocate("1495134320", GameMediaAssetType.Logo));
+    }
+
+    [Fact]
     public void Missing_webcache_returns_null()
     {
         var missing = Path.Combine(_root, "missing");

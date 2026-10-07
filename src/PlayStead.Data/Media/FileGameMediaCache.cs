@@ -54,6 +54,21 @@ public sealed class FileGameMediaCache : IGameMediaCache
         return null;
     }
 
+    public string? TryGetSourceUri(
+        GameMediaIdentity identity,
+        GameMediaAssetType assetType)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        ValidateIdentity(identity);
+        ValidateAssetType(assetType);
+
+        var manifest = ReadManifest(GetGameDirectory(identity));
+        var key = GetAssetName(assetType);
+        return manifest?.Assets.TryGetValue(key, out var entry) == true
+            ? entry.SourceUri
+            : null;
+    }
+
     public async Task<string> StoreAsync(
         GameMediaIdentity identity,
         GameMediaPayload payload,

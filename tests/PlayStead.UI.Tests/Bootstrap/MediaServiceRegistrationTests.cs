@@ -82,6 +82,8 @@ public sealed class MediaServiceRegistrationTests :
             resolver);
         Assert.IsType<GameMediaResolver>(
             host.Services.GetRequiredService<GameMediaResolver>());
+        Assert.IsType<CanonicalGameMediaResolver>(
+            host.Services.GetRequiredService<ICanonicalGameMediaResolver>());
 
         Assert.IsType<PlayStead.UI.Media.TraceMediaDiagnostics>(
             host.Services.GetRequiredService<IMediaDiagnostics>());

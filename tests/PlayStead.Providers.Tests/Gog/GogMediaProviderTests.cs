@@ -21,9 +21,12 @@ public sealed class GogMediaProviderTests : IDisposable
     {
         var path = Path.Combine(_root, "cache", "cache-instance", "gog", "1495134320");
         Directory.CreateDirectory(path);
-        var source = assetType == GameMediaAssetType.Cover
-            ? "gog_vertical_cover.webp"
-            : "gog_hero.webp";
+        var source = assetType switch
+        {
+            GameMediaAssetType.Cover => "gog_vertical_cover.webp",
+            GameMediaAssetType.Hero => "gog_hero.webp",
+            _ => "gog_hero.webp"
+        };
         File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Gog", source),
             Path.Combine(path, "hash" + suffix));
 
@@ -68,6 +71,24 @@ public sealed class GogMediaProviderTests : IDisposable
             new GameMediaIdentity(ProviderKind.Gog, "1495134320", "Game"),
             GameMediaAssetType.Logo,
             CancellationToken.None);
+        Assert.Null(payload);
+    }
+
+    [Fact]
+    public async Task Square_icon_is_not_exposed_as_logo()
+    {
+        var path = Path.Combine(_root, "cache", "cache-instance", "gog", "1495134320");
+        Directory.CreateDirectory(path);
+        File.Copy(
+            Path.Combine(AppContext.BaseDirectory, "Fixtures", "Gog", "gog_square_icon.webp"),
+            Path.Combine(path, "hash_glx_square_icon_v2.webp"));
+
+        var provider = new GogMediaProvider(new GogLocalMediaLocator(Path.Combine(_root, "cache")));
+        var payload = await provider.ResolveAsync(
+            new GameMediaIdentity(ProviderKind.Gog, "1495134320", "The Witcher 3"),
+            GameMediaAssetType.Logo,
+            CancellationToken.None);
+
         Assert.Null(payload);
     }
 

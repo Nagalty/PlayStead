@@ -158,6 +158,24 @@ public sealed class LibraryMediaResolverIntegrationTests
     }
 
     [Fact]
+    public async Task EnsureLogoAsync_resolves_exact_Gog_product_identity()
+    {
+        var resolver = new RecordingGameMediaResolver(null)
+        {
+            ResolvedPath = @"C:\Media\gog\1495134320\logo.webp"
+        };
+        var (viewModel, item) = await CreateLoadedLibraryAsync(resolver, ProviderKind.Gog);
+
+        await viewModel.EnsureLogoAsync(item, CancellationToken.None);
+
+        Assert.Equal(resolver.ResolvedPath, item.LogoPath);
+        Assert.True(item.HasLogo);
+        Assert.Equal(ProviderKind.Gog, resolver.LastResolvedIdentity?.Provider);
+        Assert.Equal("1495134320", resolver.LastResolvedIdentity?.ProviderGameId);
+        Assert.Equal(GameMediaAssetType.Logo, resolver.LastResolvedAssetType);
+    }
+
+    [Fact]
     public async Task EnsureCoverAsync_keeps_fallback_when_resolver_returns_null()
     {
         var resolver = new RecordingGameMediaResolver(null);
@@ -255,6 +273,94 @@ public sealed class LibraryMediaResolverIntegrationTests
         return (viewModel, Assert.Single(viewModel.Items));
     }
 
+    [Fact]
+    public async Task Canonical_logo_can_come_from_linked_Steam_while_GOG_installation_remains_active()
+    {
+        var now = new DateTimeOffset(2026, 9, 15, 0, 30, 0, TimeSpan.Zero);
+        var gameId = GameId.New();
+        var snapshot = new LibrarySnapshot(
+            [new LogicalGame(gameId, "Synthetic GOG Game", false, now, now)],
+            [new GameInstallation(
+                InstallationId.New(),
+                gameId,
+                ProviderKind.Gog,
+                "GOG-TEST",
+                @"G:\Gog Games\Synthetic",
+                null,
+                true,
+                true,
+                now)]);
+        var canonical = new RecordingCanonicalMediaResolver(@"C:\Media\steam\456\logo.png");
+        var viewModel = new LibraryViewModel(
+            new StubLibraryStore(snapshot),
+            new RecordingSteamReferenceRuntime(),
+            new SessionMonitor(new FakeSessionRuntime(now), SessionMonitorOptions.Default),
+            new RecordingGameMediaResolver(null),
+            canonical);
+
+        await viewModel.RefreshAsync(CancellationToken.None);
+        var item = Assert.Single(viewModel.Items);
+        await viewModel.EnsureLogoAsync(item, CancellationToken.None);
+
+        Assert.Equal(@"C:\Media\steam\456\logo.png", item.LogoPath);
+        Assert.Equal(ProviderKind.Gog, item.Provider);
+        Assert.Equal(@"G:\Gog Games\Synthetic", item.InstallPath);
+        Assert.Equal(ProviderKind.Gog, canonical.LastActiveProvider);
+    }
+
+    [Fact]
+    public async Task Canonical_logo_replaces_an_invalid_active_provider_cache_candidate()
+    {
+        var now = new DateTimeOffset(2026, 9, 15, 0, 30, 0, TimeSpan.Zero);
+        var gameId = GameId.New();
+        var snapshot = new LibrarySnapshot(
+            [new LogicalGame(gameId, "Synthetic GOG Game", false, now, now)],
+            [new GameInstallation(InstallationId.New(), gameId, ProviderKind.Gog,
+                "1103900211", @"G:\Gog Games\Synthetic", null, true, true, now)]);
+        var activeResolver = new RecordingGameMediaResolver(@"C:\Media\gog\1103900211\logo.webp");
+        var canonical = new RecordingCanonicalMediaResolver(@"C:\Media\steam\1715130\logo.png");
+        var viewModel = new LibraryViewModel(
+            new StubLibraryStore(snapshot),
+            new RecordingSteamReferenceRuntime(),
+            new SessionMonitor(new FakeSessionRuntime(now), SessionMonitorOptions.Default),
+            activeResolver,
+            canonical);
+
+        await viewModel.RefreshAsync(CancellationToken.None);
+        var item = Assert.Single(viewModel.Items);
+        Assert.Null(item.LogoPath);
+        await viewModel.EnsureLogoAsync(item, CancellationToken.None);
+
+        Assert.Equal(@"C:\Media\steam\1715130\logo.png", item.LogoPath);
+        Assert.Equal(1, canonical.ResolveCalls);
+    }
+
+    [Fact]
+    public async Task Canonical_null_clears_an_invalid_active_provider_cache_candidate()
+    {
+        var now = new DateTimeOffset(2026, 9, 15, 0, 30, 0, TimeSpan.Zero);
+        var gameId = GameId.New();
+        var snapshot = new LibrarySnapshot(
+            [new LogicalGame(gameId, "Synthetic GOG Game", false, now, now)],
+            [new GameInstallation(InstallationId.New(), gameId, ProviderKind.Gog,
+                "1103900211", @"G:\Gog Games\Synthetic", null, true, true, now)]);
+        var activeResolver = new RecordingGameMediaResolver(@"C:\Media\gog\1103900211\logo.webp");
+        var canonical = new RecordingCanonicalMediaResolver(null);
+        var viewModel = new LibraryViewModel(
+            new StubLibraryStore(snapshot),
+            new RecordingSteamReferenceRuntime(),
+            new SessionMonitor(new FakeSessionRuntime(now), SessionMonitorOptions.Default),
+            activeResolver,
+            canonical);
+
+        await viewModel.RefreshAsync(CancellationToken.None);
+        var item = Assert.Single(viewModel.Items);
+        await viewModel.EnsureLogoAsync(item, CancellationToken.None);
+
+        Assert.Null(item.LogoPath);
+        Assert.Equal(1, canonical.ResolveCalls);
+    }
+
     private sealed class RecordingGameMediaResolver(
         string? cachedPath) : IGameMediaResolver
     {
@@ -300,6 +406,26 @@ public sealed class LibraryMediaResolverIntegrationTests
             return ResolveOverride is not null
                 ? ResolveOverride(cancellationToken)
                 : Task.FromResult(ResolvedPath);
+        }
+    }
+
+    private sealed class RecordingCanonicalMediaResolver(string? path) : ICanonicalGameMediaResolver
+    {
+        public ProviderKind? LastActiveProvider { get; private set; }
+        public int ResolveCalls { get; private set; }
+
+        public string? TryGetCachedPath(GameId gameId, GameMediaAssetType assetType) => null;
+
+        public Task<string?> ResolveAndCacheAsync(
+            GameId gameId,
+            string canonicalTitle,
+            GameMediaAssetType assetType,
+            ProviderKind? activeProvider,
+            CancellationToken cancellationToken)
+        {
+            ResolveCalls++;
+            LastActiveProvider = activeProvider;
+            return Task.FromResult(path);
         }
     }
 

@@ -6,6 +6,10 @@ public interface IGameMediaCache
         GameMediaIdentity identity,
         GameMediaAssetType assetType);
 
+    string? TryGetSourceUri(
+        GameMediaIdentity identity,
+        GameMediaAssetType assetType) => null;
+
     Task<string> StoreAsync(
         GameMediaIdentity identity,
         GameMediaPayload payload,
