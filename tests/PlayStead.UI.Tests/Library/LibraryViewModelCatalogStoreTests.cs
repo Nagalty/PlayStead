@@ -1,4 +1,5 @@
 using PlayStead.Core.Catalog;
+using PlayStead.Core.Identity;
 using PlayStead.Core.Library;
 using PlayStead.Core.Media;
 using PlayStead.Core.Persistence;
@@ -14,6 +15,63 @@ namespace PlayStead.UI.Tests.Library;
 
 public sealed class LibraryViewModelCatalogStoreTests
 {
+    [Fact]
+    public async Task Reassign_manual_catalog_link_propagates_deterministic_provider_identity()
+    {
+        var gameId = GameId.New();
+        var contentId = CatalogContentId.New();
+        var catalog = new FakeCatalogStore(
+            new CatalogContent(contentId, PlaySteadPublicId.Parse("PlayStead-3768760"), CatalogContentKind.Game,
+                "007 First Light", "007-first-light", null, null, null, CatalogContentStatus.Active, null),
+            [new CatalogProviderRef(contentId, CatalogProviderKind.Steam, "3768760", null,
+                CatalogProvenance.AdminConfirmed, CatalogConfidence.Deterministic, DateTimeOffset.UtcNow)]);
+        var identities = new FakeProviderIdentityStore();
+        var linker = new CanonicalProviderIdentityLinker(catalog, identities);
+        var links = new FakeManualMetadataLinkStore();
+        var monitor = new SessionMonitor(new EmptySessionRuntime(), SessionMonitorOptions.Default, (_, _) => Task.CompletedTask);
+        var vm = new LibraryViewModel(
+            new FakeLibraryStore(new LibrarySnapshot([], [])),
+            new EmptySteamReferenceRuntime(), monitor,
+            new UiPreferencesStore(Path.Combine(Path.GetTempPath(), $"prefs-{Guid.NewGuid():N}.json")),
+            new EmptyGameMediaResolver(), catalog, null, null, null, null, links, null, linker);
+
+        Assert.True(await vm.ReassignManualMetadataAsync(gameId, contentId, CancellationToken.None));
+
+        var identity = Assert.Single(await identities.GetByGameIdAsync(gameId, CancellationToken.None));
+        Assert.Equal(ProviderKind.Steam, identity.Provider);
+        Assert.Equal("3768760", identity.ExternalId);
+    }
+
+    [Fact]
+    public async Task Refresh_syncs_existing_manual_catalog_link_into_provider_identity_store()
+    {
+        var gameId = GameId.New();
+        var contentId = CatalogContentId.New();
+        var now = DateTimeOffset.UtcNow;
+        var catalog = new FakeCatalogStore(
+            new CatalogContent(contentId, PlaySteadPublicId.Parse("PlayStead-3768760"), CatalogContentKind.Game,
+                "007 First Light", "007-first-light", null, null, null, CatalogContentStatus.Active, null),
+            [new CatalogProviderRef(contentId, CatalogProviderKind.Steam, "3768760", null,
+                CatalogProvenance.AdminConfirmed, CatalogConfidence.Deterministic, now)]);
+        var identities = new FakeProviderIdentityStore();
+        var links = new FakeManualMetadataLinkStore(new ManualMetadataLink(gameId, contentId, null, now));
+        var snapshot = new LibrarySnapshot(
+            [new LogicalGame(gameId, "007 First Light", false, now, now, contentId)],
+            [new GameInstallation(InstallationId.New(), gameId, ProviderKind.Manual, "manual", @"H:\007 First Light", null, true, true, now)]);
+        var linker = new CanonicalProviderIdentityLinker(catalog, identities);
+        var monitor = new SessionMonitor(new EmptySessionRuntime(), SessionMonitorOptions.Default, (_, _) => Task.CompletedTask);
+        var vm = new LibraryViewModel(
+            new FakeLibraryStore(snapshot), new EmptySteamReferenceRuntime(), monitor,
+            new UiPreferencesStore(Path.Combine(Path.GetTempPath(), $"prefs-{Guid.NewGuid():N}.json")),
+            new EmptyGameMediaResolver(), catalog, null, null, null, null, links, null, linker);
+
+        await vm.RefreshAsync(CancellationToken.None);
+
+        var identity = Assert.Single(await identities.GetByGameIdAsync(gameId, CancellationToken.None));
+        Assert.Equal(ProviderKind.Steam, identity.Provider);
+        Assert.Equal("3768760", identity.ExternalId);
+    }
+
     [Fact]
     public async Task Production_style_constructor_forwards_catalog_store_to_game_detail_projection()
     {
@@ -102,7 +160,7 @@ public sealed class LibraryViewModelCatalogStoreTests
             Task.FromResult<string?>(null);
     }
 
-    private sealed class FakeCatalogStore(CatalogContent content) : ICanonicalCatalogStore
+    private sealed class FakeCatalogStore(CatalogContent content, IReadOnlyList<CatalogProviderRef>? refs = null) : ICanonicalCatalogStore
     {
         public Task<CatalogContent?> GetByIdAsync(CatalogContentId id, CancellationToken cancellationToken) =>
             Task.FromResult<CatalogContent?>(id == content.Id ? content : null);
@@ -110,8 +168,25 @@ public sealed class LibraryViewModelCatalogStoreTests
         public Task<CatalogMetadata> GetMetadataAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<CatalogContent?> GetByPublicIdAsync(PlaySteadPublicId id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<CatalogContent?> FindByProviderRefAsync(CatalogProviderKind provider, string externalId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<IReadOnlyList<CatalogProviderRef>> GetProviderRefsAsync(CatalogContentId id, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<CatalogProviderRef>> GetProviderRefsAsync(CatalogContentId id, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CatalogProviderRef>>(refs ?? []);
         public Task<IReadOnlyList<CatalogAlias>> GetAliasesAsync(CatalogContentId id, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<CatalogContentRelation>> GetRelationsFromAsync(CatalogContentId id, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeProviderIdentityStore : IProviderIdentityStore
+    {
+        private readonly List<GameProviderIdentity> _items = [];
+        public Task<IReadOnlyList<GameProviderIdentity>> GetByGameIdAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameProviderIdentity>>(_items.Where(x => x.GameId == gameId).ToArray());
+        public Task AssociateAsync(GameProviderIdentity identity, CancellationToken cancellationToken) { if (!_items.Any(x => x.GameId == identity.GameId && x.Provider == identity.Provider && x.ExternalId == identity.ExternalId)) _items.Add(identity); return Task.CompletedTask; }
+        public Task<bool> RemoveAsync(GameId gameId, ProviderKind provider, string externalId, CancellationToken cancellationToken) => Task.FromResult(_items.RemoveAll(x => x.GameId == gameId && x.Provider == provider && x.ExternalId == externalId) > 0);
+    }
+
+    private sealed class FakeManualMetadataLinkStore(ManualMetadataLink? link = null) : IManualMetadataLinkStore
+    {
+        private ManualMetadataLink? _link = link;
+        public Task<ManualMetadataLink?> GetAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult(_link?.ManualGameId == gameId ? _link : null);
+        public Task UpsertAsync(ManualMetadataLink link, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task RemoveAsync(GameId gameId, CancellationToken cancellationToken) { if (_link?.ManualGameId == gameId) _link = null; return Task.CompletedTask; }
+        public ManualMetadataLink? TryGetCached(GameId gameId) => _link?.ManualGameId == gameId ? _link : null;
     }
 }

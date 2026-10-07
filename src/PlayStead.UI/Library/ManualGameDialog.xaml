@@ -20,16 +20,21 @@
             CornerRadius="{DynamicResource PlayStead.Radius.Medium}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <TextBlock Text="Ajouter un jeu"
+            <TextBlock x:Name="DialogTitleTextBlock"
+                       Text="Ajouter un jeu"
                        Style="{DynamicResource PlayStead.Text.SectionTitle}"
                        Margin="0,0,0,20" />
             <Grid Grid.Row="1" Margin="0,0,0,12">
@@ -37,39 +42,71 @@
                 <TextBlock Text="Nom" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
                 <TextBox x:Name="TitleTextBox" Grid.Column="1" />
             </Grid>
-            <Grid Grid.Row="2" Margin="0,0,0,12">
+            <TextBlock Grid.Row="2"
+                       Text="Associer à un jeu connu"
+                       Style="{DynamicResource PlayStead.Text.SectionTitle}"
+                       Margin="0,4,0,10" />
+            <Grid Grid.Row="3" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <TextBox x:Name="CatalogSearchTextBox" Grid.Column="1" Margin="0,0,8,0" ToolTip="Rechercher dans le catalogue PlayStead…" />
+                <Button Grid.Column="2" Content="Rechercher" Click="SearchCatalogButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />
+            </Grid>
+            <ListBox x:Name="CatalogResultsList" Grid.Row="4" ItemsSource="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=CatalogResults}" SelectionChanged="CatalogResult_OnSelected" DisplayMemberPath="CanonicalTitle" MaxHeight="90" Visibility="Collapsed" Background="{DynamicResource PlayStead.Brush.SurfaceRaised}" BorderBrush="{DynamicResource PlayStead.Brush.Border}" Foreground="{DynamicResource PlayStead.Brush.TextPrimary}" Margin="0,0,0,8" />
+            <Border x:Name="CatalogAssociationCard"
+                    Grid.Row="5"
+                    Background="{DynamicResource PlayStead.Brush.SurfaceRaised}"
+                    BorderBrush="{DynamicResource PlayStead.Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource PlayStead.Radius.Small}"
+                    Padding="12"
+                    Margin="0,0,0,12"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="CatalogAssociationTitleTextBlock" Text="" Style="{DynamicResource PlayStead.Text.Body}" FontWeight="SemiBold" />
+                        <TextBlock Text="Jeu catalogue associé" Style="{DynamicResource PlayStead.Text.Caption}" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="Modifier" Click="ModifyCatalogAssociationButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />
+                        <Button Content="Retirer" Click="RemoveCatalogAssociationButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" Margin="8,0,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+            <TextBlock x:Name="CatalogEmptyAssociationTextBlock" Grid.Row="5" Text="Aucun jeu associé" Margin="0,0,0,12" TextWrapping="Wrap" Style="{DynamicResource PlayStead.Text.Caption}" />
+            <Grid Grid.Row="6" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <TextBlock Text="Exécutable" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
                 <TextBox x:Name="ExecutableTextBox" Grid.Column="1" Margin="0,0,8,0" />
                 <Button Grid.Column="2" Content="Parcourir…" Click="BrowseButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />
             </Grid>
-            <Grid Grid.Row="3" Margin="0,0,0,12">
+            <Grid Grid.Row="7" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                 <TextBlock Text="Dossier de travail" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
                 <TextBox x:Name="WorkingDirectoryTextBox" Grid.Column="1" />
             </Grid>
-            <Grid Grid.Row="4" Margin="0,0,0,12">
+            <Grid Grid.Row="8" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <TextBlock Text="Dossier d’installation" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
                 <TextBox x:Name="InstallRootPathTextBox" Grid.Column="1" Margin="0,0,8,0" TextChanged="InstallRootPathTextBox_OnTextChanged" />
                 <Button Grid.Column="2" Content="Parcourir…" Click="InstallRootBrowseButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />
             </Grid>
-            <Grid Grid.Row="5" Margin="0,0,0,6">
+            <Grid Grid.Row="9" Margin="0,0,0,6">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                 <TextBlock Text="Arguments" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}" />
                 <TextBox x:Name="ArgumentsTextBox" Grid.Column="1" />
             </Grid>
             <TextBlock x:Name="ErrorTextBlock"
-                       Grid.Row="6"
+                       Grid.Row="10"
                        Foreground="{DynamicResource PlayStead.Brush.Warning}"
                        TextWrapping="Wrap"
                        Margin="140,0,0,12"
                        Visibility="Collapsed" />
-            <StackPanel Grid.Row="7"
+            <StackPanel Grid.Row="11"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
                 <Button Content="Annuler" IsCancel="True" Click="CancelButton_OnClick" Style="{DynamicResource PlayStead.Button.Secondary}" />
-                <Button Content="Ajouter" IsDefault="True" Click="AddButton_OnClick" Margin="8,0,0,0" Style="{DynamicResource PlayStead.Button.Primary}" />
+                <Button x:Name="SubmitButton" Content="Ajouter" IsDefault="True" Click="AddButton_OnClick" Margin="8,0,0,0" Style="{DynamicResource PlayStead.Button.Primary}" />
             </StackPanel>
         </Grid>
     </Border>

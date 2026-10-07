@@ -207,7 +207,7 @@ public partial class LibraryView :
         if (selection is null)
             return;
 
-        var dialog = new ManualGameDialog(selection)
+        var dialog = new ManualGameDialog(selection, catalogStore: viewModel.CanonicalCatalogStore)
         {
             Owner = owner
         };

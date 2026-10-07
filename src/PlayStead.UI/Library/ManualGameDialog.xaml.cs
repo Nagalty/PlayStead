@@ -5,6 +5,8 @@ using System.Windows.Input;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 using PlayStead.Core.Persistence;
+using PlayStead.Core.Catalog;
+using System.Collections.ObjectModel;
 
 namespace PlayStead.UI.Library;
 
@@ -12,13 +14,21 @@ public partial class ManualGameDialog : Window
 {
     private bool _suppressInstallRootEditTracking;
     private bool _installRootWasEdited;
+    private readonly ICanonicalCatalogStore? _catalogStore;
+    private CatalogContentId? _selectedCanonicalCatalogId;
 
     public ManualGameDialog(
         ManualGameExecutableSelection? initialSelection = null,
-        ManualGameDefinition? initialDefinition = null)
+        ManualGameDefinition? initialDefinition = null,
+        ICanonicalCatalogStore? catalogStore = null)
     {
+        _catalogStore = catalogStore;
         InitializeComponent();
-        Loaded += (_, _) => TitleTextBox.Focus();
+        var dialogTitle = initialDefinition is null ? "Ajouter un jeu" : "Modifier un jeu";
+        Title = dialogTitle;
+        DialogTitleTextBlock.Text = dialogTitle;
+        SubmitButton.Content = initialDefinition is null ? "Ajouter" : "Enregistrer";
+        Loaded += Dialog_OnLoaded;
 
         if (initialSelection is not null)
             ApplySelection(initialSelection, overwriteOptionalFields: true);
@@ -27,6 +37,8 @@ public partial class ManualGameDialog : Window
     }
 
     public ManualGameDefinition? Definition { get; private set; }
+    public ObservableCollection<CatalogContent> CatalogResults { get; } = [];
+    public CatalogContent? SelectedCatalogContent { get; private set; }
 
     public void SetError(string message)
     {
@@ -52,7 +64,8 @@ public partial class ManualGameDialog : Window
                 ExecutableTextBox.Text,
                 string.IsNullOrWhiteSpace(WorkingDirectoryTextBox.Text) ? null : WorkingDirectoryTextBox.Text,
                 ArgumentsTextBox.Text,
-                string.IsNullOrWhiteSpace(InstallRootPathTextBox.Text) ? null : InstallRootPathTextBox.Text);
+                string.IsNullOrWhiteSpace(InstallRootPathTextBox.Text) ? null : InstallRootPathTextBox.Text,
+                SelectedCatalogContent?.Id ?? _selectedCanonicalCatalogId);
             DialogResult = true;
         }
         catch (Exception exception)
@@ -62,6 +75,80 @@ public partial class ManualGameDialog : Window
     }
 
     private void CancelButton_OnClick(object sender, RoutedEventArgs e) => DialogResult = false;
+
+    private async void SearchCatalogButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        CatalogResults.Clear();
+        CatalogResultsList.Visibility = Visibility.Collapsed;
+        if (_catalogStore is null || string.IsNullOrWhiteSpace(CatalogSearchTextBox.Text))
+            return;
+
+        try
+        {
+            var matches = await _catalogStore.FindByNormalizedTitleAsync(
+                CanonicalCatalogTitleNormalizer.Normalize(CatalogSearchTextBox.Text),
+                CancellationToken.None);
+            foreach (var match in matches.Take(20))
+                CatalogResults.Add(match);
+            CatalogResultsList.Visibility = CatalogResults.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (CatalogResults.Count == 0)
+                SetError("Aucun jeu correspondant dans le catalogue PlayStead.");
+        }
+        catch (Exception exception)
+        {
+            SetError(exception.Message);
+        }
+    }
+
+    private void CatalogResult_OnSelected(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        SelectedCatalogContent = CatalogResultsList.SelectedItem as CatalogContent;
+        if (SelectedCatalogContent is not null)
+            SetAssociationCard(SelectedCatalogContent);
+    }
+
+    private void RemoveCatalogAssociationButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        SelectedCatalogContent = null;
+        _selectedCanonicalCatalogId = null;
+        CatalogResultsList.SelectedItem = null;
+        CatalogAssociationCard.Visibility = Visibility.Collapsed;
+        CatalogEmptyAssociationTextBlock.Visibility = Visibility.Visible;
+    }
+
+    private void ModifyCatalogAssociationButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        CatalogSearchTextBox.Focus();
+        CatalogSearchTextBox.SelectAll();
+    }
+
+    private async void Dialog_OnLoaded(object? sender, RoutedEventArgs e)
+    {
+        TitleTextBox.Focus();
+        if (_selectedCanonicalCatalogId is not null && _catalogStore is not null)
+        {
+            try
+            {
+                var content = await _catalogStore.GetByIdAsync(_selectedCanonicalCatalogId.Value, CancellationToken.None);
+                if (content is not null)
+                    SetAssociationCard(content);
+            }
+            catch (Exception exception)
+            {
+                SetError(exception.Message);
+            }
+        }
+    }
+
+    private void SetAssociationCard(CatalogContent content)
+    {
+        SelectedCatalogContent = content;
+        _selectedCanonicalCatalogId = content.Id;
+        CatalogAssociationTitleTextBlock.Text = content.CanonicalTitle;
+        CatalogAssociationCard.Visibility = Visibility.Visible;
+        CatalogEmptyAssociationTextBlock.Visibility = Visibility.Collapsed;
+        CatalogResultsList.Visibility = Visibility.Collapsed;
+    }
 
     private void InstallRootBrowseButton_OnClick(object sender, RoutedEventArgs e)
     {
@@ -109,6 +196,8 @@ public partial class ManualGameDialog : Window
         WorkingDirectoryTextBox.Text = definition.WorkingDirectory;
         SetInstallRootText(definition.InstallRootPath ?? definition.WorkingDirectory, edited: true);
         ArgumentsTextBox.Text = definition.LaunchArguments ?? string.Empty;
+        _selectedCanonicalCatalogId = definition.CanonicalCatalogId;
+        CatalogSearchTextBox.Text = string.Empty;
     }
 
     private void SetInstallRootText(string value, bool edited)

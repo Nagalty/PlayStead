@@ -174,11 +174,19 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
             INSERT INTO provider_game_refs(
                 provider,
                 external_id,
-                game_id)
+                game_id,
+                source,
+                confidence,
+                created_utc,
+                updated_utc)
             VALUES(
                 $provider,
                 $externalId,
-                $gameId);
+                $gameId,
+                $source,
+                $confidence,
+                $createdUtc,
+                $updatedUtc);
             """;
         insertReference.Parameters.AddWithValue(
             "$provider",
@@ -189,6 +197,10 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
         insertReference.Parameters.AddWithValue(
             "$gameId",
             newGameId.ToString());
+        insertReference.Parameters.AddWithValue("$source", 1);
+        insertReference.Parameters.AddWithValue("$confidence", 2);
+        insertReference.Parameters.AddWithValue("$createdUtc", observed);
+        insertReference.Parameters.AddWithValue("$updatedUtc", observed);
 
         await insertReference.ExecuteNonQueryAsync(
             cancellationToken);
@@ -297,7 +309,7 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                 (object?)discovered.LaunchArguments ?? DBNull.Value);
             update.Parameters.AddWithValue(
                 "$launchMetadata",
-                (object?)SerializeLaunchMetadata(discovered.LaunchMetadata) ?? DBNull.Value);
+                (object?)SerializeLaunchMetadata(discovered.LaunchMetadata, discovered.ContentKind) ?? DBNull.Value);
 
             await update.ExecuteNonQueryAsync(
                 cancellationToken);
@@ -371,7 +383,7 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
             (object?)discovered.LaunchArguments ?? DBNull.Value);
         insert.Parameters.AddWithValue(
             "$launchMetadata",
-            (object?)SerializeLaunchMetadata(discovered.LaunchMetadata) ?? DBNull.Value);
+            (object?)SerializeLaunchMetadata(discovered.LaunchMetadata, discovered.ContentKind) ?? DBNull.Value);
 
         await insert.ExecuteNonQueryAsync(
             cancellationToken);
@@ -485,6 +497,15 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                 ? ManualInstallRootHeuristics.Resolve(executablePath!, workingDirectory!, persistedInstallRoot)
                 : persistedInstallRoot;
 
+            var launchMetadata = DeserializeLaunchMetadata(reader.IsDBNull(13) ? null : reader.GetString(13));
+            var contentKind = InstallationContentKind.Unknown;
+            if (launchMetadata is not null &&
+                launchMetadata.Values.TryGetValue("ContentKind", out var rawKind) &&
+                Enum.TryParse<InstallationContentKind>(rawKind, true, out var parsedKind))
+            {
+                contentKind = parsedKind;
+            }
+
             result.Add(
                 new GameInstallation(
                     new InstallationId(
@@ -502,12 +523,12 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
                     reader.GetInt64(6) != 0,
                     reader.GetInt64(7) != 0,
                     ParseUtc(reader.GetString(8)),
-                    InstallationContentKind.Unknown,
+                    contentKind,
                     executablePath,
                     workingDirectory,
                     reader.IsDBNull(11) ? null : reader.GetString(11),
                     installRoot ?? (provider == ProviderKind.Manual ? workingDirectory : null),
-                    DeserializeLaunchMetadata(reader.IsDBNull(13) ? null : reader.GetString(13))));
+                    launchMetadata));
         }
 
         return result;
@@ -568,10 +589,18 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
 
         var reference = connection.CreateCommand();
         reference.Transaction = transaction;
-        reference.CommandText = "INSERT INTO provider_game_refs(provider,external_id,game_id) VALUES($provider,$externalId,$gameId);";
+        reference.CommandText = """
+            INSERT INTO provider_game_refs(
+                provider, external_id, game_id, source, confidence, created_utc, updated_utc)
+            VALUES($provider, $externalId, $gameId, $source, $confidence, $createdUtc, $updatedUtc);
+            """;
         reference.Parameters.AddWithValue("$provider", (int)ProviderKind.Manual);
         reference.Parameters.AddWithValue("$externalId", externalId);
         reference.Parameters.AddWithValue("$gameId", gameId.ToString());
+        reference.Parameters.AddWithValue("$source", 1);
+        reference.Parameters.AddWithValue("$confidence", 2);
+        reference.Parameters.AddWithValue("$createdUtc", stamp);
+        reference.Parameters.AddWithValue("$updatedUtc", stamp);
         await reference.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -662,8 +691,20 @@ public sealed class SqliteLibraryStore : ILibraryStore, IManualGameStore
             "O",
             CultureInfo.InvariantCulture);
 
-    private static string? SerializeLaunchMetadata(ProviderLaunchMetadata? metadata) =>
-        metadata is null ? null : JsonSerializer.Serialize(metadata);
+    private static string? SerializeLaunchMetadata(
+        ProviderLaunchMetadata? metadata,
+        InstallationContentKind contentKind)
+    {
+        if (metadata is null && contentKind == InstallationContentKind.Unknown)
+            return null;
+
+        if (metadata is null)
+            return null;
+
+        var values = new Dictionary<string, string>(metadata.Values, StringComparer.Ordinal);
+        values["ContentKind"] = contentKind.ToString();
+        return JsonSerializer.Serialize(new ProviderLaunchMetadata(metadata.Provider, values));
+    }
 
     private static ProviderLaunchMetadata? DeserializeLaunchMetadata(string? json) =>
         string.IsNullOrWhiteSpace(json)

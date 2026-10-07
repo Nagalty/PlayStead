@@ -1,4 +1,5 @@
 using PlayStead.Core.Library;
+using PlayStead.Core.Catalog;
 
 namespace PlayStead.Core.Persistence;
 
@@ -7,14 +8,16 @@ public sealed record ManualGameDefinition(
     string ExecutablePath,
     string WorkingDirectory,
     string? LaunchArguments = null,
-    string? InstallRootPath = null)
+    string? InstallRootPath = null,
+    CatalogContentId? CanonicalCatalogId = null)
 {
     public static ManualGameDefinition Create(
         string title,
         string executablePath,
         string? workingDirectory,
         string? launchArguments = null,
-        string? installRootPath = null)
+        string? installRootPath = null,
+        CatalogContentId? canonicalCatalogId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
@@ -55,7 +58,8 @@ public sealed record ManualGameDefinition(
             executable,
             directory,
             string.IsNullOrWhiteSpace(launchArguments) ? null : launchArguments,
-            root);
+            root,
+            canonicalCatalogId);
     }
 }
 

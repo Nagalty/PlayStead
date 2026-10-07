@@ -27,6 +27,22 @@ public sealed class ManualGameDialogStructureTests
     }
 
     [Fact]
+    public void Manual_game_dialog_has_contextual_title_and_catalog_association_card()
+    {
+        var xaml = Read("Library/ManualGameDialog.xaml");
+        var code = Read("Library/ManualGameDialog.xaml.cs");
+
+        Assert.Contains("Associer à un jeu connu", xaml, StringComparison.Ordinal);
+        Assert.Contains("Aucun jeu associé", xaml, StringComparison.Ordinal);
+        Assert.Contains("Jeu catalogue associé", xaml, StringComparison.Ordinal);
+        Assert.Contains("CatalogAssociationCard", xaml, StringComparison.Ordinal);
+        Assert.Contains("Modifier", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Rechercher dans le catalogue PlayStead…\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("var dialogTitle = initialDefinition is null ? \"Ajouter un jeu\" : \"Modifier un jeu\"", code, StringComparison.Ordinal);
+        Assert.Contains("SubmitButton.Content = initialDefinition is null ? \"Ajouter\" : \"Enregistrer\"", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Manual_game_browse_uses_filtered_file_picker_and_prefills_fields()
     {
         var code = Read("Library/ManualGameDialog.xaml.cs");
@@ -89,10 +105,10 @@ public sealed class ManualGameDialogStructureTests
         var manualFlow = code[start..end];
 
         Assert.Contains("ManualGameExecutablePicker.Select", manualFlow, StringComparison.Ordinal);
-        Assert.Contains("new ManualGameDialog(selection)", manualFlow, StringComparison.Ordinal);
+        Assert.Contains("new ManualGameDialog(selection, catalogStore:", manualFlow, StringComparison.Ordinal);
         Assert.True(
             manualFlow.IndexOf("ManualGameExecutablePicker.Select", StringComparison.Ordinal)
-            < manualFlow.IndexOf("new ManualGameDialog(selection)", StringComparison.Ordinal));
+            < manualFlow.IndexOf("new ManualGameDialog(selection, catalogStore:", StringComparison.Ordinal));
     }
 
     [Fact]

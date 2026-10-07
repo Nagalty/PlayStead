@@ -1,10 +1,29 @@
 using PlayStead.Core.Catalog;
+using PlayStead.Core.Identity;
+using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 
 namespace PlayStead.Core.Tests.Catalog;
 
 public sealed class CatalogModelTests
 {
+    [Theory]
+    [InlineData(ProviderKind.Steam, CatalogProviderKind.Steam)]
+    [InlineData(ProviderKind.Epic, CatalogProviderKind.Epic)]
+    [InlineData(ProviderKind.Gog, CatalogProviderKind.Gog)]
+    public void Provider_mapping_supports_deterministic_catalog_linking(
+        ProviderKind provider,
+        CatalogProviderKind expected)
+    {
+        Assert.True(ProviderKindMapping.TryMap(provider, out var mapped));
+        Assert.Equal(expected, mapped);
+    }
+
+    [Fact]
+    public void Manual_provider_has_no_implicit_catalog_mapping()
+    {
+        Assert.False(ProviderKindMapping.TryMap(ProviderKind.Manual, out _));
+    }
     [Fact]
     public void Canonical_content_supports_active_game_without_redirect()
     {

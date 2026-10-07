@@ -35,15 +35,12 @@ public sealed class ManualMetadataReconciliationServiceTests
             new FakeLibraryStore(
                 new LogicalGame(gameId, "007 First Light", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow),
                 installation), catalog, links, metadata);
-        var changed = 0;
-        service.Changed += (_, _) => changed++;
-
         var result = await service.ReconcileAsync(CancellationToken.None);
 
         Assert.Equal(1, result.Matched);
-        Assert.Null(await metadata.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None));
+        Assert.NotNull(await metadata.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None));
         Assert.NotNull(await metadata.GetAsync(gameId, ProviderKind.Manual, CancellationToken.None));
-        Assert.Equal(1, changed);
+        Assert.Equal(new MediaSourceIdentity(ProviderKind.Steam, "3768760"), links.Link!.MediaSource);
     }
 
     [Fact]
@@ -56,8 +53,8 @@ public sealed class ManualMetadataReconciliationServiceTests
 
         await service.ReconcileAsync(CancellationToken.None);
 
-        Assert.Equal(new MediaSourceIdentity(ProviderKind.Steam, "B"), links.Link!.MediaSource);
-        Assert.Null(await metadata.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None));
+        Assert.Equal(new MediaSourceIdentity(ProviderKind.Steam, "A"), links.Link!.MediaSource);
+        Assert.NotNull(await metadata.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None));
         Assert.Equal(content.Id, links.Link.CanonicalCatalogId);
     }
 
@@ -71,19 +68,19 @@ public sealed class ManualMetadataReconciliationServiceTests
 
         await service.ReconcileAsync(CancellationToken.None);
 
-        Assert.Null(links.Link!.MediaSource);
-        Assert.Null(await metadata.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None));
+        Assert.Equal(new MediaSourceIdentity(ProviderKind.Steam, "A"), links.Link!.MediaSource);
+        Assert.NotNull(await metadata.GetAsync(gameId, ProviderKind.Steam, CancellationToken.None));
     }
 
     private static (ManualMetadataReconciliationService Service, GameId GameId, FakeLinkStore Links, FakeMetadataStore Metadata, CatalogContent Content) CreateReconciliation(
         IReadOnlyList<CatalogProviderRef> refs,
-        MediaSourceIdentity oldSource)
+        MediaSourceIdentity? oldSource)
     {
         var gameId = GameId.New();
         var installation = new GameInstallation(InstallationId.New(), gameId, ProviderKind.Manual, "manual:007", @"H:\\007 First Light", 123, true, true, DateTimeOffset.UtcNow, InstallationContentKind.Game, @"H:\\007 First Light\\Retail\\007FirstLight.exe", @"H:\\007 First Light\\Retail", null, @"H:\\007 First Light");
         var content = new CatalogContent(CatalogContentId.New(), PlaySteadPublicId.Parse("PlayStead-123456"), CatalogContentKind.Game, "007 First Light", "007 first light", null, "Developer", "Publisher", CatalogContentStatus.Active, null);
         var catalogRefs = refs.Select(x => x with { ContentId = content.Id }).ToArray();
-        var links = new FakeLinkStore { Link = new(gameId, content.Id, oldSource, DateTimeOffset.UtcNow) };
+        var links = new FakeLinkStore { Link = oldSource is null ? null : new(gameId, content.Id, oldSource, DateTimeOffset.UtcNow) };
         var metadata = new FakeMetadataStore();
         return (new ManualMetadataReconciliationService(new FakeLibraryStore(new LogicalGame(gameId, "007 First Light", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow), installation), new FakeCatalogStore(content, catalogRefs), links, metadata), gameId, links, metadata, content);
     }
@@ -117,14 +114,11 @@ public sealed class ManualMetadataReconciliationServiceTests
         var first = await service.ReconcileAsync(CancellationToken.None);
         var second = await service.ReconcileAsync(CancellationToken.None);
 
-        var link = links.Link;
-        Assert.NotNull(link);
         Assert.Equal(1, first.Matched);
-        Assert.Equal(1, first.Updated);
+        Assert.Equal(0, first.Updated);
         Assert.Equal(1, second.Matched);
         Assert.Equal(0, second.Updated);
-        Assert.Equal(content.Id, link!.CanonicalCatalogId);
-        Assert.Equal(new MediaSourceIdentity(ProviderKind.Steam, "3768760"), link.MediaSource);
+        Assert.Null(links.Link);
         Assert.Equal("007 FIRST LIGHT", catalog.LastNormalizedTitle);
         Assert.Contains(catalog.ProviderRefs, x => x.Provider == CatalogProviderKind.Epic);
         Assert.Equal(ProviderKind.Manual, installation.Provider);
@@ -133,6 +127,20 @@ public sealed class ManualMetadataReconciliationServiceTests
         Assert.Equal(@"H:\007 First Light\Retail", installation.WorkingDirectory);
         Assert.Equal(gameId, metadata.Value!.GameId);
         Assert.Equal(ProviderKind.Manual, metadata.Value.Provider);
+    }
+
+    [Fact]
+    public async Task Reconcile_does_not_create_canonical_link_from_title_only_catalog_match()
+    {
+        var (service, gameId, links, _, _) = CreateReconciliation(
+            [new CatalogProviderRef(CatalogContentId.New(), CatalogProviderKind.Steam, "3768760", null,
+                CatalogProvenance.AdminConfirmed, CatalogConfidence.Deterministic, DateTimeOffset.UtcNow)],
+            oldSource: null);
+
+        await service.ReconcileAsync(CancellationToken.None);
+
+        Assert.Null(links.Link);
+        Assert.Equal(gameId, links.LastRequestedGameId);
     }
 
     private sealed class FakeLibraryStore(LogicalGame game, GameInstallation installation) : ILibraryStore
@@ -159,7 +167,12 @@ public sealed class ManualMetadataReconciliationServiceTests
     private sealed class FakeLinkStore : IManualMetadataLinkStore
     {
         public ManualMetadataLink? Link { get; set; }
-        public Task<ManualMetadataLink?> GetAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult(Link);
+        public GameId? LastRequestedGameId { get; private set; }
+        public Task<ManualMetadataLink?> GetAsync(GameId gameId, CancellationToken cancellationToken)
+        {
+            LastRequestedGameId = gameId;
+            return Task.FromResult(Link);
+        }
         public Task UpsertAsync(ManualMetadataLink link, CancellationToken cancellationToken) { Link = link; return Task.CompletedTask; }
         public Task RemoveAsync(GameId gameId, CancellationToken cancellationToken) { Link = null; return Task.CompletedTask; }
         public ManualMetadataLink? TryGetCached(GameId gameId) => Link;

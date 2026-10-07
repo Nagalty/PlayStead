@@ -21,6 +21,7 @@ using PlayStead.Core.Collections;
 using PlayStead.Core.Modding;
 using PlayStead.Core.LocalArtifacts;
 using PlayStead.Core.Catalog;
+using PlayStead.Core.Identity;
 
 namespace PlayStead.UI.Library;
 
@@ -30,6 +31,8 @@ public sealed class LibraryViewModel :
 {
     private readonly ILibraryStore _libraryStore;
     private readonly IGameMediaResolver _gameMediaResolver;
+    private readonly ICanonicalGameMediaResolver? _canonicalMediaResolver;
+    private readonly CanonicalProviderIdentityLinker? _canonicalIdentityLinker;
     public ICanonicalCatalogStore? CanonicalCatalogStore { get; }
     public IGamesDuMomentService? GamesDuMomentService { get; }
     private readonly UiPreferencesStore? _uiPreferencesStore;
@@ -195,13 +198,17 @@ public sealed class LibraryViewModel :
         IProviderGameMetadataStore? providerGameMetadataStore,
         IProviderActivityMetadataStore? providerActivityStore,
         ISessionStore? sessionStore,
-        IManualMetadataLinkStore? manualMetadataLinkStore = null)
+        IManualMetadataLinkStore? manualMetadataLinkStore = null,
+        ICanonicalGameMediaResolver? canonicalMediaResolver = null,
+        CanonicalProviderIdentityLinker? canonicalIdentityLinker = null)
         : this(libraryStore, steamReferenceRuntime, sessionMonitor, uiPreferencesStore,
             gameMediaResolver, canonicalCatalogStore, gamesDuMomentService, providerGameMetadataStore)
     {
         _providerActivityStore = providerActivityStore;
         _sessionStore = sessionStore;
         _manualMetadataLinkStore = manualMetadataLinkStore;
+        _canonicalMediaResolver = canonicalMediaResolver;
+        _canonicalIdentityLinker = canonicalIdentityLinker;
     }
 
     public LibraryViewModel(
@@ -221,6 +228,21 @@ public sealed class LibraryViewModel :
     {
         ArgumentNullException.ThrowIfNull(providerGameMetadataStore);
         ProviderGameMetadataStore = providerGameMetadataStore;
+    }
+
+    public LibraryViewModel(
+        ILibraryStore libraryStore,
+        ISteamReferenceRuntime steamReferenceRuntime,
+        SessionMonitor sessionMonitor,
+        IGameMediaResolver gameMediaResolver,
+        ICanonicalGameMediaResolver canonicalMediaResolver)
+        : this(
+            libraryStore,
+            steamReferenceRuntime,
+            sessionMonitor,
+            gameMediaResolver)
+    {
+        _canonicalMediaResolver = canonicalMediaResolver ?? throw new ArgumentNullException(nameof(canonicalMediaResolver));
     }
 
     public LibraryViewModel(
@@ -299,22 +321,13 @@ public sealed class LibraryViewModel :
         if (CanonicalCatalogStore is null)
             return installation;
 
-        IReadOnlyList<CatalogContent> matches;
-        try
-        {
-            matches = await CanonicalCatalogStore.FindByNormalizedTitleAsync(
-                CanonicalCatalogTitleNormalizer.Normalize(definition.Title),
-                cancellationToken);
-        }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            return installation;
-        }
-
-        if (matches.Count != 1)
+        if (definition.CanonicalCatalogId is not CatalogContentId canonicalCatalogId)
             return installation;
 
-        var match = matches[0];
+        var match = await CanonicalCatalogStore.GetByIdAsync(canonicalCatalogId, cancellationToken);
+        if (match is null)
+            return installation;
+
         var refs = await CanonicalCatalogStore.GetProviderRefsAsync(match.Id, cancellationToken);
         var mediaSource = ManualMetadataMediaSourceSelector.Select(refs);
 
@@ -328,6 +341,8 @@ public sealed class LibraryViewModel :
                     DateTimeOffset.UtcNow),
                 cancellationToken);
         }
+        if (_canonicalIdentityLinker is not null)
+            await _canonicalIdentityLinker.SyncAsync(installation.GameId, match.Id, cancellationToken);
         if (ProviderGameMetadataStore is not null)
         {
             await ProviderGameMetadataStore.UpsertAsync(
@@ -368,6 +383,8 @@ public sealed class LibraryViewModel :
         var removed = await service.RemoveAsync(gameId, cancellationToken);
         if (removed && _manualMetadataLinkStore is not null)
             await _manualMetadataLinkStore.RemoveAsync(gameId, cancellationToken);
+        if (removed && _canonicalIdentityLinker is not null)
+            await _canonicalIdentityLinker.RemoveDerivedAsync(gameId, cancellationToken);
         if (removed)
             await RefreshAsync(cancellationToken);
         return removed;
@@ -383,6 +400,8 @@ public sealed class LibraryViewModel :
         if (canonicalCatalogId is null)
         {
             await _manualMetadataLinkStore.RemoveAsync(gameId, cancellationToken);
+            if (_canonicalIdentityLinker is not null)
+                await _canonicalIdentityLinker.RemoveDerivedAsync(gameId, cancellationToken);
             return true;
         }
 
@@ -393,7 +412,11 @@ public sealed class LibraryViewModel :
             return false;
         var refs = await CanonicalCatalogStore.GetProviderRefsAsync(content.Id, cancellationToken);
         var source = ManualMetadataMediaSourceSelector.Select(refs);
+        if (_canonicalIdentityLinker is not null)
+            await _canonicalIdentityLinker.RemoveDerivedAsync(gameId, cancellationToken);
         await _manualMetadataLinkStore.UpsertAsync(new ManualMetadataLink(gameId, content.Id, source, DateTimeOffset.UtcNow), cancellationToken);
+        if (_canonicalIdentityLinker is not null)
+            await _canonicalIdentityLinker.SyncAsync(gameId, content.Id, cancellationToken);
         return true;
     }
 
@@ -1373,7 +1396,7 @@ public sealed class LibraryViewModel :
         LibraryItemViewModel item,
         CancellationToken cancellationToken)
     {
-        if (item.HasLogo)
+        if (_canonicalMediaResolver is null && item.HasLogo)
         {
             return;
         }
@@ -1402,19 +1425,21 @@ public sealed class LibraryViewModel :
 
         try
         {
-            var path =
-                await _gameMediaResolver.ResolveAndCacheAsync(
+            var path = _canonicalMediaResolver is not null
+                ? await _canonicalMediaResolver.ResolveAndCacheAsync(
+                    item.GameId,
+                    item.Title,
+                    GameMediaAssetType.Logo,
+                    item.Provider,
+                    cancellationToken)
+                : await _gameMediaResolver.ResolveAndCacheAsync(
                     identity,
                     GameMediaAssetType.Logo,
                     cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (path is not null)
-            {
-                item.SetLogoPath(
-                    path);
-            }
+            item.SetLogoPath(path);
         }
         finally
         {
@@ -1445,6 +1470,8 @@ public sealed class LibraryViewModel :
                 cancellationToken);
         _lastSnapshot = snapshot;
 
+        await SyncExistingManualCatalogLinksAsync(snapshot, cancellationToken);
+
         await RefreshActivityProjectionAsync(snapshot.Installations, cancellationToken);
 
         await RefreshLocalProtectionProjectionAsync(snapshot, cancellationToken);
@@ -1466,6 +1493,24 @@ public sealed class LibraryViewModel :
                 snapshot,
                 checking: false);
         await RefreshCollectionsAsync(cancellationToken);
+    }
+
+    private async Task SyncExistingManualCatalogLinksAsync(
+        LibrarySnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        if (_manualMetadataLinkStore is null || _canonicalIdentityLinker is null)
+            return;
+
+        foreach (var gameId in snapshot.Installations
+                     .Where(installation => installation.IsPresent && installation.Provider == ProviderKind.Manual)
+                     .Select(installation => installation.GameId)
+                     .Distinct())
+        {
+            var link = await _manualMetadataLinkStore.GetAsync(gameId, cancellationToken);
+            if (link is not null)
+                await _canonicalIdentityLinker.SyncAsync(gameId, link.CanonicalCatalogId, cancellationToken);
+        }
     }
 
     public Task VerifySteamAsync(
@@ -1554,7 +1599,8 @@ public sealed class LibraryViewModel :
             snapshot.Installations
                 .Where(
                     installation =>
-                        installation.IsPresent)
+                        installation.IsPresent &&
+                        installation.ContentKind.IsGameEligible())
                 .GroupBy(
                     installation =>
                         installation.GameId)
@@ -1764,6 +1810,14 @@ public sealed class LibraryViewModel :
         LibraryItemViewModel item,
         GameInstallation installation)
     {
+        if (_canonicalMediaResolver is not null)
+        {
+            // The canonical resolver owns Logo selection. The active provider
+            // cache remains available to it, but cannot become the final value.
+            item.SetLogoPath(null);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(installation.ExternalId))
         {
             return;
