@@ -1,0 +1,11 @@
+ALTER TABLE provider_game_refs
+    ADD COLUMN source INTEGER NOT NULL DEFAULT 1;
+
+ALTER TABLE provider_game_refs
+    ADD COLUMN confidence INTEGER NOT NULL DEFAULT 2;
+
+ALTER TABLE provider_game_refs
+    ADD COLUMN created_utc TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.0000000+00:00';
+
+ALTER TABLE provider_game_refs
+    ADD COLUMN updated_utc TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.0000000+00:00';

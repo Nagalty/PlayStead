@@ -4,7 +4,7 @@ namespace PlayStead.Data.Database;
 
 public sealed class DatabaseInitializer
 {
-    private const int TargetVersion = 28;
+    private const int TargetVersion = 29;
 
     private static readonly IReadOnlyDictionary<int, string> MigrationFiles =
         new Dictionary<int, string>
@@ -36,7 +36,8 @@ public sealed class DatabaseInitializer
             [25] = "025_manual_install_root.sql",
             [26] = "026_manual_metadata_links.sql",
             [27] = "027_provider_launch_metadata.sql",
-            [28] = "028_process_signature_absence_baseline.sql"
+            [28] = "028_process_signature_absence_baseline.sql",
+            [29] = "029_provider_identity_evidence.sql"
         };
 
     private readonly DatabaseOptions _options;

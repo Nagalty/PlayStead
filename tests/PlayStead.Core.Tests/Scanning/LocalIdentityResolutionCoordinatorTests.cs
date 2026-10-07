@@ -42,6 +42,32 @@ public sealed class LocalIdentityResolutionCoordinatorTests
     }
 
     [Fact]
+    public async Task Exact_catalog_match_links_all_deterministic_provider_refs()
+    {
+        var gameId = Game(1);
+        var contentId = CatalogContentId.New();
+        var providerStore = new RecordingProviderIdentityStore();
+        var catalogStore = new RecordingCatalogStore(
+            new CatalogProviderRef(contentId, CatalogProviderKind.Steam, "123", null, CatalogProvenance.AdminConfirmed, CatalogConfidence.Deterministic, ObservedAt),
+            new CatalogProviderRef(contentId, CatalogProviderKind.Epic, "epic-123", null, CatalogProvenance.AdminConfirmed, CatalogConfidence.Deterministic, ObservedAt));
+        var sut = new LocalIdentityResolutionCoordinator(
+            new RecordingLookup(gameId),
+            new RecordingResolver(new IdentityResolutionResult(IdentityResolutionState.MatchConfirmed, contentId, ExactMatch(contentId))),
+            new RecordingResolutionStore(),
+            new RecordingReconciler(),
+            identityDecisionStore: null,
+            notificationProducer: null,
+            catalogStore: catalogStore,
+            providerIdentityStore: providerStore);
+
+        await sut.ResolveAfterScanAsync(Scan(ProviderKind.Epic, "581c8d4fd9574884bff66cbdbaa42def"), CancellationToken.None);
+
+        Assert.Equal(
+            [(ProviderKind.Steam, "123"), (ProviderKind.Epic, "epic-123")],
+            providerStore.Identities.Select(x => (x.Provider, x.ExternalId)).ToArray());
+    }
+
+    [Fact]
     public async Task New_result_creates_provisional_once()
     {
         var gameId = Game(1);
@@ -69,7 +95,7 @@ public sealed class LocalIdentityResolutionCoordinatorTests
     }
 
     [Fact]
-    public async Task Unsupported_provider_is_ignored_conservatively()
+    public async Task Epic_provider_uses_exact_catalog_resolution()
     {
         var lookup = new RecordingLookup(Game(1));
         var resolver = new RecordingResolver(NewResult());
@@ -85,9 +111,9 @@ public sealed class LocalIdentityResolutionCoordinatorTests
             Scan(ProviderKind.Epic, "epic-ref"),
             CancellationToken.None);
 
-        Assert.Equal(0, lookup.CallCount);
-        Assert.Equal(0, resolver.CallCount);
-        Assert.Equal(0, store.GetOrCreateCount);
+        Assert.Equal(1, lookup.CallCount);
+        Assert.Equal(1, resolver.CallCount);
+        Assert.Equal(1, store.GetOrCreateCount);
         Assert.Empty(reconciler.Calls);
     }
 
@@ -339,6 +365,25 @@ public sealed class LocalIdentityResolutionCoordinatorTests
             CallCount++;
             return Task.FromResult(gameId);
         }
+    }
+
+    private sealed class RecordingProviderIdentityStore : IProviderIdentityStore
+    {
+        public List<GameProviderIdentity> Identities { get; } = [];
+        public Task<IReadOnlyList<GameProviderIdentity>> GetByGameIdAsync(GameId gameId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<GameProviderIdentity>>(Identities);
+        public Task AssociateAsync(GameProviderIdentity identity, CancellationToken cancellationToken) { if (!Identities.Any(x => x.Provider == identity.Provider && x.ExternalId == identity.ExternalId)) Identities.Add(identity); return Task.CompletedTask; }
+        public Task<bool> RemoveAsync(GameId gameId, ProviderKind provider, string externalId, CancellationToken cancellationToken) => Task.FromResult(Identities.RemoveAll(x => x.Provider == provider && x.ExternalId == externalId) > 0);
+    }
+
+    private sealed class RecordingCatalogStore(params CatalogProviderRef[] refs) : ICanonicalCatalogStore
+    {
+        public Task<CatalogMetadata> GetMetadataAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<CatalogContent?> GetByIdAsync(CatalogContentId contentId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<CatalogContent?> GetByPublicIdAsync(PlaySteadPublicId publicId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<CatalogContent?> FindByProviderRefAsync(CatalogProviderKind provider, string externalId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<CatalogProviderRef>> GetProviderRefsAsync(CatalogContentId contentId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CatalogProviderRef>>(refs);
+        public Task<IReadOnlyList<CatalogAlias>> GetAliasesAsync(CatalogContentId contentId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<CatalogContentRelation>> GetRelationsFromAsync(CatalogContentId sourceContentId, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class RecordingResolver(

@@ -9,9 +9,15 @@ public static class ProviderKindMapping
         ProviderKind provider,
         out CatalogProviderKind catalogProvider)
     {
-        if (provider == ProviderKind.Steam)
+        if (provider is ProviderKind.Steam or ProviderKind.Epic or ProviderKind.Gog)
         {
-            catalogProvider = CatalogProviderKind.Steam;
+            catalogProvider = provider switch
+            {
+                ProviderKind.Steam => CatalogProviderKind.Steam,
+                ProviderKind.Epic => CatalogProviderKind.Epic,
+                ProviderKind.Gog => CatalogProviderKind.Gog,
+                _ => throw new ArgumentOutOfRangeException(nameof(provider))
+            };
             return true;
         }
 

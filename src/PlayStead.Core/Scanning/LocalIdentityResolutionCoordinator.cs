@@ -1,4 +1,6 @@
 using PlayStead.Core.Identity;
+using PlayStead.Core.Catalog;
+using PlayStead.Core.Library;
 using PlayStead.Core.Notifications;
 using PlayStead.Core.Persistence;
 
@@ -13,6 +15,7 @@ public sealed class LocalIdentityResolutionCoordinator
     private readonly ILocalIdentityReconciler _identityReconciler;
     private readonly IIdentityDecisionStore? _identityDecisionStore;
     private readonly IIdentityNotificationProducer? _notificationProducer;
+    private readonly CanonicalProviderIdentityLinker? _providerIdentityLinker;
 
     public LocalIdentityResolutionCoordinator(
         ILibraryGameLookup libraryGameLookup,
@@ -54,7 +57,9 @@ public sealed class LocalIdentityResolutionCoordinator
         IIdentityResolutionStore identityResolutionStore,
         ILocalIdentityReconciler identityReconciler,
         IIdentityDecisionStore? identityDecisionStore,
-        IIdentityNotificationProducer? notificationProducer)
+        IIdentityNotificationProducer? notificationProducer,
+        ICanonicalCatalogStore? catalogStore = null,
+        IProviderIdentityStore? providerIdentityStore = null)
     {
         ArgumentNullException.ThrowIfNull(libraryGameLookup);
         ArgumentNullException.ThrowIfNull(identityResolver);
@@ -67,6 +72,9 @@ public sealed class LocalIdentityResolutionCoordinator
         _identityReconciler = identityReconciler;
         _identityDecisionStore = identityDecisionStore;
         _notificationProducer = notificationProducer;
+        _providerIdentityLinker = catalogStore is not null && providerIdentityStore is not null
+            ? new CanonicalProviderIdentityLinker(catalogStore, providerIdentityStore)
+            : null;
     }
 
     public async Task ResolveAfterScanAsync(
@@ -139,6 +147,13 @@ public sealed class LocalIdentityResolutionCoordinator
                         resolution.Evidence,
                         installation.ObservedAtUtc,
                         cancellationToken);
+                    if (_providerIdentityLinker is not null)
+                    {
+                        await _providerIdentityLinker.SyncAsync(
+                            gameId.Value,
+                            candidate,
+                            cancellationToken);
+                    }
                     break;
 
                 case IdentityResolutionState.New:
@@ -200,4 +215,5 @@ public sealed class LocalIdentityResolutionCoordinator
             }
         }
     }
+
 }
