@@ -67,6 +67,28 @@ public sealed class EpicLocalLibrarySourceTests : IDisposable
     }
 
     [Fact]
+    public async Task Classifies_engine_manifest_as_tool_from_official_epic_type_fields()
+    {
+        WriteManifest("engine.item", new
+        {
+            DisplayName = "Unreal Engine",
+            InstallLocation = _installPath,
+            CatalogItemId = "18b3b415bc434c5b974f50488360ca31",
+            AppName = "UE_5.8",
+            CatalogNamespace = "ue",
+            TechnicalType = "engines/ue5,engines",
+            AppCategories = new[] { "engines/ue5", "engines" },
+            LaunchExecutable = "Engine/Binaries/Win64/UnrealEditor.exe",
+            bIsIncompleteInstall = false
+        });
+
+        var installation = Assert.Single((await ScanAsync()).Installations);
+
+        Assert.Equal(InstallationContentKind.Tool, installation.ContentKind);
+        Assert.Equal("18b3b415bc434c5b974f50488360ca31", installation.ExternalId);
+    }
+
+    [Fact]
     public async Task Invalid_json_isolated_from_valid_manifest()
     {
         File.WriteAllText(Path.Combine(_root, "Manifests", "broken.item"), "{ invalid");

@@ -98,6 +98,30 @@ public sealed class SteamLocalLibrarySourceTests : IDisposable
         Assert.Contains(nameof(FormatException), warning, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Real_AION2_manifest_with_rooted_launch_path_is_discovered_when_present()
+    {
+        const string steamRoot = @"C:\Program Files (x86)\Steam";
+        const string manifest = @"H:\SteamLibrary\steamapps\appmanifest_3393110.acf";
+        const string appInfo = @"C:\Program Files (x86)\Steam\appcache\appinfo.vdf";
+        const string installPath = @"H:\SteamLibrary\steamapps\common\AION2";
+
+        if (!File.Exists(manifest) || !File.Exists(appInfo) || !Directory.Exists(installPath))
+            return;
+
+        var source = new SteamLocalLibrarySource(
+            new WindowsSteamRootLocator([steamRoot]),
+            new SteamLibraryFoldersReader(),
+            new SteamAppManifestReader(),
+            new SteamAppInfoReader());
+
+        var result = await source.ScanAsync(CancellationToken.None);
+        var installation = Assert.Single(result.Installations, x => x.ExternalId == "3393110");
+
+        Assert.Equal("AION 2", installation.Title);
+        Assert.Equal(Path.GetFullPath(installPath), installation.InstallPath);
+    }
+
     private static void WriteManifest(
         string steamApps,
         string appId,

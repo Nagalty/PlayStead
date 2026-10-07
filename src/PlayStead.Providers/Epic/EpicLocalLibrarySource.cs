@@ -152,14 +152,15 @@ public sealed class EpicLocalLibrarySource : ILocalLibrarySource
             manifest.InstallSize is >= 0 ? manifest.InstallSize : null,
             observedAtUtc) with
         {
-            ContentKind = InstallationContentKind.Game,
+            ContentKind = MapContentKind(manifest.TechnicalType, manifest.AppCategories),
             LaunchMetadata = new ProviderLaunchMetadata(
                 ProviderKind.Epic,
                 new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["CatalogNamespace"] = manifest.CatalogNamespace?.Trim() ?? string.Empty,
                     ["CatalogItemId"] = manifest.CatalogItemId?.Trim() ?? string.Empty,
-                    ["AppName"] = manifest.AppName?.Trim() ?? string.Empty
+                    ["AppName"] = manifest.AppName?.Trim() ?? string.Empty,
+                    ["TechnicalType"] = manifest.TechnicalType?.Trim() ?? string.Empty
                 })
         };
         return true;
@@ -167,6 +168,24 @@ public sealed class EpicLocalLibrarySource : ILocalLibrarySource
 
     private static string? FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim();
+
+    private static InstallationContentKind MapContentKind(
+        string? technicalType,
+        IReadOnlyList<string>? appCategories)
+    {
+        var values = (appCategories ?? Array.Empty<string>())
+            .Append(technicalType)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim().ToLowerInvariant())
+            .ToArray();
+
+        if (values.Any(value => value.Contains("engine", StringComparison.Ordinal) ||
+                               value.Contains("sdk", StringComparison.Ordinal) ||
+                               value.Contains("tool", StringComparison.Ordinal)))
+            return InstallationContentKind.Tool;
+
+        return InstallationContentKind.Game;
+    }
 
     private sealed class EpicManifest
     {
@@ -177,6 +196,8 @@ public sealed class EpicLocalLibrarySource : ILocalLibrarySource
         public string? CatalogItemId { get; set; }
         public string? AppName { get; set; }
         public string? CatalogNamespace { get; set; }
+        public string? TechnicalType { get; set; }
+        public List<string>? AppCategories { get; set; }
         [JsonPropertyName("bIsIncompleteInstall")]
         public bool IsIncompleteInstall { get; set; }
         public string? InstallationGuid { get; set; }

@@ -168,7 +168,9 @@ public sealed class SteamLocalLibrarySource : ILocalLibrarySource, ISteamEligibl
 
         return windows.Any(x =>
         {
-            var relative = x.Executable.Replace('/', Path.DirectorySeparatorChar);
+            var relative = x.Executable
+                .Replace('/', Path.DirectorySeparatorChar)
+                .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             var path = Path.GetFullPath(Path.Combine(installPath, relative));
             return File.Exists(path);
         });
