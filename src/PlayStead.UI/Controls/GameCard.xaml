@@ -17,6 +17,10 @@
             <Setter Property="Visibility"
                     Value="{Binding HasSteamStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <Style.Triggers>
+                <DataTrigger Binding="{Binding SteamState}" Value="{x:Static steam:SteamUpdateState.UpdateAvailable}">
+                    <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding SteamState}" Value="{x:Static steam:SteamUpdateState.Unknown}">
                     <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceSubtle}" />
                     <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Border}" />
@@ -31,6 +35,9 @@
             <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextSecondary}" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Style.Triggers>
+                <DataTrigger Binding="{Binding SteamState}" Value="{x:Static steam:SteamUpdateState.UpdateAvailable}">
+                    <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.Copper}" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding SteamState}" Value="{x:Static steam:SteamUpdateState.Unknown}">
                     <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextMuted}" />
                     <Setter Property="FontWeight" Value="Normal" />

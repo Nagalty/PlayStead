@@ -15,6 +15,21 @@ public sealed class GameQuickPanelStructureTests
         Assert.Contains("QuickPanelViewModel.SinceLastPlaySummary", xaml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Quick_panel_uses_the_shared_logo_path_with_title_fallback()
+    {
+        var path = Path.Combine(FindRoot(), "src", "PlayStead.UI", "Library", "LibraryView.xaml");
+        var xaml = File.ReadAllText(path);
+        var panelStart = xaml.IndexOf("x:Name=\"GameQuickPanel\"", StringComparison.Ordinal);
+        var panelEnd = xaml.IndexOf("x:Name=\"EmptyStatePanel\"", panelStart, StringComparison.Ordinal);
+
+        Assert.True(panelStart >= 0 && panelEnd > panelStart);
+        var panel = xaml[panelStart..panelEnd];
+        Assert.Contains("Source=\"{Binding LogoPath}\"", panel, StringComparison.Ordinal);
+        Assert.Contains("HasLogo", panel, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding Title}\"", panel, StringComparison.Ordinal);
+    }
+
     private static string FindRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -171,8 +171,24 @@
                     Value="{Binding HasSteamStatus, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding SteamState}"
+                             Value="{x:Static steam:SteamUpdateState.UpdateAvailable}">
+                    <Setter Property="Background" Value="{DynamicResource PlayStead.Brush.SurfaceRaised}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlayStead.Brush.Copper}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding SteamState}"
                              Value="{x:Static steam:SteamUpdateState.Unknown}">
                     <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="Library.ListSteamStatusText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.TextSecondary}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SteamState}" Value="{x:Static steam:SteamUpdateState.UpdateAvailable}">
+                    <Setter Property="Foreground" Value="{DynamicResource PlayStead.Brush.Copper}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -900,9 +916,7 @@
                                             CornerRadius="6"
                                             Visibility="{Binding HasSteamStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
                                         <TextBlock Text="{Binding SteamStatusLabel}"
-                                                   Foreground="{DynamicResource PlayStead.Brush.Copper}"
-                                                   FontSize="11"
-                                                   FontWeight="SemiBold"/>
+                                                   Style="{DynamicResource Library.ListSteamStatusText}" />
                                     </Border>
                                 </Grid>
                             </Grid>

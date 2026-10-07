@@ -17,6 +17,14 @@ namespace PlayStead.UI.Tests.Home;
 public sealed class HomeViewModelTests :
     IDisposable
 {
+    [Theory]
+    [InlineData(0, "jeux ont changé")]
+    [InlineData(1, "jeu a changé")]
+    [InlineData(2, "jeux ont changé")]
+    public void Games_changed_since_last_play_uses_french_number_agreement(int count, string expected)
+    {
+        Assert.Equal(expected, HomeViewModel.FormatGamesChangedSinceLastPlayLabel(count));
+    }
     private readonly string _root =
         Path.Combine(
             Path.GetTempPath(),

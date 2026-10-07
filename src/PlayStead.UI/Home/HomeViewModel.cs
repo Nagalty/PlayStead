@@ -438,7 +438,9 @@ public sealed class HomeViewModel :
         .Select(pair => pair.Key.GameId)
         .Distinct()
         .Count();
-    public string GamesChangedSinceLastPlayLabel => "jeux ont changé";
+    public string GamesChangedSinceLastPlayLabel => FormatGamesChangedSinceLastPlayLabel(GamesChangedSinceLastPlayCount);
+    public static string FormatGamesChangedSinceLastPlayLabel(int count) =>
+        count == 1 ? "jeu a changé" : "jeux ont changé";
     public string GamesChangedSinceLastPlaySubtitle => "depuis ta dernière partie";
 
     public bool HasRecentlyPlayedGames =>
@@ -596,9 +598,7 @@ public sealed class HomeViewModel :
 
         if (!progress.IsRunning || progress.Total <= 0)
         {
-            _metadataProgressDelayCancellation?.Cancel();
-            _metadataProgressDelayCancellation?.Dispose();
-            _metadataProgressDelayCancellation = null;
+            CancelMetadataProgressDelay();
             SetMetadataProgressVisible(false);
             return;
         }
@@ -609,6 +609,24 @@ public sealed class HomeViewModel :
         var cancellation = new CancellationTokenSource();
         _metadataProgressDelayCancellation = cancellation;
         _ = ShowMetadataProgressAfterDelayAsync(cancellation.Token);
+    }
+
+    private void CancelMetadataProgressDelay()
+    {
+        var cancellation = Interlocked.Exchange(ref _metadataProgressDelayCancellation, null);
+        if (cancellation is null) return;
+
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // A background refresh may have disposed the previous delay source
+            // while a queued Dispatcher progress callback was still pending.
+        }
+
+        cancellation.Dispose();
     }
 
     private async Task ShowMetadataProgressAfterDelayAsync(CancellationToken cancellationToken)
@@ -1372,8 +1390,7 @@ public sealed class HomeViewModel :
 
         _attentionMediaCancellation?.Cancel();
         _attentionMediaCancellation?.Dispose();
-        _metadataProgressDelayCancellation?.Cancel();
-        _metadataProgressDelayCancellation?.Dispose();
+        CancelMetadataProgressDelay();
         _attentionMediaCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var version = ++_attentionMediaVersion;
         _ = LoadHomeAttentionMediaObservedAsync(identities, version, _attentionMediaCancellation.Token);
@@ -1579,6 +1596,7 @@ public sealed class HomeViewModel :
         _suggestionMediaCancellation?.Dispose();
         _attentionMediaCancellation?.Cancel();
         _attentionMediaCancellation?.Dispose();
+        CancelMetadataProgressDelay();
         _libraryViewModel.PropertyChanged -= LibraryViewModel_OnPropertyChanged;
         _sessionViewModel.PropertyChanged -= SessionViewModel_OnPropertyChanged;
         if (_attentionService is not null) _attentionService.Changed -= AttentionService_OnChanged;

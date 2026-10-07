@@ -24,6 +24,32 @@ public sealed class NotificationAttentionInstallUpdateTests
     }
 
     [Theory]
+    [InlineData(InstallationContentKind.Tool)]
+    [InlineData(InstallationContentKind.Sdk)]
+    public async Task Non_game_content_update_is_not_projected(InstallationContentKind contentKind)
+    {
+        var service = CreateAttentionService(ProviderInstallUpdateStatus.UpdateAvailable, contentKind);
+
+        Assert.Empty(await service.GetActiveAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Game_content_update_remains_projected()
+    {
+        var service = CreateAttentionService(ProviderInstallUpdateStatus.UpdateAvailable, InstallationContentKind.Game);
+
+        Assert.Single(await service.GetActiveAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Unknown_content_update_remains_projected_conservatively()
+    {
+        var service = CreateAttentionService(ProviderInstallUpdateStatus.UpdateAvailable, InstallationContentKind.Unknown);
+
+        Assert.Single(await service.GetActiveAsync(CancellationToken.None));
+    }
+
+    [Theory]
     [InlineData(ProviderInstallUpdateStatus.UpToDate)]
     [InlineData(ProviderInstallUpdateStatus.Unknown)]
     [InlineData(ProviderInstallUpdateStatus.VersionMismatch)]
@@ -87,12 +113,15 @@ public sealed class NotificationAttentionInstallUpdateTests
         Assert.Equal(first.AttentionId, second.AttentionId);
     }
 
-    private NotificationAttentionService CreateAttentionService(ProviderInstallUpdateStatus status)
+    private NotificationAttentionService CreateAttentionService(ProviderInstallUpdateStatus status) =>
+        CreateAttentionService(status, InstallationContentKind.Unknown);
+
+    private NotificationAttentionService CreateAttentionService(ProviderInstallUpdateStatus status, InstallationContentKind contentKind)
     {
         var updates = new FakeUpdateSource { Values = [State(status)] };
         var stateService = CreateStateService(updates);
         stateService.RefreshAsync([Installation()], CancellationToken.None).GetAwaiter().GetResult();
-        return new NotificationAttentionService(new FakeNotificationService(), stateService, new FakeLibraryStore(_gameId));
+        return new NotificationAttentionService(new FakeNotificationService(), stateService, new FakeLibraryStore(_gameId, contentKind));
     }
 
     private static ProviderInstallUpdateStateReconciliationService CreateStateService(FakeUpdateSource source) =>
@@ -120,13 +149,13 @@ public sealed class NotificationAttentionInstallUpdateTests
             Task.FromResult(Values);
     }
 
-    private sealed class FakeLibraryStore(GameId gameId) : ILibraryStore
+    private sealed class FakeLibraryStore(GameId gameId, InstallationContentKind contentKind = InstallationContentKind.Unknown) : ILibraryStore
     {
         public Task ApplySourceScanAsync(SourceScanResult result, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<LibrarySnapshot> LoadSnapshotAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new LibrarySnapshot([
                 new LogicalGame(gameId, "Helldivers 2", false, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow)
-            ], []));
+            ], [new GameInstallation(InstallationId.New(), gameId, ProviderKind.Steam, "553850", "G:\\SteamLibrary\\common\\Helldivers 2", null, true, true, DateTimeOffset.UtcNow, contentKind)]));
     }
 
     private sealed class FakeNotificationService : INotificationCenterService

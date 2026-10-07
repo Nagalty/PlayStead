@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using PlayStead.Core.Library;
 using PlayStead.Core.Persistence;
 using PlayStead.Core.ProviderInstallUpdate;
 
@@ -55,13 +56,23 @@ public sealed class NotificationAttentionService : IAttentionService
             return items;
         }
 
-        var titles = _libraryStore is null
-            ? new Dictionary<Guid, string>()
-            : (await _libraryStore.LoadSnapshotAsync(cancellationToken)).Games
-                .ToDictionary(x => x.Id.Value, x => x.Title);
+        var snapshot = _libraryStore is null
+            ? null
+            : await _libraryStore.LoadSnapshotAsync(cancellationToken);
+        var titles = snapshot?.Games
+                .ToDictionary(x => x.Id.Value, x => x.Title)
+            ?? new Dictionary<Guid, string>();
+        var gameEligible = snapshot?.Installations
+                .GroupBy(x => x.GameId.Value)
+                .ToDictionary(x => x.Key, x => x.Any(i => i.ContentKind.IsGameEligible()))
+            ?? new Dictionary<Guid, bool>();
 
         foreach (var state in states)
         {
+            if (gameEligible.TryGetValue(state.GameId.Value, out var eligible) && !eligible)
+            {
+                continue;
+            }
             var gameTitle = titles.TryGetValue(state.GameId.Value, out var title)
                 ? title
                 : state.ProviderGameId;

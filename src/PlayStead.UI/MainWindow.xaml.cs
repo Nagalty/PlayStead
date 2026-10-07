@@ -1238,13 +1238,18 @@ public partial class MainWindow : Window
         if (installation is null || string.IsNullOrWhiteSpace(installation.ExecutablePath))
             return;
 
+        var existingLink = library.ManualMetadataLinkStore is null
+            ? null
+            : await library.ManualMetadataLinkStore.GetAsync(game.GameId, CancellationToken.None);
+
         var definition = new ManualGameDefinition(
             game.Title,
             installation.ExecutablePath,
             installation.WorkingDirectory ?? installation.InstallPath,
             installation.LaunchArguments,
-            installation.InstallRootPath ?? installation.InstallPath);
-        var dialog = new ManualGameDialog(initialDefinition: definition)
+            installation.InstallRootPath ?? installation.InstallPath,
+            existingLink?.CanonicalCatalogId);
+        var dialog = new ManualGameDialog(initialDefinition: definition, catalogStore: library.CanonicalCatalogStore)
         {
             Owner = this
         };
