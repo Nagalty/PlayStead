@@ -162,7 +162,7 @@ public sealed class SteamCmdRunnerTests : IDisposable
             timeout);
 
         return new SteamCmdRunner(
-            new SteamCmdPathResolver(options),
+            new SteamCmdPathResolver(options, _ => null),
             options,
             invoker);
     }

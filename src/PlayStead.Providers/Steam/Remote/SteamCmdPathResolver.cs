@@ -3,12 +3,14 @@ namespace PlayStead.Providers.Steam.Remote;
 public sealed class SteamCmdPathResolver
 {
     private readonly SteamCmdOptions _options;
+    private readonly Func<string, string?> _environment;
 
     public SteamCmdPathResolver(
-        SteamCmdOptions options)
+        SteamCmdOptions options, Func<string, string?>? environment = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = options;
+        _environment = environment ?? Environment.GetEnvironmentVariable;
     }
 
     public string? Resolve()
@@ -21,7 +23,7 @@ public sealed class SteamCmdPathResolver
         }
 
         var localAppData =
-            Environment.GetEnvironmentVariable(
+            _environment(
                 "LOCALAPPDATA");
 
         if (!string.IsNullOrWhiteSpace(localAppData))
@@ -41,7 +43,7 @@ public sealed class SteamCmdPathResolver
         }
 
         var pathValue =
-            Environment.GetEnvironmentVariable(
+            _environment(
                 "PATH");
 
         if (string.IsNullOrWhiteSpace(pathValue))

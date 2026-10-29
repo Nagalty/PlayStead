@@ -86,12 +86,10 @@ public sealed class SteamAppInfoReaderTests
     }
 
     [Fact]
-    public void Real_appinfo_exposes_public_build_and_depot_manifest_evidence_when_present()
+    public void Appinfo_exposes_exact_public_build_and_depot_manifest_from_controlled_payload()
     {
-        var path = @"C:\Program Files (x86)\Steam\appcache\appinfo.vdf";
-        if (!File.Exists(path)) return;
-
-        var result = new SteamAppInfoReader().Find(path, 553850);
+        var bytes = CreateAppInfoWithLibraryAssets(553850, "fixture");
+        var result = new SteamAppInfoReader(_ => new MemoryStream(bytes, writable: false)).Find("fixture.vdf", 553850);
 
         Assert.NotNull(result);
         Assert.Equal("25480438", result!.PublicBuildId);
@@ -236,6 +234,21 @@ public sealed class SteamAppInfoReaderTests
         add.Invoke(assets, ["library_hero", Activator.CreateInstance(objectType, hash)!]);
         add.Invoke(common, ["library_assets", assets]);
         add.Invoke(root, ["common", common]);
+
+        var depots = collection.Invoke(null, null)!;
+        var branches = collection.Invoke(null, null)!;
+        var publicBranch = collection.Invoke(null, null)!;
+        add.Invoke(publicBranch, ["buildid", Activator.CreateInstance(objectType, "25480438")!]);
+        add.Invoke(branches, ["public", publicBranch]);
+        add.Invoke(depots, ["branches", branches]);
+        var depot = collection.Invoke(null, null)!;
+        var manifests = collection.Invoke(null, null)!;
+        var publicManifest = collection.Invoke(null, null)!;
+        add.Invoke(publicManifest, ["gid", Activator.CreateInstance(objectType, "9065746766815828060")!]);
+        add.Invoke(manifests, ["public", publicManifest]);
+        add.Invoke(depot, ["manifests", manifests]);
+        add.Invoke(depots, ["553854", depot]);
+        add.Invoke(root, ["depots", depots]);
 
         using var payload = new MemoryStream();
         serialize.Invoke(serializer, [payload, root, "appinfo", options]);

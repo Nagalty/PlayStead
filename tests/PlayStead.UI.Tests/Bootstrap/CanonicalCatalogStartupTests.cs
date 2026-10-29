@@ -43,7 +43,7 @@ public sealed class CanonicalCatalogStartupTests
             Assert.Equal(Path.Combine(layout.BackupsDirectory, "Catalog"), options.BackupsDirectory);
             Assert.True(File.Exists(layout.DatabasePath));
             Assert.True(File.Exists(options.CatalogPath));
-            Assert.Equal(2, (await store.GetMetadataAsync(CancellationToken.None)).SchemaVersion);
+            Assert.Equal(3, (await store.GetMetadataAsync(CancellationToken.None)).SchemaVersion);
             Assert.NotNull(state.Snapshot);
         }
         finally

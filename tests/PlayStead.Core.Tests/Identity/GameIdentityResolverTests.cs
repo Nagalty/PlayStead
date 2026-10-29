@@ -118,18 +118,19 @@ public sealed class GameIdentityResolverTests
     }
 
     [Theory]
-    [InlineData(ProviderKind.Epic)]
-    [InlineData(ProviderKind.Gog)]
-    [InlineData(ProviderKind.Manual)]
-    public void Unsupported_library_provider_is_not_mapped(
-        ProviderKind provider)
+    [InlineData(ProviderKind.Epic, CatalogProviderKind.Epic)]
+    [InlineData(ProviderKind.Gog, CatalogProviderKind.Gog)]
+    public void Supported_library_providers_map_to_exact_catalog_provider(ProviderKind provider, CatalogProviderKind expected)
     {
-        Assert.False(
-            ProviderKindMapping.TryMap(
-                provider,
-                out _));
+        Assert.True(ProviderKindMapping.TryMap(provider, out var actual));
+        Assert.Equal(expected, actual);
     }
 
+    [Fact]
+    public void Manual_provider_has_no_automatic_catalog_provider()
+    {
+        Assert.False(ProviderKindMapping.TryMap(ProviderKind.Manual, out _));
+    }
     [Fact]
     public async Task CancellationToken_is_propagated_to_catalog_store()
     {

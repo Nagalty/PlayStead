@@ -24,7 +24,7 @@ public sealed class ExecutableInventoryPolicyIntegrationTests
     }
 
     [Fact]
-    public async Task Stable_unobserved_second_executable_blocks_promotion()
+    public async Task Stable_observed_second_executable_blocks_promotion()
     {
         using var directory = new ExecutableInventoryTestDirectory();
         directory.Write("game.exe", [1]);
@@ -33,13 +33,28 @@ public sealed class ExecutableInventoryPolicyIntegrationTests
             .InventoryAsync(Scope(directory.Root), CancellationToken.None);
         var candidate = inventory.Candidates.Single(item => item.ExecutableName == "game.exe");
 
-        var decision = Evaluate(inventory, TwoEpisodes(inventory.Scope, candidate));
-
+        var competitor = inventory.Candidates.Single(item => item.ExecutableName == "other.exe");
+        var decision = Evaluate(inventory, TwoEpisodes(inventory.Scope, candidate, competitor));
         Assert.Equal(InventoryCompleteness.Complete, inventory.Completeness);
         Assert.Equal(2, inventory.Candidates.Count);
         Assert.Equal(DiscoveryDecisionKind.Ambiguous, decision.Kind);
-        Assert.Contains(DiscoveryReason.UnobservedCompetitor, decision.Reasons);
+        Assert.Contains(DiscoveryReason.EquivalentCandidates, decision.Reasons);
         Assert.Null(decision.Main);
+    }
+
+    [Fact]
+    public async Task Inventory_only_executable_does_not_compete_with_repeated_runtime_evidence()
+    {
+        using var directory = new ExecutableInventoryTestDirectory();
+        var path = directory.Write("game.exe", [1]);
+        directory.Write("other.exe", [2]);
+        var inventory = await new WindowsExecutableInventorySource().InventoryAsync(Scope(directory.Root), CancellationToken.None);
+        var candidate = inventory.Candidates.Single(x => x.ExecutableName == "game.exe");
+        var decision = Evaluate(inventory, TwoEpisodes(inventory.Scope, candidate));
+        Assert.Equal(2, inventory.Candidates.Count);
+        Assert.Equal(DiscoveryDecisionKind.PromoteMain, decision.Kind);
+        Assert.Equal(path, decision.Main?.ExecutablePath);
+        Assert.Contains(DiscoveryReason.RepeatedQualifiedEpisodes, decision.Reasons);
     }
 
     [Fact]
@@ -209,15 +224,15 @@ public sealed class ExecutableInventoryPolicyIntegrationTests
             new DiscoveryEvaluation(inventory, episodes, false, null));
 
     private static IReadOnlyList<LearningEpisodeSummary> TwoEpisodes(
-        InstallationScope scope, ExecutableCandidate candidate)
+        InstallationScope scope, ExecutableCandidate candidate, ExecutableCandidate? competitor = null)
     {
         LearningEpisodeSummary Episode(long sequence) => new(
             Guid.NewGuid(), sequence, scope, ProcessSignatureDiscoveryPolicy.CurrentPolicyVersion,
             DateTimeOffset.UnixEpoch.AddMinutes(sequence),
             DateTimeOffset.UnixEpoch.AddMinutes(sequence).AddSeconds(14),
             0, 7, EpisodeQuality.Complete,
-            [new CandidateEpisodeEvidence(candidate.ExecutablePath, candidate.Revision,
-                true, true, [new SnapshotRange(2, 5)])]);
+            new[] { new CandidateEpisodeEvidence(candidate.ExecutablePath, candidate.Revision,
+                true, true, [new SnapshotRange(2, 5)]) }.Concat(competitor is null ? [] : new[] { new CandidateEpisodeEvidence(competitor.ExecutablePath, competitor.Revision, true, true, [new SnapshotRange(2, 5)]) }).ToArray());
         return [Episode(1), Episode(2)];
     }
 }

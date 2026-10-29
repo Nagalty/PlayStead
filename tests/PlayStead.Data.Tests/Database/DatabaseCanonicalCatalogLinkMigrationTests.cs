@@ -25,7 +25,7 @@ public sealed class DatabaseCanonicalCatalogLinkMigrationTests : IDisposable
         await new DatabaseInitializer(options)
             .InitializeAsync(CancellationToken.None);
 
-        Assert.Equal(29,
+        Assert.Equal(34,
             await ReadSchemaVersionAsync(databasePath));
 
         Assert.True(
@@ -42,55 +42,30 @@ public sealed class DatabaseCanonicalCatalogLinkMigrationTests : IDisposable
             await ReadCanonicalContentIdAsync(databasePath));
     }
 
-    private static async Task CreateVersion6FixtureAsync(
-        string databasePath)
+    private static async Task CreateVersion6FixtureAsync(string databasePath)
     {
-        await using var connection = new SqliteConnection(
-            $"Data Source={databasePath};Pooling=False");
-
+        await using var connection = new SqliteConnection($"Data Source={databasePath};Pooling=False");
         await connection.OpenAsync();
-
+        var assembly = typeof(DatabaseInitializer).Assembly;
+        foreach (var resource in assembly.GetManifestResourceNames()
+            .Where(name => name.Contains(".Database.Migrations.", StringComparison.Ordinal))
+            .OrderBy(name => name, StringComparer.Ordinal))
+        {
+            var file = resource.Split(".Database.Migrations.")[1];
+            if (!int.TryParse(file[..3], out var version) || version > 6) continue;
+            using var reader = new StreamReader(assembly.GetManifestResourceStream(resource)!);
+            var migration = connection.CreateCommand();
+            migration.CommandText = await reader.ReadToEndAsync();
+            await migration.ExecuteNonQueryAsync();
+            migration.CommandText = "INSERT INTO schema_migrations(version,applied_utc) VALUES($version,$now)";
+            migration.Parameters.AddWithValue("$version",version);
+            migration.Parameters.AddWithValue("$now",DateTimeOffset.UtcNow.ToString("O"));
+            await migration.ExecuteNonQueryAsync();
+        }
         var command = connection.CreateCommand();
-        command.CommandText = """
-            CREATE TABLE schema_migrations(
-                version INTEGER PRIMARY KEY,
-                applied_utc TEXT NOT NULL
-            );
-
-            CREATE TABLE games(
-                game_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                is_hidden INTEGER NOT NULL,
-                created_utc TEXT NOT NULL,
-                updated_utc TEXT NOT NULL
-            );
-
-            INSERT INTO schema_migrations(version, applied_utc)
-            VALUES
-                (1, '2026-09-01T00:00:00.0000000+00:00'),
-                (2, '2026-09-01T00:00:00.0000000+00:00'),
-                (3, '2026-09-01T00:00:00.0000000+00:00'),
-                (4, '2026-09-01T00:00:00.0000000+00:00'),
-                (5, '2026-09-01T00:00:00.0000000+00:00'),
-                (6, '2026-09-01T00:00:00.0000000+00:00');
-
-            INSERT INTO games(
-                game_id,
-                title,
-                is_hidden,
-                created_utc,
-                updated_utc)
-            VALUES(
-                '11111111-1111-1111-1111-111111111111',
-                'Existing Game',
-                0,
-                '2026-09-01T00:00:00.0000000+00:00',
-                '2026-09-01T00:00:00.0000000+00:00');
-            """;
-
+        command.CommandText = "INSERT INTO games(game_id,title,is_hidden,created_utc,updated_utc) VALUES('11111111-1111-1111-1111-111111111111','Existing Game',0,'2026-09-01','2026-09-01')";
         await command.ExecuteNonQueryAsync();
     }
-
     private static async Task<int> ReadSchemaVersionAsync(
         string databasePath)
     {
