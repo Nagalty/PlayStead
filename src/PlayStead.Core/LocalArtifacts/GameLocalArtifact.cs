@@ -1,4 +1,5 @@
 using PlayStead.Core.Library;
+using PlayStead.Core.LocalEnvironment;
 
 namespace PlayStead.Core.LocalArtifacts;
 
@@ -30,7 +31,8 @@ public sealed record GameLocalArtifactRule(
     string PathTemplate,
     GameLocalArtifactSource Source = GameLocalArtifactSource.ExplicitRule,
     ProviderKind? Provider = null,
-    string? ProviderGameId = null);
+    string? ProviderGameId = null,
+    LocalEnvironmentPathKind PathKind = LocalEnvironmentPathKind.Directory);
 
 public sealed record GameLocalArtifact(
     GameId GameId,

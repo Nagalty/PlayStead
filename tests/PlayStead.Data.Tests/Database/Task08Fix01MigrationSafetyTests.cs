@@ -54,7 +54,7 @@ public sealed class Task08Fix01MigrationSafetyTests : IDisposable
             "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;";
 
         Assert.Equal(
-            29,Convert.ToInt32(
+            34,Convert.ToInt32(
                 await versionCommand.ExecuteScalarAsync()));
 
         var columnsCommand =

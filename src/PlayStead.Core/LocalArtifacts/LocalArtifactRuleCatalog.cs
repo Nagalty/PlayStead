@@ -1,4 +1,5 @@
 using PlayStead.Core.Library;
+using PlayStead.Core.LocalEnvironment;
 
 namespace PlayStead.Core.LocalArtifacts;
 
@@ -45,6 +46,14 @@ public static class LocalArtifactRuleCatalog
             GameLocalArtifactSource.KnownConvention,
             ProviderKind.Steam,
             "1172710"),
+        new(
+            GameId: null,
+            GameLocalArtifactKind.Configuration,
+            @"%LOCALAPPDATA%\DuneSandbox\Saved\Config\Windows\GameUserSettings.ini",
+            GameLocalArtifactSource.KnownConvention,
+            ProviderKind.Steam,
+            "1172710",
+            LocalEnvironmentPathKind.File),
         new(
             GameId: null,
             GameLocalArtifactKind.Log,
