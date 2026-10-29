@@ -15,6 +15,8 @@ using PlayStead.Core.ProviderInstallUpdate;
 using PlayStead.Core.GameBuildHistory;
 using PlayStead.Core.Modding;
 using PlayStead.Core.LocalArtifacts;
+using PlayStead.Core.LocalEnvironment;
+using PlayStead.Core.Configuration;
 using PlayStead.Core.Graphics;
 using CommunityToolkit.Mvvm.Input;
 using System.Globalization;
@@ -35,6 +37,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     private readonly IProviderGameMetadataStore? _providerGameMetadataStore;
     private readonly IManualMetadataLinkStore? _manualMetadataLinkStore;
     private readonly ProviderInstallUpdateStateReconciliationService? _installUpdates;
+    private readonly LocalEnvironmentSectionViewModel? _localEnvironment;
     private readonly GameBuildHistoryService? _gameBuildHistoryService;
     private readonly IGameLocalArtifactDiscoveryService? _localArtifactDiscoveryService;
     private readonly IArtifactFingerprintService? _artifactFingerprintService;
@@ -90,7 +93,15 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ILocalArtifactComparisonService? localArtifactComparisonService = null,
         IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null,
         IManualMetadataLinkStore? manualMetadataLinkStore = null,
-        ProviderInstallUpdateStateReconciliationService? installUpdates = null)
+        ProviderInstallUpdateStateReconciliationService? installUpdates = null,
+        ILibraryStore? libraryStore = null,
+        ILocalEnvironmentDiscoveryService? localEnvironmentDiscoveryService = null,
+        ILocalEnvironmentBaselineStore? localEnvironmentBaselineStore = null,
+        ILocalEnvironmentSnapshotService? localEnvironmentSnapshotService = null,
+        ILocalEnvironmentBaselineService? localEnvironmentBaselineService = null,
+        IBeforeUpdateProtectionPolicyStore? beforeUpdateProtectionPolicyStore = null,
+        IBeforeUpdateProtectionWorkflow? beforeUpdateProtectionWorkflow = null,
+        IConfigSemanticService? configSemanticService = null)
     {
         ArgumentNullException.ThrowIfNull(
             game);
@@ -138,6 +149,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         _providerGameMetadataStore = providerGameMetadataStore;
         _manualMetadataLinkStore = manualMetadataLinkStore;
         _installUpdates = installUpdates;
+        if (libraryStore is not null && localEnvironmentDiscoveryService is not null && localEnvironmentBaselineStore is not null)
+            _localEnvironment = new LocalEnvironmentSectionViewModel(libraryStore, localEnvironmentDiscoveryService, localEnvironmentBaselineStore, localEnvironmentSnapshotService, localEnvironmentBaselineService, policyStore: beforeUpdateProtectionPolicyStore, beforeUpdateWorkflow: beforeUpdateProtectionWorkflow, configSemanticService: configSemanticService);
         _gameBuildHistoryService = gameBuildHistoryService;
         _localArtifactDiscoveryService = localArtifactDiscoveryService;
         _artifactFingerprintService = artifactFingerprintService;
@@ -192,8 +205,16 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         ILocalArtifactComparisonService? localArtifactComparisonService = null,
         IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null,
         IManualMetadataLinkStore? manualMetadataLinkStore = null,
-        ProviderInstallUpdateStateReconciliationService? installUpdates = null)
-        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService, localArtifactComparisonService, graphicsTechnologyDetectionService, manualMetadataLinkStore, installUpdates)
+        ProviderInstallUpdateStateReconciliationService? installUpdates = null,
+        ILibraryStore? libraryStore = null,
+        ILocalEnvironmentDiscoveryService? localEnvironmentDiscoveryService = null,
+        ILocalEnvironmentBaselineStore? localEnvironmentBaselineStore = null,
+        ILocalEnvironmentSnapshotService? localEnvironmentSnapshotService = null,
+        ILocalEnvironmentBaselineService? localEnvironmentBaselineService = null,
+        IBeforeUpdateProtectionPolicyStore? beforeUpdateProtectionPolicyStore = null,
+        IBeforeUpdateProtectionWorkflow? beforeUpdateProtectionWorkflow = null,
+        IConfigSemanticService? configSemanticService = null)
+        : this(game, launch, activity, heroPath, catalogStore, gamesDuMomentService, providerGameMetadataStore, gameBuildHistoryService, localArtifactDiscoveryService, artifactFingerprintService, artifactBaselineStore, artifactBaselineComparisonService, artifactSnapshotService, artifactRestoreService, modEvidenceStore, userDefinedArtifactService, localArtifactComparisonService, graphicsTechnologyDetectionService, manualMetadataLinkStore, installUpdates, libraryStore, localEnvironmentDiscoveryService, localEnvironmentBaselineStore, localEnvironmentSnapshotService, localEnvironmentBaselineService, beforeUpdateProtectionPolicyStore, beforeUpdateProtectionWorkflow, configSemanticService)
     {
         ArgumentNullException.ThrowIfNull(sessionMonitor);
         _sessionMonitor = sessionMonitor;
@@ -210,6 +231,8 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public GameLaunchViewModel? Launch { get; }
 
     public GameQuickPanelViewModel? Activity { get; }
+
+    public LocalEnvironmentSectionViewModel? LocalEnvironment => _localEnvironment;
 
     public string? HeroPath { get; private set; }
 
@@ -294,6 +317,11 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
     public async Task LoadAsync(CancellationToken cancellationToken)
     {
         await (Activity?.LoadSessionSummaryAsync(cancellationToken) ?? Task.CompletedTask);
+        if (_localEnvironment is not null)
+        {
+            await _localEnvironment.LoadAsync(GameId, InstallPath, cancellationToken);
+            OnPropertyChanged(nameof(LocalEnvironment));
+        }
         if (_gamesDuMomentService is not null)
         {
             IsInGamesDuMoment = (await _gamesDuMomentService.GetAsync(cancellationToken)).Any(entry => entry.GameId == GameId);
@@ -566,7 +594,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         }
         catch (SnapshotStorageQuotaExceededException)
         {
-            MessageBox.Show("L’espace réservé aux sauvegardes est plein. Supprime une ancienne sauvegarde ou augmente la limite dans Paramètres.", "Fichiers locaux", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("L’espace réservé aux sauvegardes est plein. Supprime une ancienne sauvegarde ou augmente la limite dans Paramètres.", "Environnement local", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         await LoadLocalArtifactsAsync(CancellationToken.None);
@@ -636,7 +664,7 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
             "Restaurer cette sauvegarde ?", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
         if (answer != MessageBoxResult.OK) return;
         var result = await _localArtifactRestoreService.RestoreAsync(artifact, snapshot, CancellationToken.None);
-        MessageBox.Show(result.Message, "Fichiers locaux", MessageBoxButton.OK,
+        MessageBox.Show(result.Message, "Environnement local", MessageBoxButton.OK,
             result.Succeeded ? MessageBoxImage.Information : MessageBoxImage.Warning);
         if (result.Succeeded) await LoadLocalArtifactsAsync(CancellationToken.None);
     }
@@ -668,11 +696,11 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         }
         catch (ArgumentException error)
         {
-            MessageBox.Show(error.Message, "Fichiers locaux", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(error.Message, "Environnement local", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (InvalidOperationException error)
         {
-            MessageBox.Show(error.Message, "Fichiers locaux", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(error.Message, "Environnement local", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
@@ -685,10 +713,10 @@ public sealed class GameDetailViewModel : INotifyPropertyChanged
         var snapshots = _localArtifactSnapshotService is null ? [] : await _localArtifactSnapshotService.ListAsync(artifact, CancellationToken.None);
         if (baseline is not null || snapshots.Count > 0)
         {
-            MessageBox.Show("Ce dossier a encore un point de repère ou des sauvegardes dans PlayStead.", "Fichiers locaux", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Ce dossier a encore un point de repère ou des sauvegardes dans PlayStead.", "Environnement local", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (MessageBox.Show("Retirer ce dossier de PlayStead ?\n\nRien ne sera supprimé sur ton disque.", "Fichiers locaux", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+        if (MessageBox.Show("Retirer ce dossier de PlayStead ?\n\nRien ne sera supprimé sur ton disque.", "Environnement local", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
         await _userDefinedArtifactService.RemoveAsync(id, CancellationToken.None);
         await LoadLocalArtifactsAsync(CancellationToken.None);
     }

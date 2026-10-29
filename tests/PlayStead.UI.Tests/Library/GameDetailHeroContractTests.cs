@@ -371,7 +371,7 @@ public sealed class GameDetailHeroContractTests
             element.Attributes().Any(attribute =>
                 attribute.Name.LocalName == "Name" && attribute.Value == "GameDetailContentRail"));
         var scrollViewer = document.Descendants().Single(element =>
-            element.Name.LocalName == "ScrollViewer");
+            element.Name.LocalName == "ScrollViewer" && element.Parent == document.Root);
         var heroParent = hero.Parent;
         var contentParent = contentRail.Parent;
 

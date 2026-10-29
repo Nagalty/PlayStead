@@ -55,8 +55,11 @@ using PlayStead.UI.Tray;
 using PlayStead.UI.Updates;
 using PlayStead.Core.Updates;
 using PlayStead.Core.LocalArtifacts;
+using PlayStead.Core.LocalEnvironment;
+using PlayStead.Core.Configuration;
 using PlayStead.Core.Graphics;
 using PlayStead.Data.LocalArtifacts;
+using PlayStead.Data.LocalEnvironment;
 using PlayStead.Providers.Updates;
 using PlayStead.Providers.Graphics;
 
@@ -129,6 +132,35 @@ public static class PlaySteadHost
         builder.Services.AddSingleton<
             ILibraryStore,
             SqliteLibraryStore>();
+            builder.Services.AddSingleton<ILocalEnvironmentStore, SqliteLocalEnvironmentStore>();
+            builder.Services.AddSingleton<ILocalEnvironmentBaselineStore, SqliteLocalEnvironmentBaselineStore>();
+            builder.Services.AddSingleton<IBeforeUpdateProtectionPolicyStore, SqliteBeforeUpdateProtectionPolicyStore>();
+            builder.Services.AddSingleton<ILocalFileSnapshotStore, SqliteLocalFileSnapshotStore>();
+            builder.Services.AddSingleton<ILocalEnvironmentSnapshotService>(services =>
+                new LocalEnvironmentSnapshotService(
+                    services.GetRequiredService<ILocalEnvironmentDiscoveryService>(),
+                    services.GetRequiredService<ILocalFileSnapshotStore>(),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PlayStead", "Snapshots")));
+            builder.Services.AddSingleton<IConfigSemanticService>(services =>
+                new ConfigSemanticService(
+                    new ConfigDocumentAdapterResolver([new IniConfigDocumentAdapter(), new JsonConfigDocumentAdapter()]),
+                    new FileConfigBackupWriter(),
+                    new AtomicConfigFileWriter()));
+            builder.Services.AddSingleton<ILocalEnvironmentContributor, ModRuntimeDetectionContributor>();
+            builder.Services.AddSingleton<ILocalEnvironmentContributor>(services =>
+                new LegacyLocalArtifactEnvironmentContributor(
+                    LocalArtifactRuleCatalog.Rules,
+                    services.GetRequiredService<IUserDefinedLocalArtifactStore>()));
+            builder.Services.AddSingleton<ILocalEnvironmentDiscoveryService>(services =>
+            new LocalEnvironmentDiscoveryService(
+                services.GetServices<ILocalEnvironmentContributor>(),
+                services.GetRequiredService<ILocalEnvironmentStore>(),
+                async (installationId, token) =>
+                {
+                    var snapshot = await services.GetRequiredService<ILibraryStore>().LoadSnapshotAsync(token);
+                    return snapshot.Installations.SingleOrDefault(x => x.Id == installationId);
+                }));
+            builder.Services.AddSingleton<ILocalEnvironmentBaselineService, LocalEnvironmentBaselineService>();
         builder.Services.AddSingleton<IManualGameStore>(services =>
             (IManualGameStore)services.GetRequiredService<ILibraryStore>());
         builder.Services.AddSingleton<ManualGameService>();
@@ -577,13 +609,15 @@ public static class PlaySteadHost
                 services.GetRequiredService<ILocalSnapshotStorageService>()));
         builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IWindowsSilentNotificationSink>(services =>
             services.GetRequiredService<TrayIconService>());
+        builder.Services.AddSingleton<IBeforeUpdateProtectionWorkflow>(services =>
+            new LocalEnvironmentBeforeUpdateProtectionService(
+                services.GetRequiredService<ILibraryStore>(),
+                services.GetRequiredService<ILocalEnvironmentDiscoveryService>(),
+                services.GetRequiredService<ILocalEnvironmentSnapshotService>(),
+                services.GetRequiredService<IBeforeUpdateProtectionPolicyStore>()));
         builder.Services.AddSingleton<PlayStead.Core.ProviderInstallUpdate.IProviderInstallUpdateProtectionService>(services =>
-            new PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateProtectionService(
-                services.GetRequiredService<PlayStead.Core.LocalArtifacts.ILocalProtectionSetupService>(),
-                services.GetRequiredService<PlayStead.Core.LocalArtifacts.ILocalArtifactSnapshotService>(),
-                services.GetRequiredService<PlayStead.Core.Notifications.INotificationCenterService>(),
-                services.GetRequiredService<PlayStead.Core.Persistence.ILibraryStore>(),
-                services.GetRequiredService<PlayStead.Core.ProviderInstallUpdate.IWindowsSilentNotificationSink>()));
+            new PlayStead.Core.ProviderInstallUpdate.ProviderInstallUpdateProtectionPolicyAdapter(
+                services.GetRequiredService<IBeforeUpdateProtectionWorkflow>()));
         builder.Services.AddSingleton<ILocalArtifactRestoreService>(services =>
             new LocalArtifactRestoreService(
                 services.GetRequiredService<IArtifactFingerprintService>(),

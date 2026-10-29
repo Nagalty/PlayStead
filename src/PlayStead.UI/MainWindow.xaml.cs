@@ -12,6 +12,8 @@ using PlayStead.Core.Media;
 using PlayStead.Core.Sessions;
 using PlayStead.Core.ProviderActivity;
 using PlayStead.Core.LocalArtifacts;
+using PlayStead.Core.LocalEnvironment;
+using PlayStead.Core.Configuration;
 using PlayStead.Core.Graphics;
 using PlayStead.UI.Home;
 using PlayStead.UI.Attention;
@@ -72,6 +74,13 @@ public partial class MainWindow : Window
     private readonly ILocalArtifactComparisonService? _localArtifactComparisonService;
     private readonly IGraphicsTechnologyDetectionService? _graphicsTechnologyDetectionService;
     private readonly ProviderInstallUpdateStateReconciliationService? _installUpdates;
+    private readonly ILocalEnvironmentDiscoveryService? _localEnvironmentDiscoveryService;
+    private readonly ILocalEnvironmentBaselineStore? _localEnvironmentBaselineStore;
+    private readonly ILocalEnvironmentSnapshotService? _localEnvironmentSnapshotService;
+    private readonly ILocalEnvironmentBaselineService? _localEnvironmentBaselineService;
+    private readonly IBeforeUpdateProtectionPolicyStore? _beforeUpdateProtectionPolicyStore;
+    private readonly IBeforeUpdateProtectionWorkflow? _beforeUpdateProtectionWorkflow;
+    private readonly IConfigSemanticService? _configSemanticService;
     private GameDetailViewModel? _activeGameDetailViewModel;
     private LibraryUiState? _libraryStateBeforeGameDetail;
 
@@ -476,6 +485,13 @@ public partial class MainWindow : Window
         ILocalArtifactComparisonService? localArtifactComparisonService = null,
         IGraphicsTechnologyDetectionService? graphicsTechnologyDetectionService = null,
         ProviderInstallUpdateStateReconciliationService? installUpdates = null,
+        ILocalEnvironmentDiscoveryService? localEnvironmentDiscoveryService = null,
+        ILocalEnvironmentBaselineStore? localEnvironmentBaselineStore = null,
+        ILocalEnvironmentSnapshotService? localEnvironmentSnapshotService = null,
+        ILocalEnvironmentBaselineService? localEnvironmentBaselineService = null,
+        IBeforeUpdateProtectionPolicyStore? beforeUpdateProtectionPolicyStore = null,
+        IBeforeUpdateProtectionWorkflow? beforeUpdateProtectionWorkflow = null,
+        IConfigSemanticService? configSemanticService = null,
         StartupProgressState? startupProgress = null)
         : this(viewModel, windowPlacementService, windowClosePolicy,
             sessionViewModel, navigationService, shellViewModel,
@@ -505,6 +521,13 @@ public partial class MainWindow : Window
         _localArtifactComparisonService = localArtifactComparisonService;
         _graphicsTechnologyDetectionService = graphicsTechnologyDetectionService;
         _installUpdates = installUpdates;
+        _localEnvironmentDiscoveryService = localEnvironmentDiscoveryService;
+        _localEnvironmentBaselineStore = localEnvironmentBaselineStore;
+        _localEnvironmentSnapshotService = localEnvironmentSnapshotService;
+        _localEnvironmentBaselineService = localEnvironmentBaselineService;
+        _beforeUpdateProtectionPolicyStore = beforeUpdateProtectionPolicyStore;
+        _beforeUpdateProtectionWorkflow = beforeUpdateProtectionWorkflow;
+        _configSemanticService = configSemanticService;
         _aboutViewModel = distributionChannelProvider is null
             ? null
             : new AboutViewModel(distributionChannelProvider);
@@ -937,7 +960,15 @@ public partial class MainWindow : Window
                         _localArtifactComparisonService,
                         _graphicsTechnologyDetectionService,
                         libraryViewModel.ManualMetadataLinkStore,
-                        _installUpdates)
+                        _installUpdates,
+                        libraryViewModel.LibraryStore,
+                        _localEnvironmentDiscoveryService,
+                        _localEnvironmentBaselineStore,
+                        _localEnvironmentSnapshotService,
+                        _localEnvironmentBaselineService,
+                        _beforeUpdateProtectionPolicyStore,
+                        _beforeUpdateProtectionWorkflow,
+                        _configSemanticService)
                     : new GameDetailViewModel(
                         game,
                         CreateLaunchModel(libraryViewModel, gameId),
@@ -961,7 +992,15 @@ public partial class MainWindow : Window
                         _localArtifactComparisonService,
                         _graphicsTechnologyDetectionService,
                         libraryViewModel.ManualMetadataLinkStore,
-                        _installUpdates);
+                        _installUpdates,
+                        libraryViewModel.LibraryStore,
+                        _localEnvironmentDiscoveryService,
+                        _localEnvironmentBaselineStore,
+                        _localEnvironmentSnapshotService,
+                        _localEnvironmentBaselineService,
+                        _beforeUpdateProtectionPolicyStore,
+                        _beforeUpdateProtectionWorkflow,
+                        _configSemanticService);
 
                 _activeGameDetailViewModel = gameDetailViewModel;
 

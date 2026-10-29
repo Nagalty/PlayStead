@@ -45,7 +45,8 @@ public sealed class GameDetailVisualContractTests
         Assert.Contains("Title=\"Technologies graphiques\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Title=\"Activité récente\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Title=\"Infos générales\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Title=\"Fichiers locaux\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Environnement local\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Dossiers surveillés\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]

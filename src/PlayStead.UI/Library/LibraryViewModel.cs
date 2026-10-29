@@ -34,6 +34,7 @@ public sealed class LibraryViewModel :
     private readonly ICanonicalGameMediaResolver? _canonicalMediaResolver;
     private readonly CanonicalProviderIdentityLinker? _canonicalIdentityLinker;
     public ICanonicalCatalogStore? CanonicalCatalogStore { get; }
+    public ILibraryStore LibraryStore => _libraryStore;
     public IGamesDuMomentService? GamesDuMomentService { get; }
     private readonly UiPreferencesStore? _uiPreferencesStore;
     private readonly ISteamReferenceRuntime? _steamReferenceRuntime;

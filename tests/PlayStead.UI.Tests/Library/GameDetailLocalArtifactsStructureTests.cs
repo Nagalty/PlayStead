@@ -9,7 +9,8 @@ public sealed class GameDetailLocalArtifactsStructureTests
         var xaml = File.ReadAllText(path);
 
         Assert.Contains("x:Name=\"LocalArtifactsSection\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Visibility=\"Visible\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Visibility=\"Collapsed\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Environnement local\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Je ne connais encore aucun dossier important pour ce jeu.", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding AddUserDefinedArtifactCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding DataContext.RemoveUserDefinedArtifactCommand", xaml, StringComparison.Ordinal);

@@ -34,7 +34,7 @@ public sealed class GameDetailHeroBackdropLayoutTests
         Assert.Equal(
             "24,-30,24,24",
             (string?)contentInset.Attribute("Margin"));
-        var scrollViewer = document.Descendants().Single(element => element.Name.LocalName == "ScrollViewer");
+        var scrollViewer = document.Descendants().Single(element => element.Name.LocalName == "ScrollViewer" && element.Parent == document.Root);
         Assert.Equal("Stretch", (string?)scrollViewer.Attribute("HorizontalContentAlignment"));
         Assert.Contains("MinHeight=\"320\"", View, StringComparison.Ordinal);
     }

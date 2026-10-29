@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using PlayStead.Core.LocalEnvironment;
 
 namespace PlayStead.UI.Library;
 
@@ -39,8 +40,16 @@ public partial class GameDetailView :
     {
         if (DataContext is GameDetailViewModel viewModel)
         {
+            viewModel.LocalEnvironment?.CancelPendingOperations();
             viewModel.Deactivate();
         }
+    }
+
+    private async void BeforeUpdatePolicyComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.AddedItems.Count == 0 || DataContext is not GameDetailViewModel viewModel || viewModel.LocalEnvironment is null) return;
+        if (e.AddedItems[0] is BeforeUpdateProtectionPolicyOption option && viewModel.LocalEnvironment.SetBeforeUpdatePolicyCommand.CanExecute(option))
+            await viewModel.LocalEnvironment.SetBeforeUpdatePolicyCommand.ExecuteAsync(option);
     }
 
     private void GameDetailView_OnSizeChanged(
@@ -60,6 +69,8 @@ public partial class GameDetailView :
                 GridLength.Auto;
             DetailColumns.RowDefinitions[1].Height =
                 new GridLength(0);
+            DetailColumns.RowDefinitions[2].Height =
+                GridLength.Auto;
 
             Grid.SetColumn(
                 GameActivity,
@@ -88,6 +99,8 @@ public partial class GameDetailView :
             DetailColumns.RowDefinitions[0].Height =
                 GridLength.Auto;
             DetailColumns.RowDefinitions[1].Height =
+                GridLength.Auto;
+            DetailColumns.RowDefinitions[2].Height =
                 GridLength.Auto;
 
             Grid.SetColumn(

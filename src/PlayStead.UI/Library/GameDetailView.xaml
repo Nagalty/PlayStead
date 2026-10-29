@@ -305,6 +305,8 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -461,7 +463,7 @@
                 </StackPanel>
 
                 <Border x:Name="RecentActivity"
-                        Grid.Row="2"
+                        Grid.Row="3"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0"
@@ -499,7 +501,124 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,18,0,0"
+                <Border x:Name="LocalEnvironmentSection"
+                        Grid.Row="2"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        Margin="0,18,0,0"
+                        Style="{DynamicResource PlayStead.Surface.Card}"
+                        Visibility="{Binding LocalEnvironment.IsVisible, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="{DynamicResource PlayStead.Icon.Folder}" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
+                            <controls:SectionHeader Title="Environnement local"/>
+                        </StackPanel>
+                        <TextBlock Margin="0,6,0,0" Text="Configs, sauvegardes, logs et composants détectés sur cette installation." Style="{DynamicResource PlayStead.Text.BodySecondary}" TextWrapping="Wrap"/>
+                        <TextBlock Margin="0,8,0,0" Text="{Binding LocalEnvironment.CustomizationLabel}" Style="{DynamicResource PlayStead.Text.BodySecondary}" Visibility="{Binding LocalEnvironment.IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <WrapPanel Margin="0,10,0,0">
+                            <Border Margin="0,0,8,8" Padding="10,8" MinWidth="160" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.HasConfigSummary, Converter={StaticResource BooleanToVisibilityConverter}}"><StackPanel><TextBlock Text="Configurations" Style="{DynamicResource PlayStead.Text.Caption}"/><TextBlock Margin="0,3,0,0" Text="{Binding LocalEnvironment.ConfigSummary}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap"/><Button Margin="0,6,0,0" Padding="8,4" Content="Voir les changements" Command="{Binding LocalEnvironment.ViewConfigChangesCommand}" Visibility="{Binding LocalEnvironment.HasConfigSemanticChanges, Converter={StaticResource BooleanToVisibilityConverter}}"/></StackPanel></Border>
+                            <Border Margin="0,0,8,8" Padding="10,8" MinWidth="160" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.HasSaveSummary, Converter={StaticResource BooleanToVisibilityConverter}}"><StackPanel><TextBlock Text="Sauvegardes" Style="{DynamicResource PlayStead.Text.Caption}"/><TextBlock Margin="0,3,0,0" Text="{Binding LocalEnvironment.SaveSummary}" Style="{DynamicResource PlayStead.Text.Body}"/></StackPanel></Border>
+                            <Border Margin="0,0,8,8" Padding="10,8" MinWidth="160" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.HasLogSummary, Converter={StaticResource BooleanToVisibilityConverter}}"><StackPanel><TextBlock Text="Logs" Style="{DynamicResource PlayStead.Text.Caption}"/><TextBlock Margin="0,3,0,0" Text="{Binding LocalEnvironment.LogSummary}" Style="{DynamicResource PlayStead.Text.Body}"/></StackPanel></Border>
+                            <Border Margin="0,0,8,8" Padding="10,8" MinWidth="160" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.HasModSummary, Converter={StaticResource BooleanToVisibilityConverter}}"><StackPanel><TextBlock Text="Mods / composants" Style="{DynamicResource PlayStead.Text.Caption}"/><TextBlock Margin="0,3,0,0" Text="{Binding LocalEnvironment.ModSummary}" Style="{DynamicResource PlayStead.Text.Body}"/></StackPanel></Border>
+                            <Border Margin="0,0,8,8" Padding="10,8" MinWidth="160" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.HasBaselineSummary, Converter={StaticResource BooleanToVisibilityConverter}}"><StackPanel><TextBlock Text="Référence locale" Style="{DynamicResource PlayStead.Text.Caption}"/><TextBlock Margin="0,3,0,0" Text="{Binding LocalEnvironment.BaselineSummary}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap"/></StackPanel></Border>
+                            <Border Margin="0,0,8,8" Padding="10,8" MinWidth="160" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.HasSnapshotSummary, Converter={StaticResource BooleanToVisibilityConverter}}"><StackPanel><TextBlock Text="Protection des réglages" Style="{DynamicResource PlayStead.Text.Caption}"/><TextBlock Margin="0,3,0,0" Text="{Binding LocalEnvironment.SnapshotSummary}" Style="{DynamicResource PlayStead.Text.Body}"/></StackPanel></Border>
+                        </WrapPanel>
+                        <Border Margin="0,2,0,0" Padding="12" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.IsChangesPanelVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="Fermer" Command="{Binding LocalEnvironment.CloseConfigChangesCommand}" Style="{DynamicResource PlayStead.Button.Secondary}"/>
+                                    <TextBlock Text="Changements de configuration" Style="{DynamicResource PlayStead.Text.SectionTitle}"/>
+                                </DockPanel>
+                                <TextBlock Margin="0,4,0,8" Text="Voici les réglages qui diffèrent de la version précédente." Style="{DynamicResource PlayStead.Text.BodySecondary}" TextWrapping="Wrap"/>
+                                <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding LocalEnvironment.ConfigChanges.Changes}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,0,6" Padding="8" Style="{DynamicResource PlayStead.Surface.CardNested}">
+                                                    <DockPanel>
+                                                        <CheckBox DockPanel.Dock="Right" Margin="8,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding CanSelect}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Visibility="{Binding CanSelect, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding DisplayName}" Style="{DynamicResource PlayStead.Text.Body}"/>
+                                                            <TextBlock Margin="0,2,0,0" Text="{Binding ValuesLabel}" Style="{DynamicResource PlayStead.Text.BodySecondary}" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Margin="0,2,0,0" Text="{Binding KindLabel}" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                                            <TextBlock Margin="0,2,0,0" Text="{Binding RestoreStatusLabel}" Style="{DynamicResource PlayStead.Text.Caption}" Visibility="{Binding HasRestoreStatus, Converter={StaticResource BooleanToVisibilityConverter}}" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                                <Button Margin="0,8,0,0" Content="Restaurer les réglages sélectionnés" Command="{Binding LocalEnvironment.ConfigChanges.RestoreSelectedChangesCommand}"/>
+                                <TextBlock Margin="0,8,0,0" Text="{Binding LocalEnvironment.ConfigChanges.Feedback}" Style="{DynamicResource PlayStead.Text.BodySecondary}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Margin="0,4,0,0" Text="Aucune donnée locale connue pour cette installation." Style="{DynamicResource PlayStead.Text.BodySecondary}" Visibility="{Binding LocalEnvironment.HasEmptyState, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Border Margin="0,10,0,0" Padding="10,8" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.HasBeforeUpdatePolicy, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <DockPanel>
+                                <TextBlock Text="Avant une mise à jour" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Body}"/>
+                                <ComboBox DockPanel.Dock="Right" Width="130" Style="{DynamicResource PlayStead.ComboBox.Dark}" ItemsSource="{Binding LocalEnvironment.BeforeUpdatePolicyOptions}" ItemTemplate="{DynamicResource PlayStead.ComboBox.PolicyItemTemplate}" SelectedValuePath="Value" SelectedValue="{Binding LocalEnvironment.BeforeUpdatePolicy, Mode=OneWay}" SelectionChanged="BeforeUpdatePolicyComboBox_SelectionChanged"/>
+                            </DockPanel>
+                        </Border>
+                        <Border Margin="0,8,0,0" Padding="10,8" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.HasBeforeUpdatePrompt, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding LocalEnvironment.BeforeUpdatePromptMessage}" Style="{DynamicResource PlayStead.Text.Body}" TextWrapping="Wrap"/>
+                                <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                                    <Button Content="Protéger" Command="{Binding LocalEnvironment.AcceptBeforeUpdatePromptCommand}"/>
+                                    <Button Margin="8,0,0,0" Content="Pas cette fois" Command="{Binding LocalEnvironment.DeclineBeforeUpdatePromptCommand}" Style="{DynamicResource PlayStead.Button.Secondary}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Margin="0,6,0,0" Text="{Binding LocalEnvironment.BeforeUpdateStatusMessage}" Style="{DynamicResource PlayStead.Text.BodySecondary}" Visibility="{Binding LocalEnvironment.HasBeforeUpdateStatusMessage, Converter={StaticResource BooleanToVisibilityConverter}}" TextWrapping="Wrap"/>
+                        <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding LocalEnvironment.EnvironmentEntries}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,3,0,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Name}" Style="{DynamicResource PlayStead.Text.Body}"/>
+                                            <TextBlock Margin="8,0,0,0" Text="{Binding StatusLabel}" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                        </StackPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                            <Button Margin="8,0,0,0" Content="Ouvrir" Command="{Binding DataContext.LocalEnvironment.OpenEntryCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Visibility="{Binding CanOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                            <Button Margin="8,0,0,0" Content="Protéger maintenant" Command="{Binding DataContext.LocalEnvironment.CreateSnapshotCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Visibility="{Binding CanSnapshot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Margin="0,10,0,0" Padding="10,8" Style="{DynamicResource PlayStead.Surface.CardNested}" Visibility="{Binding LocalEnvironment.HasSnapshots, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <StackPanel>
+                                <DockPanel>
+                                    <TextBlock Text="Protection des réglages" Style="{DynamicResource PlayStead.Text.Body}"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding LocalEnvironment.SnapshotQuotaLabel}" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                </DockPanel>
+                                <TextBlock Margin="0,2,0,6" Text="{Binding LocalEnvironment.SnapshotFeedback}" Style="{DynamicResource PlayStead.Text.BodySecondary}" Visibility="{Binding LocalEnvironment.HasSnapshotFeedback, Converter={StaticResource BooleanToVisibilityConverter}}" TextWrapping="Wrap"/>
+                                <ItemsControl ItemsSource="{Binding LocalEnvironment.Snapshots}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,3,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" Style="{DynamicResource PlayStead.Text.Body}"/>
+                                                    <TextBlock Text="{Binding ReasonLabel}" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                                    <TextBlock Text="{Binding CreatedLabel}" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                                </StackPanel>
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                    <TextBlock Margin="8,0,0,0" Text="{Binding SizeLabel}" VerticalAlignment="Center" Style="{DynamicResource PlayStead.Text.Caption}"/>
+                                                    <Button Margin="8,0,0,0" Content="Restaurer" Command="{Binding DataContext.LocalEnvironment.RestoreSnapshotCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"/>
+                                                    <Button Margin="8,0,0,0" Content="Supprimer" Command="{Binding DataContext.LocalEnvironment.DeleteSnapshotCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Style="{DynamicResource PlayStead.Button.Secondary}"/>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                        <Button Margin="0,10,0,0" Content="Utiliser cet état comme référence" Command="{Binding LocalEnvironment.SetBaselineCommand}" HorizontalAlignment="Left"/>
+                        <Button Margin="0,6,0,0" Content="Ajouter un dossier à surveiller" Command="{Binding AddUserDefinedArtifactCommand}" HorizontalAlignment="Left" Style="{DynamicResource PlayStead.Button.Secondary}"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,18,0,0"
                         Style="{DynamicResource PlayStead.Surface.Card}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
@@ -554,7 +673,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="4"
+                <Border Grid.Row="5"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0"
@@ -572,7 +691,7 @@
                 </Border>
 
                 <Border x:Name="BuildHistorySection"
-                        Grid.Row="5"
+                        Grid.Row="6"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0"
@@ -616,16 +735,16 @@
                 </Border>
 
                 <Border x:Name="LocalArtifactsSection"
-                        Grid.Row="5"
+                        Grid.Row="7"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0"
                         Style="{DynamicResource PlayStead.Surface.Card}"
-                        Visibility="Visible">
+                        Visibility="Collapsed">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <Path Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Data="M1,5 H8 L10,3 H19 V17 H1 Z" Style="{DynamicResource PlayStead.Icon.Navigation}" Fill="Transparent" Stroke="{DynamicResource PlayStead.Brush.TextSecondary}" StrokeThickness="1.5" Stretch="Uniform"/>
-                            <controls:SectionHeader Title="Fichiers locaux" />
+                            <controls:SectionHeader Title="Dossiers surveillés" />
                         </StackPanel>
                         <TextBlock Text="Protège les sauvegardes, configurations et fichiers importants de ce jeu."
                                    Style="{DynamicResource PlayStead.Text.BodySecondary}"
